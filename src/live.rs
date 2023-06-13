@@ -108,10 +108,12 @@ impl Client {
         let mut greeting = String::new();
         // Greeting
         reader.read_line(&mut greeting).await?;
+        greeting.pop(); // remove newline
         debug!("Greeting: {greeting}");
         let mut response = String::new();
         // Challenge
         reader.read_line(&mut response).await?;
+        response.pop(); // remove newline
 
         let challenge = if response.starts_with("cram=") {
             response.split_once('=').unwrap().1
@@ -144,6 +146,7 @@ impl Client {
             .read_line(&mut response)
             .await
             .with_context(|| "Failed to receive authentication response")?;
+        response.pop(); // remove newline
 
         let mut auth_keys: HashMap<String, String> = response
             .split('|')
