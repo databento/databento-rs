@@ -16,7 +16,7 @@ anyhow = "1.0"
 # Historical auth
 base64 = { version = "0.21.2", optional = true }
 # binary encoding
-dbn = { version = "=0.6.1", path = "../dbn/rust/dbn", features = ["async", "serde"] }
+dbn = { path = "../dbn/rust/dbn", features = ["async", "serde"] }
 # Hex encoding used for Live authentication
 hex = { version = "0.4", optional = true }
 # Logging
