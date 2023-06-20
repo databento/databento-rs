@@ -1,3 +1,6 @@
+// TODO(cg): remove
+#![allow(unused)]
+
 use std::collections::HashMap;
 
 use dbn::enums::{Encoding, Schema};
@@ -81,8 +84,6 @@ pub enum DatasetCondition {
     Degraded,
     Pending,
     Missing,
-    #[deprecated(since = "0.1.0")]
-    Bad,
 }
 
 #[derive(Debug, Clone, TypedBuilder)]

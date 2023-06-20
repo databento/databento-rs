@@ -163,7 +163,7 @@ impl Client {
             ));
         }
         debug!("{response}");
-        return Ok(auth_keys.remove("session_id").unwrap_or_default());
+        Ok(auth_keys.remove("session_id").unwrap_or_default())
     }
 
     pub async fn close(mut self) {

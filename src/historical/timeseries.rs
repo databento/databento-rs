@@ -1,3 +1,6 @@
+// TODO(cg): remove
+#![allow(dead_code, unused)]
+
 use dbn::record_ref::RecordRef;
 
 pub struct TimeseriesClient<'a> {
