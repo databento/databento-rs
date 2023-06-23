@@ -190,12 +190,12 @@ impl Client {
     pub async fn start(&mut self) -> anyhow::Result<Metadata> {
         info!("Starting session");
         self.connection.write_all(b"start_session\n").await?;
-        AsyncMetadataDecoder::new(self.decoder.get_mut())
+        Ok(AsyncMetadataDecoder::new(self.decoder.get_mut())
             .decode()
-            .await
+            .await?)
     }
 
-    pub async fn next_record(&mut self) -> std::io::Result<Option<RecordRef>> {
+    pub async fn next_record(&mut self) -> dbn::Result<Option<RecordRef>> {
         self.decoder.decode_ref().await
     }
 }
