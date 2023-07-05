@@ -3,8 +3,13 @@ name = "databento"
 authors = ["Databento <support@databento.com>"]
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/databento/databento-rs"
 description = "Official Databento client library"
 license = "Apache-2.0"
+# maximum of 5
+keywords = ["real-time", "historical", "market-data", "trading", "tick-data"]
+# see https://crates.io/category_slugs
+categories = ["api-bindings", "finance"]
 
 [features]
 default = ["historical", "live"]
@@ -12,7 +17,6 @@ historical = ["dep:base64", "dep:reqwest", "dep:serde", "dep:serde_json", "time/
 live = ["dep:hex", "dep:sha2"]
 
 [dependencies]
-anyhow = "1.0"
 # Historical auth
 base64 = { version = "0.21.2", optional = true }
 # binary encoding
@@ -28,6 +32,8 @@ serde = { version = "1.0", optional = true, features = ["derive"] }
 serde_json = { version = "1.0", optional = true }
 # Used for Live authentication
 sha2 = { version = "0.10", optional = true }
+# Error handling
+thiserror = "1.0.40"
 # Dates and datetimes
 time = "0.3"
 # Async run time

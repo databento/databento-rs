@@ -14,40 +14,40 @@ pub struct MetadataClient<'a> {
 }
 
 impl MetadataClient<'_> {
-    pub async fn list_publishers(&mut self) -> anyhow::Result<HashMap<String, u16>> {
+    pub async fn list_publishers(&mut self) -> crate::Result<HashMap<String, u16>> {
         todo!()
     }
 
-    pub async fn list_datasets(&mut self) -> anyhow::Result<Vec<String>> {
+    pub async fn list_datasets(&mut self) -> crate::Result<Vec<String>> {
         todo!()
     }
 
-    pub async fn list_schemas(&mut self, dataset: &str) -> anyhow::Result<Vec<String>> {
+    pub async fn list_schemas(&mut self, dataset: &str) -> crate::Result<Vec<String>> {
         todo!()
     }
 
     pub async fn list_fields(
         &mut self,
         params: &ListFieldsParams<'_>,
-    ) -> anyhow::Result<HashMap<String, HashMap<Encoding, HashMap<Schema, Vec<String>>>>> {
+    ) -> crate::Result<HashMap<String, HashMap<Encoding, HashMap<Schema, Vec<String>>>>> {
         todo!()
     }
 
     pub async fn list_unit_prices(
         &mut self,
         params: &ListUnitPricesParams<'_>,
-    ) -> anyhow::Result<HashMap<FeedMode, HashMap<Schema, f64>>> {
+    ) -> crate::Result<HashMap<FeedMode, HashMap<Schema, f64>>> {
         todo!()
     }
 
     pub async fn get_dataset_condition(
         &mut self,
         params: &GetDatasetConditionParams<'_>,
-    ) -> anyhow::Result<Vec<DatasetConditionDetail>> {
+    ) -> crate::Result<Vec<DatasetConditionDetail>> {
         todo!()
     }
 
-    pub async fn get_dataset_range(&mut self, dataset: &str) -> anyhow::Result<DatasetRange> {
+    pub async fn get_dataset_range(&mut self, dataset: &str) -> crate::Result<DatasetRange> {
         Ok(self
             .inner
             .get("/v0/metadata.get_dataset_range")
@@ -58,15 +58,15 @@ impl MetadataClient<'_> {
             .await?)
     }
 
-    pub async fn get_record_count(&mut self) -> anyhow::Result<Vec<String>> {
+    pub async fn get_record_count(&mut self) -> crate::Result<Vec<String>> {
         todo!()
     }
 
-    pub async fn get_billable_size(&mut self) -> anyhow::Result<Vec<String>> {
+    pub async fn get_billable_size(&mut self) -> crate::Result<Vec<String>> {
         todo!()
     }
 
-    pub async fn get_cost(&mut self) -> anyhow::Result<Vec<String>> {
+    pub async fn get_cost(&mut self) -> crate::Result<Vec<String>> {
         todo!()
     }
 }

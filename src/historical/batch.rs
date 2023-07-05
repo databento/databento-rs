@@ -14,7 +14,7 @@ pub struct BatchClient<'a> {
 }
 
 impl BatchClient<'_> {
-    pub async fn submit_job(&mut self, params: &SubmitJobParams<'_>) -> anyhow::Result<BatchJob> {
+    pub async fn submit_job(&mut self, params: &SubmitJobParams<'_>) -> crate::Result<BatchJob> {
         let mut builder = self
             .inner
             .get("/v0/batch.submit_job")
@@ -40,7 +40,7 @@ impl BatchClient<'_> {
         Ok(builder.send().await?.json().await?)
     }
 
-    pub async fn list_jobs(&mut self, params: &ListJobsParams) -> anyhow::Result<Vec<BatchJob>> {
+    pub async fn list_jobs(&mut self, params: &ListJobsParams) -> crate::Result<Vec<BatchJob>> {
         let mut builder = self.inner.get("/v0/batch.list_jobs");
         if let Some(ref states) = params.states {
             let states_str = states.iter().fold(String::new(), |mut acc, s| {
@@ -59,7 +59,7 @@ impl BatchClient<'_> {
         Ok(builder.send().await?.json().await?)
     }
 
-    pub async fn list_files(&mut self, job_id: &str) -> anyhow::Result<Vec<String>> {
+    pub async fn list_files(&mut self, job_id: &str) -> crate::Result<Vec<String>> {
         Ok(self
             .inner
             .get("/v0/batch.list_files")
@@ -70,7 +70,7 @@ impl BatchClient<'_> {
             .await?)
     }
 
-    pub async fn download() -> anyhow::Result<()> {
+    pub async fn download() -> crate::Result<()> {
         todo!()
     }
 }

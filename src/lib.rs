@@ -1,9 +1,15 @@
+pub mod error;
 #[cfg(feature = "historical")]
 pub mod historical;
 #[cfg(feature = "live")]
 pub mod live;
+
+pub use error::{Error, Result};
+#[cfg(feature = "historical")]
+pub use historical::Client as HistoricalClient;
 #[cfg(feature = "live")]
 pub use live::Client as LiveClient;
+
 use std::fmt::Write;
 
 #[derive(Debug, Clone)]

@@ -14,7 +14,7 @@ pub struct Client {
 const USER_AGENT: &str = concat!("Databento/", env!("CARGO_PKG_VERSION"), " Rust");
 
 impl Client {
-    pub fn new(api_key: String, gateway: HistoricalGateway) -> anyhow::Result<Self> {
+    pub fn new(api_key: String, gateway: HistoricalGateway) -> crate::Result<Self> {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(ACCEPT, "application/json".parse().unwrap());
         headers.insert(
