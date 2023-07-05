@@ -112,7 +112,7 @@ pub enum JobState {
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct SubmitJobParams<'a> {
     pub dataset: &'a str,
-    pub symbols: Symbols<'a>,
+    pub symbols: Symbols,
     pub schema: Schema,
     pub date_time_range: DateTimeRange,
     #[builder(default = Compression::ZStd)]

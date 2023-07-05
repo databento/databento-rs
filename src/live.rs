@@ -14,13 +14,15 @@ use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf},
     net::{TcpStream, ToSocketAddrs},
 };
+use typed_builder::TypedBuilder;
 
 use crate::{Error, Symbols};
 
-#[derive(Debug, Clone)]
-pub struct Subscription<'a> {
-    pub symbols: Symbols<'a>,
+#[derive(Debug, Clone, TypedBuilder)]
+pub struct Subscription {
+    pub symbols: Symbols,
     pub schema: Schema,
+    #[builder(default)]
     pub start: Option<OffsetDateTime>,
     pub stype_in: SType,
 }
@@ -177,11 +179,11 @@ impl Client {
             .expect("Error on disconnect");
     }
 
-    pub async fn subscribe(&mut self, sub: &Subscription<'_>) -> crate::Result<()> {
+    pub async fn subscribe(&mut self, sub: &Subscription) -> crate::Result<()> {
         let Subscription {
             schema, stype_in, ..
         } = &sub;
-        let sym_str = sub.symbols.to_string();
+        let sym_str = sub.symbols.to_api_string();
         let args = format!("schema={schema}|stype_in={stype_in}|symbols={sym_str}");
 
         let sub_str = if let Some(start) = sub.start.as_ref() {

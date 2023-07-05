@@ -45,8 +45,8 @@ impl AddToQuery<DateTimeRange> for reqwest::RequestBuilder {
     }
 }
 
-impl AddToQuery<Symbols<'_>> for reqwest::RequestBuilder {
-    fn add_to_query(self, param: &Symbols<'_>) -> Self {
-        self.query(&[("symbols", param.to_string())])
+impl AddToQuery<Symbols> for reqwest::RequestBuilder {
+    fn add_to_query(self, param: &Symbols) -> Self {
+        self.query(&[("symbols", param.to_api_string())])
     }
 }
