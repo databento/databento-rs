@@ -147,7 +147,10 @@ impl Client {
                 format!("auth={encoded_response}-{bucket_id}|dataset={dataset}|encoding=dbn|ts_out={send_ts_out}\n");
 
         // Send CRAM reply
-        debug!("[{dataset}] Sending CRAM reply: {reply}");
+        debug!(
+            "[{dataset}] Sending CRAM reply: {}",
+            &reply[..reply.len() - 1]
+        );
         writer.write_all(reply.as_bytes()).await.unwrap();
 
         response.clear();
@@ -192,7 +195,11 @@ impl Client {
             format!("{args}\n")
         };
 
-        debug!("[{}] Subscribing: {sub_str}", self.dataset);
+        debug!(
+            "[{}] Subscribing: {}",
+            self.dataset,
+            &sub_str[..sub_str.len() - 1]
+        );
         Ok(self.connection.write_all(sub_str.as_bytes()).await?)
     }
 
