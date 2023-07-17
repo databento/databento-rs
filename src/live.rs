@@ -187,9 +187,9 @@ impl Client {
         let args = format!("schema={schema}|stype_in={stype_in}|symbols={sym_str}");
 
         let sub_str = if let Some(start) = sub.start.as_ref() {
-            format!("{args}|start={}", start.unix_timestamp_nanos())
+            format!("{args}|start={}\n", start.unix_timestamp_nanos())
         } else {
-            args
+            format!("{args}\n")
         };
 
         debug!("[{}] Subscribing: {sub_str}", self.dataset);
