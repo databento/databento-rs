@@ -1,0 +1,36 @@
+name: build
+on: push
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    name: build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      # Cargo setup
+      - name: Set up Cargo cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - name: Format
+        run: scripts/format.sh
+        shell: bash
+      - name: Build
+        run: scripts/build.sh
+        shell: bash
+      - name: Lint
+        run: scripts/lint.sh
+        shell: bash
+      - name: Test
+        run: scripts/test.sh
+        shell: bash

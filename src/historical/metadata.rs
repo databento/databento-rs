@@ -1,126 +1,651 @@
-// TODO(cg): remove
-#![allow(unused)]
+//! Historical metadata download API.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, num::NonZeroU64, str::FromStr};
 
-use dbn::enums::{Encoding, Schema};
-use serde::Deserialize;
+use dbn::enums::{Encoding, SType, Schema};
+use reqwest::RequestBuilder;
+use serde::{Deserialize, Deserializer};
 use typed_builder::TypedBuilder;
 
-use super::DateTimeRange;
+use crate::Symbols;
 
+use super::{AddToQuery, DateRange, DateTimeRange};
+
+/// A client for the metadata group of Historical API endpoints.
 pub struct MetadataClient<'a> {
-    pub(crate) inner: &'a mut reqwest::Client,
+    pub(crate) inner: &'a mut super::Client,
 }
 
 impl MetadataClient<'_> {
+    /// Lists all publisher ID mappings.
+    ///
+    /// # Errors
+    /// This function returns an error when it fails to communicate with the Databento API.
     pub async fn list_publishers(&mut self) -> crate::Result<HashMap<String, u16>> {
-        todo!()
-    }
-
-    pub async fn list_datasets(&mut self) -> crate::Result<Vec<String>> {
-        todo!()
-    }
-
-    pub async fn list_schemas(&mut self, dataset: &str) -> crate::Result<Vec<String>> {
-        todo!()
-    }
-
-    pub async fn list_fields(
-        &mut self,
-        params: &ListFieldsParams<'_>,
-    ) -> crate::Result<HashMap<String, HashMap<Encoding, HashMap<Schema, Vec<String>>>>> {
-        todo!()
-    }
-
-    pub async fn list_unit_prices(
-        &mut self,
-        params: &ListUnitPricesParams<'_>,
-    ) -> crate::Result<HashMap<FeedMode, HashMap<Schema, f64>>> {
-        todo!()
-    }
-
-    pub async fn get_dataset_condition(
-        &mut self,
-        params: &GetDatasetConditionParams<'_>,
-    ) -> crate::Result<Vec<DatasetConditionDetail>> {
-        todo!()
-    }
-
-    pub async fn get_dataset_range(&mut self, dataset: &str) -> crate::Result<DatasetRange> {
         Ok(self
-            .inner
-            .get("/v0/metadata.get_dataset_range")
-            .query(&["dataset", dataset])
+            .get("list_publishers")?
             .send()
             .await?
+            .error_for_status()?
             .json()
             .await?)
     }
 
-    pub async fn get_record_count(&mut self) -> crate::Result<Vec<String>> {
-        todo!()
+    /// Lists all available dataset codes on Databento.
+    ///
+    /// # Errors
+    /// This function returns an error when it fails to communicate with the Databento API
+    /// or the API indicates there's an issue with the request.
+    pub async fn list_datasets(
+        &mut self,
+        date_range: Option<DateRange>,
+    ) -> crate::Result<Vec<String>> {
+        let mut builder = self.get("list_datasets")?;
+        if let Some(date_range) = date_range {
+            builder = builder.add_to_query(&date_range);
+        }
+        Ok(builder.send().await?.error_for_status()?.json().await?)
     }
 
-    pub async fn get_billable_size(&mut self) -> crate::Result<Vec<String>> {
-        todo!()
+    /// Lists all available schemas for the given `dataset`.
+    ///
+    /// # Errors
+    /// This function returns an error when it fails to communicate with the Databento API
+    /// or the API indicates there's an issue with the request.
+    pub async fn list_schemas(&mut self, dataset: &str) -> crate::Result<Vec<String>> {
+        Ok(self
+            .get("list_schemas")?
+            .query(&[("dataset", dataset)])
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
     }
 
-    pub async fn get_cost(&mut self) -> crate::Result<Vec<String>> {
-        todo!()
+    /// Lists all fields for a dataset, schema, and encoding.
+    ///
+    /// # Errors
+    /// This function returns an error when it fails to communicate with the Databento API
+    /// or the API indicates there's an issue with the request.
+    pub async fn list_fields(
+        &mut self,
+        params: &ListFieldsParams,
+    ) -> crate::Result<HashMap<String, HashMap<Encoding, HashMap<Schema, Vec<String>>>>> {
+        let mut builder = self.get("list_fields")?;
+        if let Some(ref dataset) = params.dataset {
+            builder = builder.query(&[("dataset", dataset)]);
+        }
+        if let Some(encoding) = params.encoding {
+            builder = builder.query(&[("encoding", encoding.as_str())]);
+        }
+        if let Some(schema) = params.schema {
+            builder = builder.query(&[("schema", schema.as_str())]);
+        }
+        Ok(builder.send().await?.error_for_status()?.json().await?)
+    }
+
+    /// Lists unit prices for each data schema in US dollars per gigabyte.
+    ///
+    /// # Errors
+    /// This function returns an error when it fails to communicate with the Databento API
+    /// or the API indicates there's an issue with the request.
+    pub async fn list_unit_prices(
+        &mut self,
+        params: &ListUnitPricesParams,
+    ) -> crate::Result<HashMap<FeedMode, HashMap<Schema, f64>>> {
+        let mut builder = self
+            .get("list_unit_prices")?
+            .query(&[("dataset", &params.dataset)]);
+        if let Some(feed_mode) = params.feed_mode {
+            builder = builder.query(&[("feed_mode", feed_mode.as_str())]);
+        }
+        if let Some(schema) = params.schema {
+            builder = builder.query(&[("schema", schema.as_str())]);
+        }
+        Ok(builder.send().await?.error_for_status()?.json().await?)
+    }
+
+    /// Gets the dataset condition from Databento.
+    ///
+    /// Use this method to discover data availability and quality.
+    ///
+    /// # Errors
+    /// This function returns an error when it fails to communicate with the Databento API
+    /// or the API indicates there's an issue with the request.
+    pub async fn get_dataset_condition(
+        &mut self,
+        params: &GetDatasetConditionParams,
+    ) -> crate::Result<Vec<DatasetConditionDetail>> {
+        let mut builder = self
+            .get("get_dataset_condition")?
+            .query(&[("dataset", &params.dataset)]);
+        if let Some(ref date_range) = params.date_range {
+            builder = builder.add_to_query(date_range);
+        }
+        Ok(builder.send().await?.error_for_status()?.json().await?)
+    }
+
+    /// Gets the available range for the dataset from Databento.
+    ///
+    /// Use this method to discover data availability.
+    ///
+    /// # Errors
+    /// This function returns an error when it fails to communicate with the Databento API
+    /// or the API indicates there's an issue with the request.
+    pub async fn get_dataset_range(&mut self, dataset: &str) -> crate::Result<DatasetRange> {
+        Ok(self
+            .get("get_dataset_range")?
+            .query(&[("dataset", dataset)])
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
+    }
+
+    /// Gets the record count of the time series data query.
+    ///
+    /// # Errors
+    /// This function returns an error when it fails to communicate with the Databento API
+    /// or the API indicates there's an issue with the request.
+    pub async fn get_record_count(&mut self, params: &GetRecordCountParams) -> crate::Result<u64> {
+        Ok(self
+            .get("get_record_count")?
+            .add_to_query(params)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
+    }
+
+    /// Gets the billable uncompressed raw binary size for historical streaming or
+    /// batched files.
+    ///
+    /// # Errors
+    /// This function returns an error when it fails to communicate with the Databento API
+    /// or the API indicates there's an issue with the request.
+    pub async fn get_billable_size(
+        &mut self,
+        params: &GetBillableSizeParams,
+    ) -> crate::Result<u64> {
+        Ok(self
+            .get("get_billable_size")?
+            .add_to_query(params)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
+    }
+
+    /// Gets the cost in US dollars for a historical streaming or batch download
+    /// request.
+    ///
+    /// # Errors
+    /// This function returns an error when it fails to communicate with the Databento API
+    /// or the API indicates there's an issue with the request.
+    pub async fn get_cost(&mut self, params: &GetCostParams) -> crate::Result<f64> {
+        Ok(self
+            .get("get_cost")?
+            .add_to_query(params)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?)
+    }
+
+    fn get(&mut self, slug: &str) -> crate::Result<RequestBuilder> {
+        self.inner.get(&format!("metadata.{slug}"))
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A type of data feed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FeedMode {
+    /// The historical batch data feed.
     Historical,
+    /// The historical streaming data feed.
     HistoricalStreaming,
+    /// The Live data feed for real-time and intraday historical.
     Live,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+/// The condition of a dataset on a day.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DatasetCondition {
+    /// The data is available with no known issues.
     Available,
+    /// The data is available, but there may be missing data or other correctness
+    /// issues.
     Degraded,
+    /// The data is not yet available, but may be available soon.
     Pending,
+    /// The data is not available.
     Missing,
 }
 
-#[derive(Debug, Clone, TypedBuilder)]
-pub struct ListFieldsParams<'a> {
+/// The parameters for [`MetadataClient::list_fields()`]. Use
+/// [`ListFieldsParams::builder()`] to get a builder type with all the preset defaults.
+#[derive(Debug, Clone, Default, TypedBuilder)]
+pub struct ListFieldsParams {
+    /// The optional filter by dataset code.
     #[builder(default)]
-    pub dataset: Option<&'a str>,
+    pub dataset: Option<String>,
+    /// The optional filter by encoding.
     #[builder(default)]
     pub encoding: Option<Encoding>,
+    /// The optional filter by data record schema.
     #[builder(default)]
     pub schema: Option<Schema>,
 }
 
+/// The parameters for [`MetadataClient::list_unit_prices()`]. Use
+/// [`ListUnitPricesParams::builder()`] to get a builder type with all the preset
+/// defaults.
 #[derive(Debug, Clone, TypedBuilder)]
-pub struct ListUnitPricesParams<'a> {
-    pub dataset: &'a str,
+pub struct ListUnitPricesParams {
+    /// The required filter by dataset code.
+    pub dataset: String,
+    /// The optional filter by data feed mode.
     #[builder(default)]
     pub feed_mode: Option<FeedMode>,
+    /// The optional filter by data record schema.
     #[builder(default)]
     pub schema: Option<Schema>,
 }
 
+/// The parameters for [`MetadataClient::get_dataset_condition()`]. Use
+/// [`GetDatasetConditionParams::builder()`] to get a builder type with all the preset
+/// defaults.
 #[derive(Debug, Clone, TypedBuilder)]
-pub struct GetDatasetConditionParams<'a> {
-    pub dataset: &'a str,
+pub struct GetDatasetConditionParams {
+    /// The dataset code.
+    pub dataset: String,
+    /// The optional filter by UTC date range.
     #[builder(default)]
-    pub date_range: Option<DateTimeRange>,
+    pub date_range: Option<DateRange>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+/// The condition of a dataset on a particular day.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct DatasetConditionDetail {
+    /// The day of the described data.
+    #[serde(deserialize_with = "deserialize_date")]
     pub date: time::Date,
+    /// The condition code describing the quality and availability of the data on the
+    /// given day.
     pub condition: DatasetCondition,
+    /// The date when any schemna in the dataset on the given day was last generated or
+    /// modified.
+    #[serde(deserialize_with = "deserialize_date")]
     pub last_modified_date: time::Date,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+/// The available range for a dataset.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct DatasetRange {
+    /// The start date of the available range.
+    #[serde(deserialize_with = "deserialize_date")]
     pub start_date: time::Date,
+    /// The end date of the available range.
+    #[serde(deserialize_with = "deserialize_date")]
     pub end_date: time::Date,
+}
+
+/// The parameters for several metadata requests.
+#[derive(Debug, Clone, TypedBuilder)]
+pub struct GetQueryParams {
+    /// The dataset code.
+    pub dataset: String,
+    /// The symbols to filter for.
+    pub symbols: Symbols,
+    /// The data record schema.
+    pub schema: Schema,
+    /// The request time range.
+    pub date_time_range: DateTimeRange,
+    /// The symbology type of the input `symbols`. Defaults to
+    /// [`RawSymbol`](dbn::enums::SType::RawSymbol).
+    #[builder(default = SType::RawSymbol)]
+    pub stype_in: SType,
+    /// The optional maximum number of records to return. Defaults to no limit.
+    #[builder(default)]
+    pub limit: Option<NonZeroU64>,
+}
+
+/// The parameters for [`MetadataClient::get_record_count()`]. Use
+/// [`GetRecordCountParams::builder()`] to get a builder type with all the preset
+/// defaults.
+pub type GetRecordCountParams = GetQueryParams;
+/// The parameters for [`MetadataClient::get_billable_size()`]. Use
+/// [`GetBillableSizeParams::builder()`] to get a builder type with all the preset
+/// defaults.
+pub type GetBillableSizeParams = GetQueryParams;
+/// The parameters for [`MetadataClient::get_cost()`]. Use
+/// [`GetCostParams::builder()`] to get a builder type with all the preset
+/// defaults.
+pub type GetCostParams = GetQueryParams;
+
+impl AsRef<str> for FeedMode {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl FeedMode {
+    /// Converts the enum to its `str` representation.
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            FeedMode::Historical => "historical",
+            FeedMode::HistoricalStreaming => "historical-streaming",
+            FeedMode::Live => "live",
+        }
+    }
+}
+
+impl FromStr for FeedMode {
+    type Err = crate::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "historical" => Ok(Self::Historical),
+            "historical-streaming" => Ok(Self::HistoricalStreaming),
+            "live" => Ok(Self::Live),
+            _ => Err(crate::Error::internal(format_args!(
+                "Unabled to convert {s} to FeedMode"
+            ))),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for FeedMode {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let str = String::deserialize(deserializer)?;
+        FromStr::from_str(&str).map_err(serde::de::Error::custom)
+    }
+}
+
+impl AsRef<str> for DatasetCondition {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl DatasetCondition {
+    /// Converts the enum to its `str` representation.
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            DatasetCondition::Available => "available",
+            DatasetCondition::Degraded => "degraded",
+            DatasetCondition::Pending => "pending",
+            DatasetCondition::Missing => "missing",
+        }
+    }
+}
+
+impl FromStr for DatasetCondition {
+    type Err = crate::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "available" => Ok(DatasetCondition::Available),
+            "degraded" => Ok(DatasetCondition::Degraded),
+            "pending" => Ok(DatasetCondition::Pending),
+            "missing" => Ok(DatasetCondition::Missing),
+            _ => Err(crate::Error::internal(format_args!(
+                "Unabled to convert {s} to DatasetCondition"
+            ))),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for DatasetCondition {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let str = String::deserialize(deserializer)?;
+        FromStr::from_str(&str).map_err(serde::de::Error::custom)
+    }
+}
+
+fn deserialize_date<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<time::Date, D::Error> {
+    let dt_str = String::deserialize(deserializer)?;
+    time::Date::parse(&dt_str, super::DATE_FORMAT).map_err(serde::de::Error::custom)
+}
+impl AddToQuery<GetQueryParams> for reqwest::RequestBuilder {
+    fn add_to_query(mut self, params: &GetQueryParams) -> Self {
+        self = self
+            .query(&[
+                ("dataset", params.dataset.as_str()),
+                ("schema", params.schema.as_str()),
+                ("stype_in", params.stype_in.as_str()),
+            ])
+            .add_to_query(&params.symbols)
+            .add_to_query(&params.date_time_range);
+        if let Some(limit) = params.limit {
+            self = self.query(&[("limit", &limit.to_string())]);
+        }
+        self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use reqwest::StatusCode;
+    use serde_json::json;
+    use time::macros::date;
+    use wiremock::{
+        matchers::{basic_auth, method, path, query_param, query_param_is_missing},
+        Mock, MockServer, ResponseTemplate,
+    };
+
+    use super::*;
+    use crate::{
+        historical::{HistoricalGateway, API_VERSION},
+        HistoricalClient,
+    };
+
+    const API_KEY: &str = "test-metadata";
+
+    #[tokio::test]
+    async fn test_list_fields() {
+        const ENC: Encoding = Encoding::Csv;
+        const DATASET: &str = "GLBX.MDP3";
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(basic_auth(API_KEY, ""))
+            .and(path(format!("/v{API_VERSION}/metadata.list_fields")))
+            .and(query_param("encoding", ENC.as_str()))
+            .and(query_param("dataset", DATASET))
+            .and(query_param_is_missing("schema"))
+            .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_json(json!({
+                DATASET: {
+                    ENC.as_str(): {
+                        "ohlcv-1s": [
+                            "ts_event", "rtype", "open", "high", "low", "close", "volume"
+                        ]
+                    }
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+        let mut target = HistoricalClient::with_url(
+            mock_server.uri(),
+            API_KEY.to_owned(),
+            HistoricalGateway::Bo1,
+        )
+        .unwrap();
+        let fields_map = target
+            .metadata()
+            .list_fields(
+                &ListFieldsParams::builder()
+                    .dataset(Some(DATASET.to_owned()))
+                    .encoding(Some(ENC))
+                    .build(),
+            )
+            .await
+            .unwrap();
+        let fields = fields_map
+            .get(DATASET)
+            .and_then(|m| m.get(&ENC))
+            .and_then(|m| m.get(&Schema::Ohlcv1S))
+            .unwrap();
+        assert_eq!(
+            *fields,
+            vec![
+                "ts_event".to_owned(),
+                "rtype".to_owned(),
+                "open".to_owned(),
+                "high".to_owned(),
+                "low".to_owned(),
+                "close".to_owned(),
+                "volume".to_owned()
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_list_unit_prices() {
+        const SCHEMA: Schema = Schema::Tbbo;
+        const DATASET: &str = "GLBX.MDP3";
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(basic_auth(API_KEY, ""))
+            .and(path(format!("/v{API_VERSION}/metadata.list_unit_prices")))
+            .and(query_param("dataset", DATASET))
+            .and(query_param("schema", SCHEMA.as_str()))
+            .and(query_param_is_missing("feed_mode"))
+            .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_json(json!({
+                "historical": {
+                    SCHEMA.as_str(): 17.89
+                },
+                "live": {
+                    SCHEMA.as_str(): 34.22
+                }
+            })))
+            .mount(&mock_server)
+            .await;
+        let mut target = HistoricalClient::with_url(
+            mock_server.uri(),
+            API_KEY.to_owned(),
+            HistoricalGateway::Bo1,
+        )
+        .unwrap();
+        let prices = target
+            .metadata()
+            .list_unit_prices(
+                &ListUnitPricesParams::builder()
+                    .dataset(DATASET.to_owned())
+                    .schema(Some(SCHEMA))
+                    .build(),
+            )
+            .await
+            .unwrap();
+        assert!(
+            (prices
+                .get(&FeedMode::Historical)
+                .and_then(|m| m.get(&SCHEMA))
+                .unwrap()
+                - 17.89)
+                .abs()
+                < f64::EPSILON,
+        );
+        assert!(
+            (prices
+                .get(&FeedMode::Live)
+                .and_then(|m| m.get(&SCHEMA))
+                .unwrap()
+                - 34.22)
+                .abs()
+                < f64::EPSILON,
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_dataset_condition() {
+        const DATASET: &str = "GLBX.MDP3";
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(basic_auth(API_KEY, ""))
+            .and(path(format!(
+                "/v{API_VERSION}/metadata.get_dataset_condition"
+            )))
+            .and(query_param("dataset", DATASET))
+            .and(query_param("start_date", "2022-05-17"))
+            .and(query_param_is_missing("end_date"))
+            .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_json(json!([
+                {
+                    "date": "2022-05-17",
+                    "condition": "available",
+                    "last_modified_date": "2023-07-11",
+                },
+                {
+                    "date": "2022-05-18",
+                    "condition": "degraded",
+                    "last_modified_date": "2022-05-19",
+                }
+            ])))
+            .mount(&mock_server)
+            .await;
+        let mut target = HistoricalClient::with_url(
+            mock_server.uri(),
+            API_KEY.to_owned(),
+            HistoricalGateway::Bo1,
+        )
+        .unwrap();
+        let condition = target
+            .metadata()
+            .get_dataset_condition(
+                &GetDatasetConditionParams::builder()
+                    .dataset(DATASET.to_owned())
+                    .date_range(Some(date!(2022 - 05 - 17).into()))
+                    .build(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(condition.len(), 2);
+        assert_eq!(
+            condition[0],
+            DatasetConditionDetail {
+                date: date!(2022 - 05 - 17),
+                condition: DatasetCondition::Available,
+                last_modified_date: date!(2023 - 07 - 11)
+            }
+        );
+        assert_eq!(
+            condition[1],
+            DatasetConditionDetail {
+                date: date!(2022 - 05 - 18),
+                condition: DatasetCondition::Degraded,
+                last_modified_date: date!(2022 - 05 - 19)
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_dataset_range() {
+        const DATASET: &str = "XNAS.ITCH";
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(basic_auth(API_KEY, ""))
+            .and(path(format!("/v{API_VERSION}/metadata.get_dataset_range")))
+            .and(query_param("dataset", DATASET))
+            .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_json(json!({
+                "start_date": "2019-07-07",
+                "end_date": "2023-07-19",
+            })))
+            .mount(&mock_server)
+            .await;
+        let mut target = HistoricalClient::with_url(
+            mock_server.uri(),
+            API_KEY.to_owned(),
+            HistoricalGateway::Bo1,
+        )
+        .unwrap();
+        let range = target.metadata().get_dataset_range(DATASET).await.unwrap();
+        assert_eq!(range.start_date, date!(2019 - 07 - 07));
+        assert_eq!(range.end_date, date!(2023 - 07 - 19));
+    }
 }

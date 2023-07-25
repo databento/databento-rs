@@ -6,7 +6,12 @@ use thiserror::Error;
 pub enum Error {
     /// An invalid argument was passed.
     #[error("bad argument {param_name}: {desc}")]
-    BadArgument { param_name: String, desc: String },
+    BadArgument {
+        /// The name of the parameter to which the bad argument was passed.
+        param_name: String,
+        /// The description of how the argument was invalid.
+        desc: String,
+    },
     /// An I/O error while reading or writing DBN or another encoding.
     #[error("I/O error: {0:?}")]
     Io(#[from] std::io::Error),

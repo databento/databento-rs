@@ -1,0 +1,61 @@
+name: release
+on:
+  workflow_run:
+    workflows:
+      - build
+    branches: [main]
+    types:
+      - completed
+
+jobs:
+  tag-release:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    name: tag-release (ubuntu-latest)
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create-release.outputs.upload_url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Cargo setup
+      - name: Set up Cargo cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+
+      # Tag the commit with the library version
+      - name: Create git tag
+        uses: salsify/action-detect-and-tag-new-version@v2
+        with:
+          version-command: scripts/get_version.sh
+
+      # Set release output variables
+      - name: Set output
+        id: vars
+        run: |
+          echo "TAG_NAME=v$(scripts/get_version.sh)" >> $GITHUB_ENV
+          echo "RELEASE_NAME=$(scripts/get_version.sh)" >> $GITHUB_ENV
+          echo "## Release notes" > NOTES.md
+          sed -n '/^## /{n; :a; /^## /q; p; n; ba}' CHANGELOG.md >> NOTES.md
+
+      # Create GitHub release
+      - name: Create release
+        id: create-release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ env.RELEASE_NAME }}
+          tag_name: ${{ env.TAG_NAME }}
+          append_body: true
+          body_path: ./NOTES.md
+          prerelease: false
+
+      - name: Publish to crates.io
+        run: cargo publish --token ${CARGO_REGISTRY_TOKEN}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
