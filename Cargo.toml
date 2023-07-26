@@ -18,7 +18,7 @@ live = ["dep:hex", "dep:sha2", "tokio/net"]
 
 [dependencies]
 # binary encoding
-dbn = { path = "../dbn/rust/dbn", features = ["async", "serde"] }
+dbn = { version = "0.8.0", features = ["async", "serde"] }
 # Async stream trait
 futures = { version = "0.3", optional = true }
 # Hex encoding used for Live authentication
