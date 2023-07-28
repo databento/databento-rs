@@ -26,8 +26,8 @@ pub enum HistoricalGateway {
 /// forward fill behavior.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DateRange {
-    /// An interval where `end` is implied.
-    FwdFill(time::Date),
+    /// An interval where `end` is unspecified.
+    Open(time::Date),
     /// A closed interval with an inclusive start date and an exclusive end date.
     Closed {
         /// The start date (inclusive).
@@ -63,7 +63,7 @@ impl From<(time::Date, time::Date)> for DateRange {
 
 impl From<time::Date> for DateRange {
     fn from(value: time::Date) -> Self {
-        Self::FwdFill(value)
+        Self::Open(value)
     }
 }
 
@@ -103,7 +103,7 @@ trait AddToQuery<T> {
 impl AddToQuery<DateRange> for reqwest::RequestBuilder {
     fn add_to_query(self, param: &DateRange) -> Self {
         match param {
-            DateRange::FwdFill(start) => {
+            DateRange::Open(start) => {
                 self.query(&[("start_date", start.format(DATE_FORMAT).unwrap())])
             }
             DateRange::Closed { start, end } => self.query(&[
@@ -135,7 +135,7 @@ impl AddToQuery<Symbols> for reqwest::RequestBuilder {
 impl DateRange {
     pub(crate) fn add_to_form(&self, form: &mut Vec<(&'static str, String)>) {
         match self {
-            DateRange::FwdFill(start) => {
+            DateRange::Open(start) => {
                 form.push(("start_date", start.format(DATE_FORMAT).unwrap()));
             }
             DateRange::Closed { start, end } => {

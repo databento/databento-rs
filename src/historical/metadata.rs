@@ -52,7 +52,7 @@ impl MetadataClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
-    pub async fn list_schemas(&mut self, dataset: &str) -> crate::Result<Vec<String>> {
+    pub async fn list_schemas(&mut self, dataset: &str) -> crate::Result<Vec<Schema>> {
         Ok(self
             .get("list_schemas")?
             .query(&[("dataset", dataset)])
@@ -71,7 +71,8 @@ impl MetadataClient<'_> {
     pub async fn list_fields(
         &mut self,
         params: &ListFieldsParams,
-    ) -> crate::Result<HashMap<String, HashMap<Encoding, HashMap<Schema, Vec<String>>>>> {
+    ) -> crate::Result<HashMap<String, HashMap<Encoding, HashMap<Schema, HashMap<String, String>>>>>
+    {
         let mut builder = self.get("list_fields")?;
         if let Some(ref dataset) = params.dataset {
             builder = builder.query(&[("dataset", dataset)]);
@@ -232,13 +233,13 @@ pub enum DatasetCondition {
 #[derive(Debug, Clone, Default, TypedBuilder)]
 pub struct ListFieldsParams {
     /// The optional filter by dataset code.
-    #[builder(default)]
+    #[builder(default, setter(transform = |dataset: impl ToString| Some(dataset.to_string())))]
     pub dataset: Option<String>,
     /// The optional filter by encoding.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub encoding: Option<Encoding>,
     /// The optional filter by data record schema.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub schema: Option<Schema>,
 }
 
@@ -248,12 +249,13 @@ pub struct ListFieldsParams {
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct ListUnitPricesParams {
     /// The required filter by dataset code.
+    #[builder(setter(transform = |dataset: impl ToString| dataset.to_string()))]
     pub dataset: String,
     /// The optional filter by data feed mode.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub feed_mode: Option<FeedMode>,
     /// The optional filter by data record schema.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub schema: Option<Schema>,
 }
 
@@ -263,9 +265,10 @@ pub struct ListUnitPricesParams {
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct GetDatasetConditionParams {
     /// The dataset code.
+    #[builder(setter(transform = |dataset: impl ToString| dataset.to_string()))]
     pub dataset: String,
     /// The optional filter by UTC date range.
-    #[builder(default)]
+    #[builder(default, setter(transform = |dr: impl Into<DateRange>| Some(dr.into())))]
     pub date_range: Option<DateRange>,
 }
 
@@ -299,12 +302,15 @@ pub struct DatasetRange {
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct GetQueryParams {
     /// The dataset code.
+    #[builder(setter(transform = |dataset: impl ToString| dataset.to_string()))]
     pub dataset: String,
     /// The symbols to filter for.
+    #[builder(setter(into))]
     pub symbols: Symbols,
     /// The data record schema.
     pub schema: Schema,
     /// The request time range.
+    #[builder(setter(into))]
     pub date_time_range: DateTimeRange,
     /// The symbology type of the input `symbols`. Defaults to
     /// [`RawSymbol`](dbn::enums::SType::RawSymbol).
@@ -463,9 +469,15 @@ mod tests {
             .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_json(json!({
                 DATASET: {
                     ENC.as_str(): {
-                        "ohlcv-1s": [
-                            "ts_event", "rtype", "open", "high", "low", "close", "volume"
-                        ]
+                        "ohlcv-1s": {
+                            "ts_event": "uint64_t",
+                            "rtype": "uint8_t",
+                            "open": "int64_t",
+                            "high": "int64_t",
+                            "low": "int64_t",
+                            "close": "int64_t",
+                            "volume": "uint64_t",
+                        }
                     }
                 }
             })))
@@ -481,8 +493,8 @@ mod tests {
             .metadata()
             .list_fields(
                 &ListFieldsParams::builder()
-                    .dataset(Some(DATASET.to_owned()))
-                    .encoding(Some(ENC))
+                    .dataset(DATASET)
+                    .encoding(ENC)
                     .build(),
             )
             .await
@@ -492,18 +504,16 @@ mod tests {
             .and_then(|m| m.get(&ENC))
             .and_then(|m| m.get(&Schema::Ohlcv1S))
             .unwrap();
-        assert_eq!(
-            *fields,
-            vec![
-                "ts_event".to_owned(),
-                "rtype".to_owned(),
-                "open".to_owned(),
-                "high".to_owned(),
-                "low".to_owned(),
-                "close".to_owned(),
-                "volume".to_owned()
-            ]
-        );
+        let exp = HashMap::from([
+            ("ts_event".to_owned(), "uint64_t".to_owned()),
+            ("rtype".to_owned(), "uint8_t".to_owned()),
+            ("open".to_owned(), "int64_t".to_owned()),
+            ("high".to_owned(), "int64_t".to_owned()),
+            ("low".to_owned(), "int64_t".to_owned()),
+            ("close".to_owned(), "int64_t".to_owned()),
+            ("volume".to_owned(), "uint64_t".to_owned()),
+        ]);
+        assert_eq!(*fields, exp);
     }
 
     #[tokio::test]
@@ -537,8 +547,8 @@ mod tests {
             .metadata()
             .list_unit_prices(
                 &ListUnitPricesParams::builder()
-                    .dataset(DATASET.to_owned())
-                    .schema(Some(SCHEMA))
+                    .dataset(DATASET)
+                    .schema(SCHEMA)
                     .build(),
             )
             .await
@@ -600,7 +610,7 @@ mod tests {
             .get_dataset_condition(
                 &GetDatasetConditionParams::builder()
                     .dataset(DATASET.to_owned())
-                    .date_range(Some(date!(2022 - 05 - 17).into()))
+                    .date_range(date!(2022 - 05 - 17))
                     .build(),
             )
             .await

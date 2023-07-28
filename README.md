@@ -39,13 +39,13 @@ use databento::{
 async fn main() -> Result<(), Box<dyn Error>> {
     let mut client = LiveClient::builder()
         .key_from_env()?
-        .dataset(dbn::datasets::GLBX_MDP3.to_owned())
+        .dataset(dbn::datasets::GLBX_MDP3)
         .build()
         .await?;
     client
         .subscribe(
             &Subscription::builder()
-                .symbols("ES.FUT".into())
+                .symbols("ES.FUT")
                 .schema(Schema::Trades)
                 .stype_in(SType::Parent)
                 .build(),
@@ -96,14 +96,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .timeseries()
         .get_range(
             &GetRangeParams::builder()
-                .dataset("GLBX.MDP3".to_owned())
-                .date_time_range(
-                    (
-                        datetime!(2022-06-10 14:30 UTC),
-                        datetime!(2022-06-10 14:40 UTC),
-                    )
-                        .into(),
-                )
+                .dataset("GLBX.MDP3")
+                .date_time_range((
+                    datetime!(2022-06-10 14:30 UTC),
+                    datetime!(2022-06-10 14:40 UTC),
+                ))
                 .symbols(Symbols::All)
                 .schema(Schema::Trades)
                 .build(),
@@ -113,8 +110,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         println!("{trade:?}");
     }
     Ok(())
-}
-```
+}```
 To run this program, set the `DATABENTO_API_KEY` environment variable with an actual API key.
 
 ## Documentation

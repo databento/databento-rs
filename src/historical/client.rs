@@ -105,6 +105,17 @@ impl Client {
         self.request(reqwest::Method::GET, slug)
     }
 
+    pub(crate) fn get_with_path(&mut self, path: &str) -> crate::Result<RequestBuilder> {
+        Ok(self
+            .client
+            .get(
+                self.base_url
+                    .join(path)
+                    .map_err(|e| Error::Internal(format!("created invalid URL: {e:?}")))?,
+            )
+            .basic_auth(&self.key, Option::<&str>::None))
+    }
+
     pub(crate) fn post(&mut self, slug: &str) -> crate::Result<RequestBuilder> {
         self.request(reqwest::Method::POST, slug)
     }
@@ -168,9 +179,9 @@ impl ClientBuilder<Unset> {
     ///
     /// # Errors
     /// This function returns an error when the API key is invalid.
-    pub fn key(self, key: String) -> crate::Result<ClientBuilder<String>> {
+    pub fn key(self, key: impl ToString) -> crate::Result<ClientBuilder<String>> {
         Ok(ClientBuilder {
-            key: crate::validate_key(key)?,
+            key: crate::validate_key(key.to_string())?,
             base_url: self.base_url,
             gateway: self.gateway,
         })

@@ -18,7 +18,7 @@ use tokio::{
 };
 use typed_builder::TypedBuilder;
 
-use crate::{Error, Symbols};
+use crate::{validate_key, Error, Symbols, API_KEY_LENGTH};
 
 /// The Live client. Used for subscribing to real-time and intraday historical market data.
 ///
@@ -33,7 +33,6 @@ pub struct Client {
     session_id: String,
 }
 
-const API_KEY_LENGTH: usize = 32;
 const BUCKET_ID_LENGTH: usize = 5;
 
 impl Client {
@@ -49,15 +48,6 @@ impl Client {
     /// This function returns an error when `key` is invalid or its unable to connect
     /// and authenticate with the Live gateway.
     pub async fn connect(key: String, dataset: String, send_ts_out: bool) -> crate::Result<Self> {
-        if key.len() != API_KEY_LENGTH {
-            return Err(Error::bad_arg(
-                "key",
-                format!("must be of length {API_KEY_LENGTH}"),
-            ));
-        }
-        if key.is_ascii() {
-            return Err(Error::bad_arg("key", "contains non-ASCII characters"));
-        }
         Self::connect_with_addr(Self::determine_gateway(&dataset), key, dataset, send_ts_out).await
     }
 
@@ -73,6 +63,7 @@ impl Client {
         dataset: String,
         send_ts_out: bool,
     ) -> crate::Result<Self> {
+        let key = validate_key(key)?;
         let stream = TcpStream::connect(addr).await?;
         let (reader, mut writer) = tokio::io::split(stream);
         let mut reader = BufReader::new(reader);
@@ -198,12 +189,14 @@ impl Client {
         Ok(auth_keys.remove("session_id").unwrap_or_default())
     }
 
-    /// Closes the connection with the gateway, ending the session and all subscriptions.
-    pub async fn close(mut self) {
-        self.connection
-            .shutdown()
-            .await
-            .expect("Error on disconnect");
+    /// Closes the connection with the gateway, ending the session and all subscriptions. Consumes
+    /// the client.
+    ///
+    /// # Errors
+    /// This function returns an error if the shutdown of the TCP stream is unsuccessful, this usually
+    /// means the stream is no longer usable.
+    pub async fn close(mut self) -> crate::Result<()> {
+        Ok(self.connection.shutdown().await?)
     }
 
     /// Attempts to add a new subscription to the session. Note that
@@ -265,18 +258,19 @@ impl Client {
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct Subscription {
     /// The symbols of the instruments to subscribe to.
+    #[builder(setter(into))]
     pub symbols: Symbols,
     /// The schema of data to subscribe to.
     pub schema: Schema,
+    /// The symbology type of symbols in [`symbols`](Self::symbols).
+    pub stype_in: SType,
     /// If specified, requests available data since that time. When `None`,
     /// only real-time data is sent.
     ///
     /// Setting this field is not supported once the session has been started with
     /// [`LiveClient::start`](crate::LiveClient::start).
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub start: Option<OffsetDateTime>,
-    /// The symbology type of symbols in [`symbols`](Self::symbols).
-    pub stype_in: SType,
 }
 
 #[doc(hidden)]
@@ -323,9 +317,9 @@ impl<D> ClientBuilder<Unset, D> {
     ///
     /// # Errors
     /// This function returns an error when the API key is invalid.
-    pub fn key(self, key: String) -> crate::Result<ClientBuilder<String, D>> {
+    pub fn key(self, key: impl ToString) -> crate::Result<ClientBuilder<String, D>> {
         Ok(ClientBuilder {
-            key: crate::validate_key(key)?,
+            key: crate::validate_key(key.to_string())?,
             dataset: self.dataset,
             send_ts_out: self.send_ts_out,
         })
@@ -345,10 +339,10 @@ impl<D> ClientBuilder<Unset, D> {
 
 impl<AK> ClientBuilder<AK, Unset> {
     /// Sets the dataset.
-    pub fn dataset(self, dataset: String) -> ClientBuilder<AK, String> {
+    pub fn dataset(self, dataset: impl ToString) -> ClientBuilder<AK, String> {
         ClientBuilder {
             key: self.key,
-            dataset,
+            dataset: dataset.to_string(),
             send_ts_out: self.send_ts_out,
         }
     }

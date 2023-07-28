@@ -21,29 +21,29 @@ pub use dbn;
 
 use std::fmt::{Display, Write};
 
+use log::error;
+#[cfg(feature = "historical")]
+use serde::{Deserialize, Deserializer};
+
 /// One or more symbols in a particular [`SType`](dbn::enums::SType).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Symbols {
     /// Sentinel value for all symbols in a dataset.
     All,
-    /// A single symbol identified by its instrument ID.
-    Id(u32),
     /// A set of symbols identified by their instrument IDs.
     Ids(Vec<u32>),
-    /// A single symbol.
-    Symbol(String),
     /// A set of symbols.
     Symbols(Vec<String>),
 }
 
 const ALL_SYMBOLS: &str = "ALL_SYMBOLS";
+const API_KEY_LENGTH: usize = 32;
 
 impl Symbols {
     /// Returns the string representation for sending to the API.
     pub fn to_api_string(&self) -> String {
         match self {
             Symbols::All => ALL_SYMBOLS.to_owned(),
-            Symbols::Id(id) => id.to_string(),
             Symbols::Ids(ids) => ids.iter().fold(String::new(), |mut acc, s| {
                 if acc.is_empty() {
                     s.to_string()
@@ -52,7 +52,6 @@ impl Symbols {
                     acc
                 }
             }),
-            Symbols::Symbol(symbol) => symbol.to_owned(),
             Symbols::Symbols(symbols) => symbols.join(","),
         }
     }
@@ -62,7 +61,6 @@ impl Display for Symbols {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Symbols::All => f.write_str(ALL_SYMBOLS),
-            Symbols::Id(id) => write!(f, "{id}"),
             Symbols::Ids(ids) => {
                 for (i, id) in ids.iter().enumerate() {
                     if i == 0 {
@@ -73,7 +71,6 @@ impl Display for Symbols {
                 }
                 Ok(())
             }
-            Symbols::Symbol(symbol) => f.write_str(symbol),
             Symbols::Symbols(symbols) => {
                 for (i, sym) in symbols.iter().enumerate() {
                     if i == 0 {
@@ -90,13 +87,13 @@ impl Display for Symbols {
 
 impl From<&str> for Symbols {
     fn from(value: &str) -> Self {
-        Symbols::Symbol(value.to_owned())
+        Symbols::Symbols(vec![value.to_owned()])
     }
 }
 
 impl From<u32> for Symbols {
     fn from(value: u32) -> Self {
-        Symbols::Id(value)
+        Symbols::Ids(vec![value])
     }
 }
 
@@ -108,7 +105,7 @@ impl From<Vec<u32>> for Symbols {
 
 impl From<String> for Symbols {
     fn from(value: String) -> Self {
-        Symbols::Symbol(value)
+        Symbols::Symbols(vec![value])
     }
 }
 
@@ -125,9 +122,10 @@ impl From<Vec<&str>> for Symbols {
 }
 
 pub(crate) fn validate_key(key: String) -> crate::Result<String> {
-    if key.len() != 32 {
+    if key.len() != API_KEY_LENGTH {
         Err(Error::bad_arg("key", "expected to be 32-characters long"))
     } else if !key.is_ascii() {
+        error!("API key '{key}' contains non-ASCII characters");
         Err(Error::bad_arg(
             "key",
             "expected to be composed of only ASCII characters",
@@ -139,6 +137,31 @@ pub(crate) fn validate_key(key: String) -> crate::Result<String> {
 
 pub(crate) fn key_from_env() -> crate::Result<String> {
     std::env::var("DATABENTO_API_KEY").map_err(|e| Error::bad_arg("key", format!("{e:?}")))
+}
+
+#[cfg(feature = "historical")]
+impl<'de> Deserialize<'de> for Symbols {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Helper {
+            Id(u32),
+            Ids(Vec<u32>),
+            Symbol(String),
+            Symbols(Vec<String>),
+        }
+        let ir = Helper::deserialize(deserializer)?;
+        Ok(match ir {
+            Helper::Id(id) => Symbols::Ids(vec![id]),
+            Helper::Ids(ids) => Symbols::Ids(ids),
+            Helper::Symbol(symbol) if symbol == ALL_SYMBOLS => Symbols::All,
+            Helper::Symbol(symbol) => Symbols::Symbols(vec![symbol]),
+            Helper::Symbols(symbols) => Symbols::Symbols(symbols),
+        })
+    }
 }
 
 #[cfg(test)]
@@ -153,4 +176,24 @@ pub(crate) fn body_contains(
     val: impl Display,
 ) -> wiremock::matchers::BodyContainsMatcher {
     wiremock::matchers::body_string_contains(&format!("{key}={val}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_deserialize_symbols() {
+        const JSON: &str = r#"["ALL_SYMBOLS", [1, 2, 3], ["ESZ3", "CLZ3"], "TSLA", 1001]"#;
+        let symbol_res: Vec<Symbols> = serde_json::from_str(JSON).unwrap();
+        assert_eq!(symbol_res.len(), 5);
+        assert_eq!(symbol_res[0], Symbols::All);
+        assert_eq!(symbol_res[1], Symbols::Ids(vec![1, 2, 3]));
+        assert_eq!(
+            symbol_res[2],
+            Symbols::Symbols(vec!["ESZ3".to_owned(), "CLZ3".to_owned()])
+        );
+        assert_eq!(symbol_res[3], Symbols::Symbols(vec!["TSLA".to_owned()]));
+        assert_eq!(symbol_res[4], Symbols::Ids(vec![1001]));
+    }
 }

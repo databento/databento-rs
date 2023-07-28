@@ -3,6 +3,7 @@ use std::{collections::HashMap, error::Error};
 
 use databento::{
     dbn::{
+        datasets,
         enums::{SType, Schema},
         record::{SymbolMappingMsg, TradeMsg},
     },
@@ -14,13 +15,13 @@ use databento::{
 async fn main() -> Result<(), Box<dyn Error>> {
     let mut client = LiveClient::builder()
         .key_from_env()?
-        .dataset(dbn::datasets::GLBX_MDP3.to_owned())
+        .dataset(datasets::GLBX_MDP3)
         .build()
         .await?;
     client
         .subscribe(
             &Subscription::builder()
-                .symbols("ES.FUT".into())
+                .symbols("ES.FUT")
                 .schema(Schema::Trades)
                 .stype_in(SType::Parent)
                 .build(),

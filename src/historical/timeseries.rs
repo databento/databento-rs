@@ -70,12 +70,15 @@ impl TimeseriesClient<'_> {
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct GetRangeParams {
     /// The dataset code.
+    #[builder(setter(transform = |dt: impl ToString| dt.to_string()))]
     pub dataset: String,
     /// The symbols to filter for.
+    #[builder(setter(into))]
     pub symbols: Symbols,
     /// The data record schema.
     pub schema: Schema,
     /// The request time range.
+    #[builder(setter(into))]
     pub date_time_range: DateTimeRange,
     /// The symbology type of the input `symbols`. Defaults to
     /// [`RawSymbol`](dbn::enums::SType::RawSymbol).
@@ -144,10 +147,10 @@ mod tests {
             .timeseries()
             .get_range(
                 &GetRangeParams::builder()
-                    .dataset(dbn::datasets::XNAS_ITCH.to_owned())
+                    .dataset(dbn::datasets::XNAS_ITCH)
                     .schema(SCHEMA)
-                    .symbols(vec!["SPOT", "AAPL"].into())
-                    .date_time_range((START, END).into())
+                    .symbols(vec!["SPOT", "AAPL"])
+                    .date_time_range((START, END))
                     .build(),
             )
             .await

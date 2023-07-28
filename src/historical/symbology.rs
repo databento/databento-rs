@@ -52,8 +52,10 @@ impl SymbologyClient<'_> {
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct ResolveParams {
     /// The dataset code.
+    #[builder(setter(transform = |dt: impl ToString| dt.to_string()))]
     pub dataset: String,
     /// The symbols to resolve.
+    #[builder(setter(into))]
     pub symbols: Symbols,
     /// The symbology type of the input `symbols`. Defaults to
     /// [`RawSymbol`](dbn::enums::SType::RawSymbol).
@@ -64,6 +66,7 @@ pub struct ResolveParams {
     #[builder(default = SType::InstrumentId)]
     pub stype_out: SType,
     /// The date range of the resolution.
+    #[builder(setter(into))]
     pub date_range: DateRange,
 }
 
@@ -72,6 +75,7 @@ pub struct ResolveParams {
 pub struct Resolution {
     /// A mapping from input symbol to a list of resolved symbols in the output
     /// symbology.
+    #[serde(rename = "result")]
     pub mappings: HashMap<String, Vec<MappingInterval>>,
     /// A list of symbols that were resolved for part, but not all of the date range
     /// from the request.
@@ -113,7 +117,7 @@ mod tests {
             .and(body_contains("start_date", "2023-06-14"))
             .and(body_contains("end_date", "2023-06-17"))
             .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_json(json!({
-                "mappings": {
+                "result": {
                     "ES.c.0": [
                         {
                             "d0": "2023-06-14",
@@ -142,10 +146,10 @@ mod tests {
             .symbology()
             .resolve(
                 &ResolveParams::builder()
-                    .dataset(dbn::datasets::GLBX_MDP3.to_owned())
-                    .symbols(vec!["ES.c.0", "ES.d.0"].into())
+                    .dataset(dbn::datasets::GLBX_MDP3)
+                    .symbols(vec!["ES.c.0", "ES.d.0"])
                     .stype_in(SType::Continuous)
-                    .date_range((date!(2023 - 06 - 14), date!(2023 - 06 - 17)).into())
+                    .date_range((date!(2023 - 06 - 14), date!(2023 - 06 - 17)))
                     .build(),
             )
             .await

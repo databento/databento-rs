@@ -11,6 +11,7 @@ use std::{
 
 use dbn::enums::{Compression, Encoding, SType, Schema};
 use futures::StreamExt;
+use log::info;
 use reqwest::RequestBuilder;
 use serde::{de, Deserialize, Deserializer};
 use time::OffsetDateTime;
@@ -80,7 +81,7 @@ impl BatchClient<'_> {
             builder = builder.query(&[("states", states_str)]);
         }
         if let Some(ref since) = params.since {
-            builder = builder.query(&["since", &since.unix_timestamp_nanos().to_string()]);
+            builder = builder.query(&[("since", &since.unix_timestamp_nanos().to_string())]);
         }
         Ok(builder.send().await?.error_for_status()?.json().await?)
     }
@@ -155,11 +156,13 @@ impl BatchClient<'_> {
         let url = reqwest::Url::parse(url)
             .map_err(|e| Error::internal(format!("Unable to parse URL: {e:?}")))?;
         let mut stream = self
-            .get(url.path())?
+            .inner
+            .get_with_path(url.path())?
             .send()
             .await?
             .error_for_status()?
             .bytes_stream();
+        info!("Saving {url} to {}", path.as_ref().display());
         let mut output = BufWriter::new(
             tokio::fs::OpenOptions::new()
                 .create(true)
@@ -238,12 +241,15 @@ pub enum JobState {
 #[derive(Debug, Clone, TypedBuilder)]
 pub struct SubmitJobParams {
     /// The dataset code.
+    #[builder(setter(transform = |dt: impl ToString| dt.to_string()))]
     pub dataset: String,
     /// The symbols to filter for.
+    #[builder(setter(into))]
     pub symbols: Symbols,
     /// The data record schema.
     pub schema: Schema,
     /// The request time range.
+    #[builder(setter(into))]
     pub date_time_range: DateTimeRange,
     /// The data compression mode. Defaults to [`ZStd`](dbn::enums::Compression::ZStd).
     #[builder(default = Compression::ZStd)]
@@ -254,10 +260,10 @@ pub struct SubmitJobParams {
     pub split_duration: SplitDuration,
     /// The optional maximum size (in bytes) of each batched data file before being split.
     /// Defaults to `None`.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub split_size: Option<NonZeroU64>,
     /// The optional archive type to package all batched data files in. Defaults to `None`.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub packaging: Option<Packaging>,
     /// The delivery mechanism for the batched data files once processed. Defaults to
     /// [`Download`](Delivery::Download).
@@ -290,7 +296,7 @@ pub struct BatchJob {
     /// The dataset code.
     pub dataset: String,
     /// The list of symbols specified in the request.
-    pub symbols: Vec<String>,
+    pub symbols: Symbols,
     /// The symbology type of the input `symbols`.
     pub stype_in: SType,
     /// The symbology type of the output `symbols`.
@@ -308,6 +314,7 @@ pub struct BatchJob {
     /// The data encoding.
     pub encoding: Encoding,
     /// The data compression mode.
+    #[serde(deserialize_with = "deserialize_compression")]
     pub compression: Compression,
     /// The maximum time interval for an individual file before splitting into multiple
     /// files.
@@ -350,11 +357,11 @@ pub struct BatchJob {
 #[derive(Debug, Clone, Default, TypedBuilder)]
 pub struct ListJobsParams {
     /// The optional filter for job states.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub states: Option<Vec<JobState>>,
     /// The optional filter for timestamp submitted (will not include jobs prior to
     /// this time).
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub since: Option<OffsetDateTime>,
 }
 
@@ -380,12 +387,12 @@ pub struct DownloadParams {
     /// The batch job identifier.
     pub job_id: String,
     /// `None` means all files associated with the job will be downloaded.
-    #[builder(default)]
+    #[builder(default, setter(strip_option))]
     pub filename_to_download: Option<String>,
 }
 
 const DATE_TIME_FORMAT: &[time::format_description::FormatItem<'static>] =
-        time::macros::format_description!("[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:6][offset_hour padding:zero]:[offset_minute padding:zero]");
+        time::macros::format_description!("[year]-[month]-[day] [hour]:[minute]:[second][optional [.[subsecond digits:6]]][offset_hour padding:zero]:[offset_minute padding:zero]");
 
 fn deserialize_date_time<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
@@ -582,6 +589,14 @@ impl<'de> Deserialize<'de> for JobState {
     }
 }
 
+// Handles Compression::None being serialized as null in JSON
+fn deserialize_compression<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Compression, D::Error> {
+    let opt = Option::<Compression>::deserialize(deserializer)?;
+    Ok(opt.unwrap_or(Compression::None))
+}
+
 #[cfg(test)]
 mod tests {
     use reqwest::StatusCode;
@@ -602,7 +617,7 @@ mod tests {
     const API_KEY: &str = "test-batch";
 
     #[tokio::test]
-    async fn test_submit_job() {
+    async fn test_submit_job() -> crate::Result<()> {
         const START: time::OffsetDateTime = datetime!(2023 - 06 - 14 00:00 UTC);
         const END: time::OffsetDateTime = datetime!(2023 - 06 - 17 00:00 UTC);
         const SCHEMA: Schema = Schema::Trades;
@@ -654,25 +669,24 @@ mod tests {
             mock_server.uri(),
             API_KEY.to_owned(),
             HistoricalGateway::Bo1,
-        )
-        .unwrap();
+        )?;
         let job_desc = target
             .batch()
             .submit_job(
                 &SubmitJobParams::builder()
-                    .dataset(dbn::datasets::XNAS_ITCH.to_owned())
+                    .dataset(dbn::datasets::XNAS_ITCH)
                     .schema(SCHEMA)
-                    .symbols("TSLA".into())
-                    .date_time_range((START, END).into())
+                    .symbols("TSLA")
+                    .date_time_range((START, END))
                     .build(),
             )
-            .await
-            .unwrap();
+            .await?;
         assert_eq!(job_desc.dataset, dbn::datasets::XNAS_ITCH);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_list_jobs() {
+    async fn test_list_jobs() -> crate::Result<()> {
         const SCHEMA: Schema = Schema::Trades;
 
         let mock_server = MockServer::start().await;
@@ -687,12 +701,12 @@ mod tests {
                 "bill_id": "345",
                 "cost_usd": 10.50,
                 "dataset": "XNAS.ITCH",
-                "symbols": ["TSLA"],
+                "symbols": "TSLA",
                 "stype_in": "raw_symbol",
                 "stype_out": "instrument_id",
                 "schema": SCHEMA.as_str(),
-                "start": "2023-06-14 00:00:00.000000+00:00",
-                "end": "2023-06-17 00:00:00.000000+00:00",
+                "start": "2023-06-14 00:00:00+00:00",
+                "end": "2023-06-17 00:00:00+00:00",
                 "limit": null,
                 "encoding": "dbn",
                 "compression": "zstd",
@@ -713,13 +727,8 @@ mod tests {
             mock_server.uri(),
             API_KEY.to_owned(),
             HistoricalGateway::Bo1,
-        )
-        .unwrap();
-        let job_descs = target
-            .batch()
-            .list_jobs(&ListJobsParams::default())
-            .await
-            .unwrap();
+        )?;
+        let job_descs = target.batch().list_jobs(&ListJobsParams::default()).await?;
         assert_eq!(job_descs.len(), 1);
         let job_desc = &job_descs[0];
         assert_eq!(
@@ -729,6 +738,24 @@ mod tests {
         assert_eq!(
             job_desc.ts_process_start.unwrap(),
             datetime!(2023-07-19 23:01:04 UTC)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_deserialize_compression() {
+        #[derive(serde::Deserialize)]
+        struct Test {
+            #[serde(deserialize_with = "deserialize_compression")]
+            compression: Compression,
+        }
+
+        const JSON: &str =
+            r#"[{"compression":null}, {"compression":"none"}, {"compression":"zstd"}]"#;
+        let res: Vec<Test> = serde_json::from_str(JSON).unwrap();
+        assert_eq!(
+            res.into_iter().map(|t| t.compression).collect::<Vec<_>>(),
+            vec![Compression::None, Compression::None, Compression::ZStd]
         );
     }
 }

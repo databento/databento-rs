@@ -15,14 +15,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .timeseries()
         .get_range(
             &GetRangeParams::builder()
-                .dataset("GLBX.MDP3".to_owned())
-                .date_time_range(
-                    (
-                        datetime!(2022-06-10 14:30 UTC),
-                        datetime!(2022-06-10 14:40 UTC),
-                    )
-                        .into(),
-                )
+                .dataset("GLBX.MDP3")
+                .date_time_range((
+                    datetime!(2022-06-10 14:30 UTC),
+                    datetime!(2022-06-10 14:40 UTC),
+                ))
                 .symbols(Symbols::All)
                 .schema(Schema::Trades)
                 .build(),
