@@ -109,25 +109,23 @@ impl BatchClient<'_> {
     /// or the API indicates there's an issue with the request. It will also return an
     /// error if it encounters an issue downloading a file.
     pub async fn download(&mut self, params: &DownloadParams) -> crate::Result<Vec<PathBuf>> {
-        if params.output_dir.exists() {
-            if !params.output_dir.is_dir() {
+        let job_dir = params.output_dir.join(&params.job_id);
+        if job_dir.exists() {
+            if !job_dir.is_dir() {
                 return Err(Error::bad_arg(
                     "output_dir",
                     "exists but is not a directory",
                 ));
             }
         } else {
-            tokio::fs::create_dir_all(params.output_dir.join(&params.job_id)).await?;
+            tokio::fs::create_dir_all(&job_dir).await?;
         }
         let job_files = self.list_files(&params.job_id).await?;
         if let Some(filename_to_download) = params.filename_to_download.as_ref() {
             let Some(file_desc) = job_files.iter().find(|file| file.filename == *filename_to_download) else {
                 return Err(Error::bad_arg("filename_to_download", "not found for batch job"))
             };
-            let output_path = params
-                .output_dir
-                .join(&params.job_id)
-                .join(filename_to_download);
+            let output_path = job_dir.join(filename_to_download);
             let https_url = file_desc
                 .urls
                 .get("https")
