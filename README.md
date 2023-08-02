@@ -110,7 +110,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         println!("{trade:?}");
     }
     Ok(())
-}```
+}
+```
+
 To run this program, set the `DATABENTO_API_KEY` environment variable with an actual API key.
 
 ## Documentation
