@@ -158,7 +158,7 @@ impl Client {
         let encoded_response = result.encode_hex::<String>();
         let send_ts_out = send_ts_out as i32;
         let reply =
-                format!("auth={encoded_response}-{bucket_id}|dataset={dataset}|encoding=dbn|ts_out={send_ts_out}\n");
+                format!("auth={encoded_response}-{bucket_id}|dataset={dataset}|encoding=dbn|ts_out={send_ts_out}|client=Rust {}\n", env!("CARGO_PKG_VERSION"));
 
         // Send CRAM reply
         debug!(
