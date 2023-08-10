@@ -17,11 +17,11 @@ pub struct MetadataClient<'a> {
 }
 
 impl MetadataClient<'_> {
-    /// Lists all publisher ID mappings.
+    /// Lists the details of all publishers.
     ///
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API.
-    pub async fn list_publishers(&mut self) -> crate::Result<HashMap<String, u16>> {
+    pub async fn list_publishers(&mut self) -> crate::Result<Vec<PublisherDetail>> {
         Ok(self
             .get("list_publishers")?
             .send()
@@ -63,7 +63,7 @@ impl MetadataClient<'_> {
             .await?)
     }
 
-    /// Lists all fields for a dataset, schema, and encoding.
+    /// Lists all fields for a schema and encoding.
     ///
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
@@ -71,39 +71,26 @@ impl MetadataClient<'_> {
     pub async fn list_fields(
         &mut self,
         params: &ListFieldsParams,
-    ) -> crate::Result<HashMap<String, HashMap<Encoding, HashMap<Schema, HashMap<String, String>>>>>
-    {
-        let mut builder = self.get("list_fields")?;
-        if let Some(ref dataset) = params.dataset {
-            builder = builder.query(&[("dataset", dataset)]);
-        }
-        if let Some(encoding) = params.encoding {
-            builder = builder.query(&[("encoding", encoding.as_str())]);
-        }
-        if let Some(schema) = params.schema {
-            builder = builder.query(&[("schema", schema.as_str())]);
-        }
+    ) -> crate::Result<Vec<FieldDetail>> {
+        let builder = self.get("list_fields")?.query(&[
+            ("encoding", params.encoding.as_str()),
+            ("schema", params.schema.as_str()),
+        ]);
         Ok(builder.send().await?.error_for_status()?.json().await?)
     }
 
-    /// Lists unit prices for each data schema in US dollars per gigabyte.
+    /// Lists unit prices for each data schema and feed mode in US dollars per gigabyte.
     ///
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
     pub async fn list_unit_prices(
         &mut self,
-        params: &ListUnitPricesParams,
-    ) -> crate::Result<HashMap<FeedMode, HashMap<Schema, f64>>> {
-        let mut builder = self
+        dataset: &str,
+    ) -> crate::Result<Vec<UnitPricesForMode>> {
+        let builder = self
             .get("list_unit_prices")?
-            .query(&[("dataset", &params.dataset)]);
-        if let Some(feed_mode) = params.feed_mode {
-            builder = builder.query(&[("feed_mode", feed_mode.as_str())]);
-        }
-        if let Some(schema) = params.schema {
-            builder = builder.query(&[("schema", schema.as_str())]);
-        }
+            .query(&[("dataset", &dataset)]);
         Ok(builder.send().await?.error_for_status()?.json().await?)
     }
 
@@ -228,35 +215,46 @@ pub enum DatasetCondition {
     Missing,
 }
 
-/// The parameters for [`MetadataClient::list_fields()`]. Use
-/// [`ListFieldsParams::builder()`] to get a builder type with all the preset defaults.
-#[derive(Debug, Clone, Default, TypedBuilder)]
-pub struct ListFieldsParams {
-    /// The optional filter by dataset code.
-    #[builder(default, setter(transform = |dataset: impl ToString| Some(dataset.to_string())))]
-    pub dataset: Option<String>,
-    /// The optional filter by encoding.
-    #[builder(default, setter(strip_option))]
-    pub encoding: Option<Encoding>,
-    /// The optional filter by data record schema.
-    #[builder(default, setter(strip_option))]
-    pub schema: Option<Schema>,
+/// The details about a publisher.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct PublisherDetail {
+    /// The publisher ID assigned by Databento.
+    pub publisher_id: u16,
+    /// The dataset code for the publisher.
+    pub dataset: String,
+    /// The venue for the publisher.
+    pub venue: String,
+    /// The publisher description.
+    pub description: String,
 }
 
-/// The parameters for [`MetadataClient::list_unit_prices()`]. Use
-/// [`ListUnitPricesParams::builder()`] to get a builder type with all the preset
-/// defaults.
+/// The parameters for [`MetadataClient::list_fields()`]. Use
+/// [`ListFieldsParams::builder()`] to get a builder type with all the preset defaults.
 #[derive(Debug, Clone, TypedBuilder)]
-pub struct ListUnitPricesParams {
-    /// The required filter by dataset code.
-    #[builder(setter(transform = |dataset: impl ToString| dataset.to_string()))]
-    pub dataset: String,
-    /// The optional filter by data feed mode.
-    #[builder(default, setter(strip_option))]
-    pub feed_mode: Option<FeedMode>,
-    /// The optional filter by data record schema.
-    #[builder(default, setter(strip_option))]
-    pub schema: Option<Schema>,
+pub struct ListFieldsParams {
+    /// The encoding to request fields for.
+    pub encoding: Encoding,
+    /// The data record schema to request fields for.
+    pub schema: Schema,
+}
+
+/// The details about a field in a schema.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct FieldDetail {
+    /// The field name.
+    pub name: String,
+    /// The field type name.
+    #[serde(rename = "type")]
+    pub type_name: String,
+}
+
+/// The unit prices for a particular [`FeedMode`].
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct UnitPricesForMode {
+    /// The data feed mode.
+    pub mode: FeedMode,
+    /// The unit prices in US dollars by data record schema.
+    pub unit_prices: HashMap<Schema, f64>,
 }
 
 /// The parameters for [`MetadataClient::get_dataset_condition()`]. Use
@@ -458,29 +456,22 @@ mod tests {
     #[tokio::test]
     async fn test_list_fields() {
         const ENC: Encoding = Encoding::Csv;
-        const DATASET: &str = "GLBX.MDP3";
+        const SCHEMA: Schema = Schema::Ohlcv1S;
         let mock_server = MockServer::start().await;
         Mock::given(method("GET"))
             .and(basic_auth(API_KEY, ""))
             .and(path(format!("/v{API_VERSION}/metadata.list_fields")))
             .and(query_param("encoding", ENC.as_str()))
-            .and(query_param("dataset", DATASET))
-            .and(query_param_is_missing("schema"))
-            .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_json(json!({
-                DATASET: {
-                    ENC.as_str(): {
-                        "ohlcv-1s": {
-                            "ts_event": "uint64_t",
-                            "rtype": "uint8_t",
-                            "open": "int64_t",
-                            "high": "int64_t",
-                            "low": "int64_t",
-                            "close": "int64_t",
-                            "volume": "uint64_t",
-                        }
-                    }
-                }
-            })))
+            .and(query_param("schema", SCHEMA.as_str()))
+            .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_json(json!([
+                {"name":"ts_event", "type": "uint64_t"},
+                {"name":"rtype", "type": "uint8_t"},
+                {"name":"open", "type": "int64_t"},
+                {"name":"high", "type": "int64_t"},
+                {"name":"low", "type": "int64_t"},
+                {"name":"close", "type": "int64_t"},
+                {"name":"volume", "type": "uint64_t"},
+            ])))
             .mount(&mock_server)
             .await;
         let mut target = HistoricalClient::with_url(
@@ -489,30 +480,46 @@ mod tests {
             HistoricalGateway::Bo1,
         )
         .unwrap();
-        let fields_map = target
+        let fields = target
             .metadata()
             .list_fields(
                 &ListFieldsParams::builder()
-                    .dataset(DATASET)
                     .encoding(ENC)
+                    .schema(SCHEMA)
                     .build(),
             )
             .await
             .unwrap();
-        let fields = fields_map
-            .get(DATASET)
-            .and_then(|m| m.get(&ENC))
-            .and_then(|m| m.get(&Schema::Ohlcv1S))
-            .unwrap();
-        let exp = HashMap::from([
-            ("ts_event".to_owned(), "uint64_t".to_owned()),
-            ("rtype".to_owned(), "uint8_t".to_owned()),
-            ("open".to_owned(), "int64_t".to_owned()),
-            ("high".to_owned(), "int64_t".to_owned()),
-            ("low".to_owned(), "int64_t".to_owned()),
-            ("close".to_owned(), "int64_t".to_owned()),
-            ("volume".to_owned(), "uint64_t".to_owned()),
-        ]);
+        let exp = vec![
+            FieldDetail {
+                name: "ts_event".to_owned(),
+                type_name: "uint64_t".to_owned(),
+            },
+            FieldDetail {
+                name: "rtype".to_owned(),
+                type_name: "uint8_t".to_owned(),
+            },
+            FieldDetail {
+                name: "open".to_owned(),
+                type_name: "int64_t".to_owned(),
+            },
+            FieldDetail {
+                name: "high".to_owned(),
+                type_name: "int64_t".to_owned(),
+            },
+            FieldDetail {
+                name: "low".to_owned(),
+                type_name: "int64_t".to_owned(),
+            },
+            FieldDetail {
+                name: "close".to_owned(),
+                type_name: "int64_t".to_owned(),
+            },
+            FieldDetail {
+                name: "volume".to_owned(),
+                type_name: "uint64_t".to_owned(),
+            },
+        ];
         assert_eq!(*fields, exp);
     }
 
@@ -525,16 +532,20 @@ mod tests {
             .and(basic_auth(API_KEY, ""))
             .and(path(format!("/v{API_VERSION}/metadata.list_unit_prices")))
             .and(query_param("dataset", DATASET))
-            .and(query_param("schema", SCHEMA.as_str()))
-            .and(query_param_is_missing("feed_mode"))
-            .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_json(json!({
-                "historical": {
-                    SCHEMA.as_str(): 17.89
+            .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_json(json!([
+                {
+                    "mode": "historical",
+                    "unit_prices": {
+                        SCHEMA.as_str(): 17.89
+                    }
                 },
-                "live": {
-                    SCHEMA.as_str(): 34.22
+                {
+                    "mode": "live",
+                    "unit_prices": {
+                        SCHEMA.as_str(): 34.22
+                    }
                 }
-            })))
+            ])))
             .mount(&mock_server)
             .await;
         let mut target = HistoricalClient::with_url(
@@ -543,33 +554,19 @@ mod tests {
             HistoricalGateway::Bo1,
         )
         .unwrap();
-        let prices = target
-            .metadata()
-            .list_unit_prices(
-                &ListUnitPricesParams::builder()
-                    .dataset(DATASET)
-                    .schema(SCHEMA)
-                    .build(),
-            )
-            .await
-            .unwrap();
-        assert!(
-            (prices
-                .get(&FeedMode::Historical)
-                .and_then(|m| m.get(&SCHEMA))
-                .unwrap()
-                - 17.89)
-                .abs()
-                < f64::EPSILON,
-        );
-        assert!(
-            (prices
-                .get(&FeedMode::Live)
-                .and_then(|m| m.get(&SCHEMA))
-                .unwrap()
-                - 34.22)
-                .abs()
-                < f64::EPSILON,
+        let prices = target.metadata().list_unit_prices(DATASET).await.unwrap();
+        assert_eq!(
+            prices,
+            vec![
+                UnitPricesForMode {
+                    mode: FeedMode::Historical,
+                    unit_prices: HashMap::from([(SCHEMA, 17.89)])
+                },
+                UnitPricesForMode {
+                    mode: FeedMode::Live,
+                    unit_prices: HashMap::from([(SCHEMA, 34.22)])
+                }
+            ]
         );
     }
 
