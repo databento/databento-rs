@@ -218,7 +218,7 @@ pub enum DatasetCondition {
 /// The details about a publisher.
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct PublisherDetail {
-    /// The publisher ID assigned by Databento.
+    /// The publisher ID assigned by Databento, which denotes the dataset and venue.
     pub publisher_id: u16,
     /// The dataset code for the publisher.
     pub dataset: String,
