@@ -1,4 +1,4 @@
-//! Historical batch download API.
+//! The historical batch download API.
 
 use core::fmt;
 use std::{

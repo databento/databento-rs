@@ -1,4 +1,4 @@
-//! Historical metadata download API.
+//! The historical metadata download API.
 
 use std::{collections::HashMap, num::NonZeroU64, str::FromStr};
 

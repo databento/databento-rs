@@ -11,6 +11,12 @@ keywords = ["real-time", "historical", "market-data", "trading", "tick-data"]
 # see https://crates.io/category_slugs
 categories = ["api-bindings", "finance"]
 
+[package.metadata.docs.rs]
+# Document all features on docs.rs
+all-features = true
+# To build locally: `RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --open`
+rustdoc-args = ["--cfg", "docsrs"]
+
 [features]
 default = ["historical", "live"]
 historical = ["dep:futures", "dep:reqwest", "dep:serde", "dep:tokio-util", "dep:serde_json", "tokio/fs"]

@@ -1,15 +1,15 @@
-//! Types for errors that can occur in databento-defs and dependent crates.
+//! Types for errors received from the API and occurring in the clients.
 use thiserror::Error;
 
 /// An error that can occur while working with Databento's API.
 #[derive(Debug, Error)]
 pub enum Error {
-    /// An invalid argument was passed.
+    /// An invalid argument was passed to a function.
     #[error("bad argument {param_name}: {desc}")]
     BadArgument {
         /// The name of the parameter to which the bad argument was passed.
         param_name: String,
-        /// The description of how the argument was invalid.
+        /// The description of why the argument was invalid.
         desc: String,
     },
     /// An I/O error while reading or writing DBN or another encoding.

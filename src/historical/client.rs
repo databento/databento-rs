@@ -8,7 +8,7 @@ use super::{
 };
 
 /// The Historical client. Used for symbology resolutions, metadata requests, Historical
-/// data older than 24 hours and submitting batch downloads.
+/// data older than 24 hours, and submitting batch downloads.
 ///
 /// Use [`HistoricalClient::builder()`](Client::builder) to get a type-safe builder for
 /// initializing the required parameters for the client.

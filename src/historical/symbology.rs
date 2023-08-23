@@ -1,4 +1,4 @@
-//! Historical symbology API.
+//! The historical symbology API.
 
 use std::collections::HashMap;
 

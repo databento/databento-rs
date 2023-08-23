@@ -11,7 +11,7 @@ use time::{format_description::FormatItem, macros::format_description};
 
 use crate::{Error, Symbols};
 
-/// The current historical API version.
+/// The current Databento historical API version.
 pub const API_VERSION: u32 = 0;
 
 /// The Historical API gateway to use.
