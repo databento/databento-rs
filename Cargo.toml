@@ -1,7 +1,7 @@
 [package]
 name = "databento"
 authors = ["Databento <support@databento.com>"]
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 repository = "https://github.com/databento/databento-rs"
 description = "Official Databento client library"
@@ -11,6 +11,12 @@ keywords = ["real-time", "historical", "market-data", "trading", "tick-data"]
 # see https://crates.io/category_slugs
 categories = ["api-bindings", "finance"]
 
+[package.metadata.docs.rs]
+# Document all features on docs.rs
+all-features = true
+# To build locally: `RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --open`
+rustdoc-args = ["--cfg", "docsrs"]
+
 [features]
 default = ["historical", "live"]
 historical = ["dep:futures", "dep:reqwest", "dep:serde", "dep:tokio-util", "dep:serde_json", "tokio/fs"]
@@ -18,7 +24,7 @@ live = ["dep:hex", "dep:sha2", "tokio/net"]
 
 [dependencies]
 # binary encoding
-dbn = { version = "0.8.2", features = ["async", "serde"] }
+dbn = { version = "0.9.0", features = ["async", "serde"] }
 # Async stream trait
 futures = { version = "0.3", optional = true }
 # Hex encoding used for Live authentication

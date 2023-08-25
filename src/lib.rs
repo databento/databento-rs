@@ -1,5 +1,19 @@
-//! The official Databento client library.
+//! The official [Databento](https://databento.com) client library.
+//! It provides clients for fast, safe streaming of both real-time and historical market data through
+//! similar interfaces.
+//! The library is built on top of the tokio asynchronous runtime and
+//! [Databento's efficient binary encoding](https://docs.databento.com/knowledge-base/new-users/dbn-encoding).
+//!
+//! You can find getting started tutorials, full API method documentation, example
+//! code and output on the [Databento docs site](https://docs.databento.com/?historical=rust&live=rust).
+//!
+//! # Feature flags
+//! By default both features are enabled.
+//! - `historical`: enables the [historical client](HistoricalClient) for data older than 24 hours
+//! - `live`: enables the [live client](LiveClient) for real-time and intraday
+//!   historical data
 
+// Experimental feature to allow docs.rs to display features
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
@@ -25,7 +39,7 @@ use log::error;
 #[cfg(feature = "historical")]
 use serde::{Deserialize, Deserializer};
 
-/// One or more symbols in a particular [`SType`](dbn::enums::SType).
+/// A set of symbols for a particular [`SType`](dbn::enums::SType).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Symbols {
     /// Sentinel value for all symbols in a dataset.

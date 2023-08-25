@@ -6,7 +6,8 @@
 [![Slack](https://img.shields.io/badge/join_Slack-community-darkblue.svg?logo=slack)](https://join.slack.com/t/databento-hq/shared_invite/zt-1xk498wxs-9fUs_xhz5ypaGD~mhI_hVQ)
 
 The official Rust client library for [Databento](https://databento.com).
-The clients support streaming both real-time and historical market data through similar interfaces.
+The clients support fast and safe streaming of both real-time and historical market data
+through similar interfaces.
 
 ## Installation
 

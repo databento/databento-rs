@@ -1,4 +1,4 @@
-//! Historical timeseries API.
+//! The historical timeseries API.
 
 use std::num::NonZeroU64;
 
