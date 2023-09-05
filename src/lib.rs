@@ -69,6 +69,30 @@ impl Symbols {
             Symbols::Symbols(symbols) => symbols.join(","),
         }
     }
+
+    pub(crate) fn to_chunked_api_string(&self) -> Vec<String> {
+        const CHUNK_SIZE: usize = 128;
+        match self {
+            Symbols::All => vec![ALL_SYMBOLS.to_owned()],
+            Symbols::Ids(ids) => ids
+                .chunks(CHUNK_SIZE)
+                .map(|chunk| {
+                    chunk.iter().fold(String::new(), |mut acc, s| {
+                        if acc.is_empty() {
+                            s.to_string()
+                        } else {
+                            write!(acc, ",{s}").unwrap();
+                            acc
+                        }
+                    })
+                })
+                .collect(),
+            Symbols::Symbols(symbols) => symbols
+                .chunks(CHUNK_SIZE)
+                .map(|chunk| chunk.join(","))
+                .collect(),
+        }
+    }
 }
 
 impl Display for Symbols {

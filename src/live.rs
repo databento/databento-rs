@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use dbn::{
     decode::dbn::{AsyncMetadataDecoder, AsyncRecordDecoder},
     enums::{SType, Schema},
+    record::SymbolMappingMsg,
     record_ref::RecordRef,
     Metadata,
 };
@@ -170,6 +171,11 @@ impl Client {
         response.clear();
         reader.read_line(&mut response).await?;
 
+        debug!(
+            "[{dataset}] Received auth response: {}",
+            &response[..response.len() - 1]
+        );
+
         response.pop(); // remove newline
 
         let mut auth_keys: HashMap<String, String> = response
@@ -209,21 +215,23 @@ impl Client {
         let Subscription {
             schema, stype_in, ..
         } = &sub;
-        let sym_str = sub.symbols.to_api_string();
-        let args = format!("schema={schema}|stype_in={stype_in}|symbols={sym_str}");
+        for sym_str in sub.symbols.to_chunked_api_string() {
+            let args = format!("schema={schema}|stype_in={stype_in}|symbols={sym_str}");
 
-        let sub_str = if let Some(start) = sub.start.as_ref() {
-            format!("{args}|start={}\n", start.unix_timestamp_nanos())
-        } else {
-            format!("{args}\n")
-        };
+            let sub_str = if let Some(start) = sub.start.as_ref() {
+                format!("{args}|start={}\n", start.unix_timestamp_nanos())
+            } else {
+                format!("{args}\n")
+            };
 
-        debug!(
-            "[{}] Subscribing: {}",
-            self.dataset,
-            &sub_str[..sub_str.len() - 1]
-        );
-        Ok(self.connection.write_all(sub_str.as_bytes()).await?)
+            debug!(
+                "[{}] Subscribing: {}",
+                self.dataset,
+                &sub_str[..sub_str.len() - 1]
+            );
+            self.connection.write_all(sub_str.as_bytes()).await?;
+        }
+        Ok(())
     }
 
     /// Instructs the gateway to start sending data, starting the session. This method
@@ -243,8 +251,8 @@ impl Client {
             .await?)
     }
 
-    /// Fetches the next record
-    /// This method should only be called after the session has been [started](Self::start).
+    /// Fetches the next record. This method should only be called after the session has
+    /// been [started](Self::start).
     ///
     /// # Errors
     /// This function returns an error when it's unable to decode the next record
@@ -356,5 +364,435 @@ impl ClientBuilder<String, String> {
     /// to connect and authenticate with the Live gateway.
     pub async fn build(self) -> crate::Result<Client> {
         Client::connect(self.key, self.dataset, self.send_ts_out).await
+    }
+}
+
+/// Manages the mapping between the instrument IDs included in each record and
+/// a text symbology.
+#[derive(Debug, Clone, Default)]
+pub struct SymbolMap {
+    symbol_map: HashMap<u32, String>,
+}
+
+impl SymbolMap {
+    /// Creates a new `SymbolMap` instance.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Handles updating the mappings (if required) for a generic record.
+    ///
+    /// # Errors
+    /// This function returns an error when `record` contains a [`SymbolMappingMsg`] but
+    /// it contains invalid UTF-8.
+    pub fn on_record(&mut self, record: RecordRef) -> crate::Result<()> {
+        if let Some(symbol_mapping) = record.get::<SymbolMappingMsg>() {
+            self.on_symbol_mapping(symbol_mapping)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Handles updating the mappings for a .
+    ///
+    /// # Errors
+    /// This function returns an error when `symbol_mapping` contains invalid UTF-8.
+    pub fn on_symbol_mapping(&mut self, symbol_mapping: &SymbolMappingMsg) -> crate::Result<()> {
+        let stype_out_symbol = symbol_mapping.stype_out_symbol()?;
+        info!(
+            "Updated symbol mapping for {} to {}",
+            symbol_mapping.hd.instrument_id, stype_out_symbol
+        );
+        self.symbol_map
+            .insert(symbol_mapping.hd.instrument_id, stype_out_symbol.to_owned());
+        Ok(())
+    }
+
+    /// Returns a reference to the mapping for the given instrument ID.
+    pub fn get(&self, instrument_id: u32) -> Option<&String> {
+        self.symbol_map.get(&instrument_id)
+    }
+
+    /// Returns a reference to the inner map.
+    pub fn inner(&self) -> &HashMap<u32, String> {
+        &self.symbol_map
+    }
+
+    /// Returns a mutable reference to the inner map.
+    pub fn inner_mut(&mut self) -> &mut HashMap<u32, String> {
+        &mut self.symbol_map
+    }
+}
+
+impl std::ops::Index<u32> for SymbolMap {
+    type Output = String;
+
+    fn index(&self, instrument_id: u32) -> &Self::Output {
+        self.get(instrument_id)
+            .expect("symbol mapping for instrument ID")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{ffi::c_char, fmt};
+
+    use dbn::{
+        encode::AsyncDbnMetadataEncoder,
+        enums::rtype,
+        publishers::Dataset,
+        record::{HasRType, OhlcvMsg, RecordHeader, TradeMsg, WithTsOut},
+        MetadataBuilder, UNDEF_TIMESTAMP,
+    };
+    use tokio::{net::TcpListener, sync::mpsc::UnboundedSender, task::JoinHandle};
+
+    use super::*;
+
+    struct MockLsgServer {
+        dataset: String,
+        send_ts_out: bool,
+        listener: TcpListener,
+        stream: Option<BufReader<TcpStream>>,
+    }
+
+    impl MockLsgServer {
+        async fn new(dataset: String, send_ts_out: bool) -> Self {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            Self {
+                dataset,
+                send_ts_out,
+                listener,
+                stream: None,
+            }
+        }
+
+        async fn accept(&mut self) {
+            self.stream = Some(BufReader::new(self.listener.accept().await.unwrap().0));
+        }
+
+        async fn authenticate(&mut self) {
+            self.accept().await;
+            self.send("lsg-test\n").await;
+            self.send("cram=t7kNhwj4xqR0QYjzFKtBEG2ec2pXJ4FK\n").await;
+            let auth_line = self.read_line().await;
+            let auth_start = auth_line.find("auth=").unwrap() + 5;
+            let auth_end = auth_line[auth_start..].find('|').unwrap();
+            let auth = &auth_line[auth_start..auth_start + auth_end];
+            let (auth, bucket) = auth.split_once('-').unwrap();
+            assert!(
+                auth.chars().all(|c| c.is_ascii_hexdigit()),
+                "Expected '{auth}' to be composed of only hex characters"
+            );
+            assert_eq!(bucket, "iller");
+            assert!(auth_line.contains(&format!("dataset={}", self.dataset)));
+            assert!(auth_line.contains("encoding=dbn"));
+            assert!(auth_line.contains(&format!("ts_out={}", if self.send_ts_out { 1 } else { 0 })));
+            assert!(auth_line.contains(&format!("client=Rust {}", env!("CARGO_PKG_VERSION"))));
+            self.send("success=1|session_id=5\n").await;
+        }
+
+        async fn subscribe(&mut self, subscription: Subscription) {
+            let sub_line = self.read_line().await;
+            assert!(sub_line.contains(&format!("symbols={}", subscription.symbols.to_api_string())));
+            assert!(sub_line.contains(&format!("schema={}", subscription.schema)));
+            assert!(sub_line.contains(&format!("stype_in={}", subscription.stype_in)));
+            if let Some(start) = subscription.start {
+                assert!(sub_line.contains(&format!("start={}", start.unix_timestamp_nanos())))
+            }
+        }
+
+        async fn start(&mut self) {
+            let start_line = self.read_line().await;
+            assert_eq!(start_line, "start_session\n");
+            let dataset = self.dataset.clone();
+            let stream = self.stream();
+            let mut encoder = AsyncDbnMetadataEncoder::new(stream);
+            encoder
+                .encode(
+                    &MetadataBuilder::new()
+                        .dataset(dataset)
+                        .start(time::OffsetDateTime::now_utc().unix_timestamp_nanos() as u64)
+                        .schema(None)
+                        .stype_in(None)
+                        .stype_out(SType::InstrumentId)
+                        .build(),
+                )
+                .await
+                .unwrap();
+        }
+
+        async fn send(&mut self, bytes: &str) {
+            self.stream().write_all(bytes.as_bytes()).await.unwrap();
+            info!("Sent: {}", &bytes[..bytes.len() - 1])
+        }
+
+        async fn send_record(&mut self, record: Box<dyn AsRef<[u8]> + Send>) {
+            let bytes = (*record).as_ref();
+            self.stream().write_all(bytes).await.unwrap()
+        }
+
+        async fn read_line(&mut self) -> String {
+            let mut res = String::new();
+            self.stream().read_line(&mut res).await.unwrap();
+            info!("Read: {}", &res[..res.len() - 1]);
+            res
+        }
+
+        fn stream(&mut self) -> &mut BufReader<TcpStream> {
+            self.stream.as_mut().unwrap()
+        }
+    }
+
+    struct Fixture {
+        send: UnboundedSender<Event>,
+        port: u16,
+        task: JoinHandle<()>,
+    }
+
+    enum Event {
+        Stop,
+        Authenticate,
+        Subscribe(Subscription),
+        Start,
+        SendRecord(Box<dyn AsRef<[u8]> + Send>),
+    }
+
+    impl fmt::Debug for Event {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                Event::Stop => write!(f, "Stop"),
+                Event::Authenticate => write!(f, "Authenticate"),
+                Event::Subscribe(sub) => write!(f, "Subscribe({sub:?})"),
+                Event::Start => write!(f, "Start"),
+                Event::SendRecord(_) => write!(f, "SendRecord"),
+            }
+        }
+    }
+
+    impl Fixture {
+        pub async fn new(dataset: String, send_ts_out: bool) -> Self {
+            let (send, mut recv) = tokio::sync::mpsc::unbounded_channel();
+            let mut mock = MockLsgServer::new(dataset, send_ts_out).await;
+            let port = mock.listener.local_addr().unwrap().port();
+            let task = tokio::task::spawn(async move {
+                loop {
+                    match recv.recv().await {
+                        Some(Event::Authenticate) => mock.authenticate().await,
+                        Some(Event::Subscribe(sub)) => mock.subscribe(sub).await,
+                        Some(Event::Start) => mock.start().await,
+                        Some(Event::SendRecord(rec)) => mock.send_record(rec).await,
+                        Some(Event::Stop) | None => break,
+                    }
+                }
+            });
+            Self { task, port, send }
+        }
+
+        pub fn authenticate(&mut self) {
+            self.send.send(Event::Authenticate).unwrap();
+        }
+
+        pub fn expect_subscribe(&mut self, subscription: Subscription) {
+            self.send.send(Event::Subscribe(subscription)).unwrap();
+        }
+
+        pub fn start(&mut self) {
+            self.send.send(Event::Start).unwrap();
+        }
+
+        pub fn send_record<R>(&mut self, record: R)
+        where
+            R: HasRType + AsRef<[u8]> + Clone + Send + 'static,
+        {
+            self.send
+                .send(Event::SendRecord(Box::new(record.clone())))
+                .unwrap();
+        }
+
+        pub async fn stop(self) {
+            self.send.send(Event::Stop).unwrap();
+            self.task.await.unwrap()
+        }
+    }
+
+    async fn setup(dataset: Dataset, send_ts_out: bool) -> (Fixture, Client) {
+        let _ = env_logger::try_init();
+        let mut fixture = Fixture::new(dataset.as_str().to_owned(), send_ts_out).await;
+        fixture.authenticate();
+        let target = Client::connect_with_addr(
+            format!("127.0.0.1:{}", fixture.port),
+            "32-character-with-lots-of-filler".to_owned(),
+            dataset.as_str().to_owned(),
+            send_ts_out,
+        )
+        .await
+        .unwrap();
+        (fixture, target)
+    }
+
+    #[tokio::test]
+    async fn test_subscribe() {
+        let (mut fixture, mut client) = setup(Dataset::XnasItch, false).await;
+        let subscription = Subscription::builder()
+            .symbols(vec!["MSFT", "TSLA", "QQQ"])
+            .schema(Schema::Ohlcv1M)
+            .stype_in(SType::RawSymbol)
+            .build();
+        fixture.expect_subscribe(subscription.clone());
+        client.subscribe(&subscription).await.unwrap();
+        fixture.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_subscription_chunking() {
+        const SYMBOL: &str = "TEST";
+        const SYMBOL_COUNT: usize = 1000;
+        let (mut fixture, mut client) = setup(Dataset::XnasItch, false).await;
+        let sub_base = Subscription::builder()
+            .schema(Schema::Ohlcv1M)
+            .stype_in(SType::RawSymbol);
+        let subscription = sub_base.clone().symbols(vec![SYMBOL; SYMBOL_COUNT]).build();
+        client.subscribe(&subscription).await.unwrap();
+        let mut i = 0;
+        while i < SYMBOL_COUNT {
+            let chunk_size = 128.min(SYMBOL_COUNT - i);
+            fixture.expect_subscribe(sub_base.clone().symbols(vec![SYMBOL; chunk_size]).build());
+            i += chunk_size;
+        }
+        fixture.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_next_record() {
+        const REC: OhlcvMsg = OhlcvMsg {
+            hd: RecordHeader::new::<OhlcvMsg>(rtype::OHLCV_1M, 1, 2, 3),
+            open: 1,
+            high: 2,
+            low: 3,
+            close: 4,
+            volume: 5,
+        };
+        let (mut fixture, mut client) = setup(Dataset::GlbxMdp3, false).await;
+        fixture.start();
+        let metadata = client.start().await.unwrap();
+        assert_eq!(metadata.version, 1);
+        assert!(metadata.schema.is_none());
+        assert_eq!(metadata.dataset, Dataset::GlbxMdp3.as_str());
+        fixture.send_record(REC);
+        let rec = client.next_record().await.unwrap().unwrap();
+        assert_eq!(*rec.get::<OhlcvMsg>().unwrap(), REC);
+        fixture.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_next_record_with_ts_out() {
+        let expected = WithTsOut::new(
+            TradeMsg {
+                hd: RecordHeader::new::<TradeMsg>(rtype::MBP_0, 1, 2, 3),
+                price: 1,
+                size: 2,
+                action: b'A' as c_char,
+                side: b'A' as c_char,
+                flags: 0,
+                depth: 1,
+                ts_recv: 0,
+                ts_in_delta: 0,
+                sequence: 2,
+            },
+            time::OffsetDateTime::now_utc().unix_timestamp_nanos() as u64,
+        );
+        let (mut fixture, mut client) = setup(Dataset::GlbxMdp3, true).await;
+        fixture.start();
+        let metadata = client.start().await.unwrap();
+        assert_eq!(metadata.version, 1);
+        assert!(metadata.schema.is_none());
+        assert_eq!(metadata.dataset, Dataset::GlbxMdp3.as_str());
+        fixture.send_record(expected.clone());
+        let rec = client.next_record().await.unwrap().unwrap();
+        assert_eq!(*rec.get::<WithTsOut<TradeMsg>>().unwrap(), expected);
+        fixture.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_symbol_mapping() -> crate::Result<()> {
+        let mut target = SymbolMap::new();
+        let (mut fixture, mut client) = setup(Dataset::XnasItch, true).await;
+        fixture.start();
+        client.start().await?;
+        fixture.send_record(SymbolMappingMsg::new(
+            1,
+            2,
+            "",
+            "AAPL",
+            UNDEF_TIMESTAMP,
+            UNDEF_TIMESTAMP,
+        )?);
+        fixture.send_record(SymbolMappingMsg::new(
+            2,
+            2,
+            "",
+            "TSLA",
+            UNDEF_TIMESTAMP,
+            UNDEF_TIMESTAMP,
+        )?);
+        fixture.send_record(SymbolMappingMsg::new(
+            3,
+            2,
+            "",
+            "MSFT",
+            UNDEF_TIMESTAMP,
+            UNDEF_TIMESTAMP,
+        )?);
+        target.on_record(client.next_record().await?.unwrap())?;
+        target.on_record(client.next_record().await?.unwrap())?;
+        target.on_record(client.next_record().await?.unwrap())?;
+        assert_eq!(
+            *target.inner(),
+            HashMap::from([
+                (1, "AAPL".to_owned()),
+                (2, "TSLA".to_owned()),
+                (3, "MSFT".to_owned())
+            ])
+        );
+        fixture.send_record(SymbolMappingMsg::new(
+            10,
+            2,
+            "",
+            "AAPL",
+            UNDEF_TIMESTAMP,
+            UNDEF_TIMESTAMP,
+        )?);
+        target.on_symbol_mapping(
+            client
+                .next_record()
+                .await?
+                .unwrap()
+                .get::<SymbolMappingMsg>()
+                .unwrap(),
+        )?;
+        assert_eq!(target[10], "AAPL");
+        fixture.send_record(SymbolMappingMsg::new(
+            9,
+            2,
+            "",
+            "MSFT",
+            UNDEF_TIMESTAMP,
+            UNDEF_TIMESTAMP,
+        )?);
+        target.on_record(client.next_record().await?.unwrap())?;
+        assert_eq!(target[9], "MSFT");
+
+        // client.next_record().await.unwrap().unwrap();
+        fixture.stop().await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_close() {
+        let (mut fixture, mut client) = setup(Dataset::GlbxMdp3, true).await;
+        fixture.start();
+        client.start().await.unwrap();
+        client.close().await.unwrap();
+        fixture.stop().await;
     }
 }

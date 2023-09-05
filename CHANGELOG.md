@@ -1,8 +1,10 @@
 # Changelog
 
-## 0.2.2 - TBD
+## 0.3.0 - TBD
 
 #### Enhancements
+- Added `SymbolMap` type to help maintain up-to-date symbol mappings with live data
+- Added chunking to handle subscribing to many symbols for the Live client
 - Updated DBN version to 0.10.2 for easier historical symbology
 
 ## 0.2.1 - 2023-08-25
