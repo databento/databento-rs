@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.2 - TBD
+
+#### Enhancements
+- Updated DBN version to 0.10.2 for easier historical symbology
+
 ## 0.2.1 - 2023-08-25
 
 #### Enhancements
