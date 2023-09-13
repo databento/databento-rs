@@ -24,23 +24,23 @@ Real-time and intraday replay is provided through the Live clients.
 Here is a simple program that fetches the next ES mini futures trade:
 
 ```rust
-use std::{collections::HashMap, error::Error};
+use std::error::Error;
 
 use databento::{
     dbn::{
+        datasets,
         enums::{SType, Schema},
-        record::{SymbolMappingMsg, TradeMsg},
+        record::TradeMsg,
     },
-    live::Subscription,
+    live::{Subscription, SymbolMap},
     LiveClient,
 };
-
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let mut client = LiveClient::builder()
         .key_from_env()?
-        .dataset(dbn::datasets::GLBX_MDP3)
+        .dataset(datasets::GLBX_MDP3)
         .build()
         .await?;
     client
@@ -55,22 +55,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .unwrap();
     client.start().await?;
 
-    let mut symbol_mappings = HashMap::new();
+    let mut symbol_map = SymbolMap::new();
     // Get the next trade
     loop {
         let rec = client.next_record().await?.unwrap();
-        if rec.has::<TradeMsg>() {
-            let trade = rec.get::<TradeMsg>().unwrap();
-            let symbol = symbol_mappings.get(&trade.hd.instrument_id).unwrap();
+        if let Some(trade) = rec.get::<TradeMsg>() {
+            let symbol = &symbol_map[trade.hd.instrument_id];
             println!("Received trade for {symbol}: {trade:?}",);
             break;
-        } else if rec.has::<SymbolMappingMsg>() {
-            let sym_map = rec.get::<SymbolMappingMsg>().unwrap();
-            symbol_mappings.insert(
-                sym_map.hd.instrument_id,
-                sym_map.stype_out_symbol()?.to_owned(),
-            );
         }
+        symbol_map.on_record(rec)?;
     }
     Ok(())
 }

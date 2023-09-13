@@ -1,7 +1,7 @@
 [package]
 name = "databento"
 authors = ["Databento <support@databento.com>"]
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 repository = "https://github.com/databento/databento-rs"
 description = "Official Databento client library"
@@ -24,7 +24,7 @@ live = ["dep:hex", "dep:sha2", "tokio/net"]
 
 [dependencies]
 # binary encoding
-dbn = { version = "0.9.0", features = ["async", "serde"] }
+dbn = { version = "0.10.2", features = ["async", "serde"] }
 # Async stream trait
 futures = { version = "0.3", optional = true }
 # Hex encoding used for Live authentication
@@ -50,6 +50,8 @@ tokio-util = { version = "0.7.8", features = ["io"], optional = true }
 typed-builder = { version = "0.14" }
 
 [dev-dependencies]
+# Basic logger
+env_logger = "0.10.0"
 # Enable all features
 tokio = { version = "1.27", features = ["full"] }
 # HTTP client testing

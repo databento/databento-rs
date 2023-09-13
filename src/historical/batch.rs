@@ -122,8 +122,14 @@ impl BatchClient<'_> {
         }
         let job_files = self.list_files(&params.job_id).await?;
         if let Some(filename_to_download) = params.filename_to_download.as_ref() {
-            let Some(file_desc) = job_files.iter().find(|file| file.filename == *filename_to_download) else {
-                return Err(Error::bad_arg("filename_to_download", "not found for batch job"))
+            let Some(file_desc) = job_files
+                .iter()
+                .find(|file| file.filename == *filename_to_download)
+            else {
+                return Err(Error::bad_arg(
+                    "filename_to_download",
+                    "not found for batch job",
+                ));
             };
             let output_path = job_dir.join(filename_to_download);
             let https_url = file_desc
