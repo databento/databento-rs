@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 - TBD
+## 0.3.0 - 2023-09-13
 
 #### Enhancements
 - Added `SymbolMap` type to help maintain up-to-date symbol mappings with live data

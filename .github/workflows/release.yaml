@@ -1,15 +1,16 @@
 name: release
 on:
   workflow_run:
-    workflows:
-      - build
+    workflows: [build]
     branches: [main]
     types:
       - completed
+  workflow_dispatch:
+    branches: [main]
 
 jobs:
   tag-release:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' }} || ${{ github.event.workflow_dispatch }}
     name: tag-release (ubuntu-latest)
     runs-on: ubuntu-latest
     outputs:
