@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 - TBD
+
+#### Enhancements
+- Added `map_symbols` option to `batch::submit_job`. When `true`, appends the
+  raw symbol to every record (available for CSV and JSON text encodings) reducing the
+  need to look at the `symbology.json` file
+- Added `encoding` option to `batch::submit_job` to allow requesting non-DBN encoded
+  data through the client
+- Added `map_symbols`, `pretty_px`, and `pretty_ts` to `BatchJob` response
+
 ## 0.3.0 - 2023-09-13
 
 #### Enhancements

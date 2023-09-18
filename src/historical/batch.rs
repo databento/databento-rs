@@ -37,8 +37,9 @@ impl BatchClient<'_> {
         let mut form = vec![
             ("dataset", params.dataset.to_string()),
             ("schema", params.schema.to_string()),
+            ("encoding", params.encoding.to_string()),
             ("compression", params.compression.to_string()),
-            ("encoding", Encoding::Dbn.to_string()),
+            ("map_symbols", params.map_symbols.to_string()),
             ("split_duration", params.split_duration.to_string()),
             (
                 "packaging",
@@ -255,9 +256,17 @@ pub struct SubmitJobParams {
     /// The request time range.
     #[builder(setter(into))]
     pub date_time_range: DateTimeRange,
-    /// The data compression mode. Defaults to [`ZStd`](dbn::enums::Compression::ZStd).
+    /// The data encoding. Defaults to [`Dbn`](Encoding::Dbn).
+    #[builder(default = Encoding::Dbn)]
+    pub encoding: Encoding,
+    /// The data compression mode. Defaults to [`ZStd`](Compression::ZStd).
     #[builder(default = Compression::ZStd)]
     pub compression: Compression,
+    /// If `true`, the raw symbol will be appended to every text-encoded record,
+    /// reducing the need to look at the `symbology.json`. Only valid for
+    /// [`Encoding::Csv`] and [`Encoding::Json`].
+    #[builder(default = false)]
+    pub map_symbols: bool,
     /// The maximum time duration before batched data is split into multiple files.
     /// Defaults to [`Day`](SplitDuration::Day).
     #[builder(default)]
@@ -320,6 +329,15 @@ pub struct BatchJob {
     /// The data compression mode.
     #[serde(deserialize_with = "deserialize_compression")]
     pub compression: Compression,
+    /// If prices are formatted as the correct decimal-precision strings (customization
+    /// not currently available).
+    pub pretty_px: bool,
+    /// If timestamps are formatted as ISO 8601 strings (customization not currently
+    /// available).
+    pub pretty_ts: bool,
+    /// If a requested symbol field should be appended to every text-encoded record.
+    #[serde(default)]
+    pub map_symbols: bool,
     /// The maximum time interval for an individual file before splitting into multiple
     /// files.
     pub split_duration: SplitDuration,
@@ -637,6 +655,9 @@ mod tests {
                 "start",
                 START.unix_timestamp_nanos().to_string(),
             ))
+            .and(body_contains("encoding", "dbn"))
+            .and(body_contains("compression", "zstd"))
+            .and(body_contains("map_symbols", "false"))
             .and(body_contains("end", END.unix_timestamp_nanos().to_string()))
             // // default
             .and(body_contains("stype_in", "raw_symbol"))
@@ -656,6 +677,9 @@ mod tests {
                 "limit": null,
                 "encoding": "dbn",
                 "compression": "zstd",
+                "pretty_px": false,
+                "pretty_ts": false,
+                "map_symbols": false,
                 "split_duration": "day",
                 "split_size": null,
                 "packaging": null,
@@ -712,8 +736,11 @@ mod tests {
                 "start": "2023-06-14 00:00:00+00:00",
                 "end": "2023-06-17 00:00:00+00:00",
                 "limit": null,
-                "encoding": "dbn",
+                "encoding": "json",
                 "compression": "zstd",
+                "pretty_px": true,
+                "pretty_ts": false,
+                "map_symbols": true,
                 "split_duration": "day",
                 "split_size": null,
                 "packaging": null,
@@ -743,6 +770,10 @@ mod tests {
             job_desc.ts_process_start.unwrap(),
             datetime!(2023-07-19 23:01:04 UTC)
         );
+        assert_eq!(job_desc.encoding, Encoding::Json);
+        assert!(job_desc.pretty_px);
+        assert!(!job_desc.pretty_ts);
+        assert!(job_desc.map_symbols);
         Ok(())
     }
 
