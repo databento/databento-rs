@@ -335,7 +335,7 @@ pub struct BatchJob {
     /// If timestamps are formatted as ISO 8601 strings (customization not currently
     /// available).
     pub pretty_ts: bool,
-    /// If a requested symbol field should be appended to every text-encoded record.
+    /// If a symbol field is included with each text-encoded record.
     #[serde(default)]
     pub map_symbols: bool,
     /// The maximum time interval for an individual file before splitting into multiple
