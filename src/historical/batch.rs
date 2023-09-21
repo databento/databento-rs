@@ -9,7 +9,7 @@ use std::{
     str::FromStr,
 };
 
-use dbn::enums::{Compression, Encoding, SType, Schema};
+use dbn::{Compression, Encoding, SType, Schema};
 use futures::StreamExt;
 use log::info;
 use reqwest::RequestBuilder;

@@ -2,7 +2,7 @@
 
 use std::num::NonZeroU64;
 
-use dbn::enums::{Compression, Encoding, SType, Schema};
+use dbn::{Compression, Encoding, SType, Schema};
 use futures::TryStreamExt;
 use reqwest::{header::ACCEPT, RequestBuilder};
 use tokio::io::AsyncReadExt;

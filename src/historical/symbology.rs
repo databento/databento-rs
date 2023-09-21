@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use dbn::{enums::SType, MappingInterval};
+use dbn::{MappingInterval, SType};
 use reqwest::RequestBuilder;
 use serde::Deserialize;
 use typed_builder::TypedBuilder;

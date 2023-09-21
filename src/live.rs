@@ -4,10 +4,7 @@ use std::collections::HashMap;
 
 use dbn::{
     decode::dbn::{AsyncMetadataDecoder, AsyncRecordDecoder},
-    enums::{SType, Schema},
-    record::SymbolMappingMsg,
-    record_ref::RecordRef,
-    Metadata,
+    Metadata, RecordRef, SType, Schema, SymbolMappingMsg,
 };
 use hex::ToHex;
 use log::{debug, error, info};

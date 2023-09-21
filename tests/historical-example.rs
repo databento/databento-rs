@@ -2,7 +2,7 @@
 use std::error::Error;
 
 use databento::{
-    dbn::{enums::Schema, record::TradeMsg},
+    dbn::{Schema, TradeMsg},
     historical::timeseries::GetRangeParams,
     HistoricalClient, Symbols,
 };

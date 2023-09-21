@@ -27,11 +27,7 @@ Here is a simple program that fetches the next ES mini futures trade:
 use std::error::Error;
 
 use databento::{
-    dbn::{
-        datasets,
-        enums::{SType, Schema},
-        record::TradeMsg,
-    },
+    dbn::{Dataset, SType, Schema, TradeMsg},
     live::{Subscription, SymbolMap},
     LiveClient,
 };
@@ -40,7 +36,7 @@ use databento::{
 async fn main() -> Result<(), Box<dyn Error>> {
     let mut client = LiveClient::builder()
         .key_from_env()?
-        .dataset(datasets::GLBX_MDP3)
+        .dataset(Dataset::GlbxMdp3)
         .build()
         .await?;
     client
@@ -78,7 +74,7 @@ Here is a simple program that fetches 10 minutes worth of historical trades for 
 use std::error::Error;
 
 use databento::{
-    dbn::{enums::Schema, record::TradeMsg},
+    dbn::{Schema, TradeMsg},
     historical::timeseries::GetRangeParams,
     HistoricalClient, Symbols,
 };
