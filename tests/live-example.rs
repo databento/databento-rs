@@ -2,11 +2,7 @@
 use std::error::Error;
 
 use databento::{
-    dbn::{
-        datasets,
-        enums::{SType, Schema},
-        record::TradeMsg,
-    },
+    dbn::{Dataset, SType, Schema, TradeMsg},
     live::{Subscription, SymbolMap},
     LiveClient,
 };
@@ -15,7 +11,7 @@ use databento::{
 async fn main() -> Result<(), Box<dyn Error>> {
     let mut client = LiveClient::builder()
         .key_from_env()?
-        .dataset(datasets::GLBX_MDP3)
+        .dataset(Dataset::GlbxMdp3)
         .build()
         .await?;
     client

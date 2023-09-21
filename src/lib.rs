@@ -70,6 +70,7 @@ impl Symbols {
         }
     }
 
+    #[cfg(feature = "live")]
     pub(crate) fn to_chunked_api_string(&self) -> Vec<String> {
         const CHUNK_SIZE: usize = 128;
         match self {

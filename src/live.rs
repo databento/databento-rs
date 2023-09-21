@@ -4,10 +4,7 @@ use std::collections::HashMap;
 
 use dbn::{
     decode::dbn::{AsyncMetadataDecoder, AsyncRecordDecoder},
-    enums::{SType, Schema},
-    record::SymbolMappingMsg,
-    record_ref::RecordRef,
-    Metadata,
+    Metadata, RecordRef, SType, Schema, SymbolMappingMsg,
 };
 use hex::ToHex;
 use log::{debug, error, info};
@@ -268,9 +265,10 @@ pub struct Subscription {
     /// The symbols of the instruments to subscribe to.
     #[builder(setter(into))]
     pub symbols: Symbols,
-    /// The schema of data to subscribe to.
+    /// The data record schema of data to subscribe to.
     pub schema: Schema,
-    /// The symbology type of symbols in [`symbols`](Self::symbols).
+    /// The symbology type of the symbols in [`symbols`](Self::symbols).
+    #[builder(default = SType::RawSymbol)]
     pub stype_in: SType,
     /// If specified, requests available data since that time. When `None`,
     /// only real-time data is sent.

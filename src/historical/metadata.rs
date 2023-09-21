@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, num::NonZeroU64, str::FromStr};
 
-use dbn::enums::{Encoding, SType, Schema};
+use dbn::{Encoding, SType, Schema};
 use reqwest::RequestBuilder;
 use serde::{Deserialize, Deserializer};
 use typed_builder::TypedBuilder;
