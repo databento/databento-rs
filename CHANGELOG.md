@@ -3,9 +3,16 @@
 ## 0.4.0 - TBD
 
 #### Enhancements
-- Added `map_symbols` option to `batch::submit_job`. When `true`, appends the
-  raw symbol to every record (available for CSV and JSON text encodings) reducing the
-  need to look at the `symbology.json` file
+- Added `pretty_px` option for `batch::submit_job`, which formats prices to the correct
+  scale using the fixed-precision scalar 1e-9 (available for CSV and JSON text
+  encodings)
+- Added `pretty_ts` option for `batch::submit_job`, which formats timestamps as ISO 8601
+  strings (available for CSV and JSON text encodings)
+- Added `map_symbols` option to `batch::submit_job`, which appends the raw symbol to
+  every record (available for CSV and JSON text encodings) reducing the need to look at
+  the `symbology.json` file
+- Added `split_symbols` option for `batch::submit_job`, which will split files by raw
+  symbol
 - Added `encoding` option to `batch::submit_job` to allow requesting non-DBN encoded
   data through the client
 - Added `map_symbols`, `pretty_px`, and `pretty_ts` to `BatchJob` response

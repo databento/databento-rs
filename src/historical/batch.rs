@@ -39,7 +39,10 @@ impl BatchClient<'_> {
             ("schema", params.schema.to_string()),
             ("encoding", params.encoding.to_string()),
             ("compression", params.compression.to_string()),
+            ("pretty_px", params.pretty_px.to_string()),
+            ("pretty_ts", params.pretty_ts.to_string()),
             ("map_symbols", params.map_symbols.to_string()),
+            ("split_symbols", params.split_symbols.to_string()),
             ("split_duration", params.split_duration.to_string()),
             (
                 "packaging",
@@ -262,11 +265,22 @@ pub struct SubmitJobParams {
     /// The data compression mode. Defaults to [`ZStd`](Compression::ZStd).
     #[builder(default = Compression::ZStd)]
     pub compression: Compression,
-    /// If `true`, the raw symbol will be appended to every text-encoded record,
-    /// reducing the need to look at the `symbology.json`. Only valid for
+    /// If `true`, prices will be formatted to the correct scale (using the fixed-
+    /// precision scalar 1e-9). Only valid for [`Encoding::Csv`] and [`Encoding::Json`].
+    #[builder(default)]
+    pub pretty_px: bool,
+    /// If `true`, timestamps will be formatted as ISO 8601 strings. Only valid for
     /// [`Encoding::Csv`] and [`Encoding::Json`].
-    #[builder(default = false)]
+    #[builder(default)]
+    pub pretty_ts: bool,
+    /// If `true`, a symbol field will be included with each text-encoded
+    /// record, reducing the need to look at the `symbology.json`. Only valid for
+    /// [`Encoding::Csv`] and [`Encoding::Json`].
+    #[builder(default)]
     pub map_symbols: bool,
+    /// If `true`, files will be split by raw symbol. Cannot be requested with [`Symbols::All`].
+    #[builder(default)]
+    pub split_symbols: bool,
     /// The maximum time duration before batched data is split into multiple files.
     /// Defaults to [`Day`](SplitDuration::Day).
     #[builder(default)]
@@ -329,15 +343,14 @@ pub struct BatchJob {
     /// The data compression mode.
     #[serde(deserialize_with = "deserialize_compression")]
     pub compression: Compression,
-    /// If prices are formatted as the correct decimal-precision strings (customization
-    /// not currently available).
+    /// If prices are formatted to the correct scale (using the fixed-precision scalar 1e-9).
     pub pretty_px: bool,
-    /// If timestamps are formatted as ISO 8601 strings (customization not currently
-    /// available).
+    /// If timestamps are formatted as ISO 8601 strings.
     pub pretty_ts: bool,
     /// If a symbol field is included with each text-encoded record.
-    #[serde(default)]
     pub map_symbols: bool,
+    /// If files are split by raw symbol.
+    pub split_symbols: bool,
     /// The maximum time interval for an individual file before splitting into multiple
     /// files.
     pub split_duration: SplitDuration,
@@ -680,6 +693,7 @@ mod tests {
                 "pretty_px": false,
                 "pretty_ts": false,
                 "map_symbols": false,
+                "split_symbols": false,
                 "split_duration": "day",
                 "split_size": null,
                 "packaging": null,
@@ -741,6 +755,7 @@ mod tests {
                 "pretty_px": true,
                 "pretty_ts": false,
                 "map_symbols": true,
+                "split_symbols": false,
                 "split_duration": "day",
                 "split_size": null,
                 "packaging": null,
