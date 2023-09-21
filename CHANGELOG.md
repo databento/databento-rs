@@ -16,6 +16,8 @@
 - Added `encoding` option to `batch::submit_job` to allow requesting non-DBN encoded
   data through the client
 - Added `map_symbols`, `pretty_px`, and `pretty_ts` to `BatchJob` response
+- Added default `stype_in` of `RawSymbol` for live subscriptions to match behavior of
+  the historical client and the Python client
 
 ## 0.3.0 - 2023-09-13
 
