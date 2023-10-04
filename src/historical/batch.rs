@@ -426,23 +426,29 @@ pub struct DownloadParams {
     pub filename_to_download: Option<String>,
 }
 
-const DATE_TIME_FORMAT: &[time::format_description::FormatItem<'static>] =
-        time::macros::format_description!("[year]-[month]-[day] [hour]:[minute]:[second][optional [.[subsecond digits:6]]][offset_hour padding:zero]:[offset_minute padding:zero]");
+const LEGACY_DATE_TIME_FORMAT: &[time::format_description::FormatItem<'static>] =
+    time::macros::format_description!("[year]-[month]-[day] [hour]:[minute]:[second][optional [.[subsecond digits:6]]][offset_hour]:[offset_minute]");
+const DATE_TIME_FORMAT: &[time::format_description::FormatItem<'static>] = time::macros::format_description!(
+    "[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:9]Z"
+);
 
 fn deserialize_date_time<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<time::OffsetDateTime, D::Error> {
     let dt_str = String::deserialize(deserializer)?;
-    time::OffsetDateTime::parse(&dt_str, DATE_TIME_FORMAT).map_err(serde::de::Error::custom)
+    time::PrimitiveDateTime::parse(&dt_str, DATE_TIME_FORMAT)
+        .map(|dt| dt.assume_utc())
+        .or_else(|_| time::OffsetDateTime::parse(&dt_str, LEGACY_DATE_TIME_FORMAT))
+        .map_err(serde::de::Error::custom)
 }
 
 fn deserialize_opt_date_time<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<time::OffsetDateTime>, D::Error> {
-    pub const DATE_TIME_FORMAT: &[time::format_description::FormatItem<'static>] =
-        time::macros::format_description!("[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:6][offset_hour padding:zero]:[offset_minute padding:zero]");
     if let Some(dt_str) = Option::<String>::deserialize(deserializer)? {
-        time::OffsetDateTime::parse(&dt_str, DATE_TIME_FORMAT)
+        time::PrimitiveDateTime::parse(&dt_str, DATE_TIME_FORMAT)
+            .map(|dt| dt.assume_utc())
+            .or_else(|_| time::OffsetDateTime::parse(&dt_str, LEGACY_DATE_TIME_FORMAT))
             .map(Some)
             .map_err(serde::de::Error::custom)
     } else {
@@ -685,7 +691,7 @@ mod tests {
                 "stype_in": "raw_symbol",
                 "stype_out": "instrument_id",
                 "schema": SCHEMA.as_str(),
-                "start": "2023-06-14 00:00:00.000000+00:00",
+                "start": "2023-06-14T00:00:00.000000000Z",
                 "end": "2023-06-17 00:00:00.000000+00:00",
                 "limit": null,
                 "encoding": "dbn",
@@ -699,7 +705,7 @@ mod tests {
                 "packaging": null,
                 "delivery": "download",
                 "state": "queued",
-                 "ts_received": "2023-07-19 23:00:04.095538+00:00",
+                 "ts_received": "2023-07-19T23:00:04.095538123Z",
                  "ts_queued": null,
                  "ts_process_start": null,
                  "ts_process_done": null,
@@ -747,8 +753,9 @@ mod tests {
                 "stype_in": "raw_symbol",
                 "stype_out": "instrument_id",
                 "schema": SCHEMA.as_str(),
+                // test both time formats
                 "start": "2023-06-14 00:00:00+00:00",
-                "end": "2023-06-17 00:00:00+00:00",
+                "end": "2023-06-17T00:00:00.012345678Z",
                 "limit": null,
                 "encoding": "json",
                 "compression": "zstd",
@@ -762,7 +769,7 @@ mod tests {
                 "delivery": "download",
                 "state": "processing",
                  "ts_received": "2023-07-19 23:00:04.095538+00:00",
-                 "ts_queued": "2023-07-19 23:00:08.095538+00:00",
+                 "ts_queued": "2023-07-19T23:00:08.095538123Z",
                  "ts_process_start": "2023-07-19 23:01:04.000000+00:00",
                  "ts_process_done": null,
                  "ts_expiration": null
@@ -779,7 +786,7 @@ mod tests {
         let job_desc = &job_descs[0];
         assert_eq!(
             job_desc.ts_queued.unwrap(),
-            datetime!(2023-07-19 23:00:08.095538 UTC)
+            datetime!(2023-07-19 23:00:08.095538123 UTC)
         );
         assert_eq!(
             job_desc.ts_process_start.unwrap(),

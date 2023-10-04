@@ -1,6 +1,11 @@
 # Changelog
 
-## 0.4.0 - TBD
+## 0.4.1 - TBD
+
+#### Enhancements
+- Added support for changing datetime format used in batch job responses
+
+## 0.4.0 - 2023-09-21
 
 #### Enhancements
 - Added `pretty_px` option for `batch::submit_job`, which formats prices to the correct
