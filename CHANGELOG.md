@@ -1,9 +1,10 @@
 # Changelog
 
-## 0.4.1 - TBD
+## 0.4.1 - 2023-10-06
 
 #### Enhancements
 - Added support for changing datetime format used in batch job responses
+- Upgraded `dbn` to 0.11.1
 
 ## 0.4.0 - 2023-09-21
 
