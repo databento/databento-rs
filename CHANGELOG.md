@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2 - TBD
+
+#### Bug fixes
+- Fixed panic in `LiveClient` when gateway returned an auth response without the
+  `success` key
+
 ## 0.4.1 - 2023-10-06
 
 #### Enhancements

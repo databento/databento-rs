@@ -180,12 +180,13 @@ impl Client {
             .filter_map(|kvp| kvp.split_once('='))
             .map(|(key, val)| (key.to_owned(), val.to_owned()))
             .collect();
-        if auth_keys.get_key_value("success").unwrap().1 != "1" {
+        // Lack of success key also indicates something went wrong
+        if auth_keys.get("success").map(|v| v != "1").unwrap_or(true) {
             return Err(Error::Auth(
                 auth_keys
                     .get("error")
                     .map(ToOwned::to_owned)
-                    .unwrap_or_else(|| "unknown".to_owned()),
+                    .unwrap_or_else(|| response),
             ));
         }
         debug!("[{dataset}] {response}");
@@ -442,7 +443,7 @@ mod tests {
         record::{HasRType, OhlcvMsg, RecordHeader, TradeMsg, WithTsOut},
         MetadataBuilder, UNDEF_TIMESTAMP,
     };
-    use tokio::{net::TcpListener, sync::mpsc::UnboundedSender, task::JoinHandle};
+    use tokio::{join, net::TcpListener, sync::mpsc::UnboundedSender, task::JoinHandle};
 
     use super::*;
 
@@ -549,7 +550,9 @@ mod tests {
 
     enum Event {
         Stop,
+        Accept,
         Authenticate,
+        Send(String),
         Subscribe(Subscription),
         Start,
         SendRecord(Box<dyn AsRef<[u8]> + Send>),
@@ -559,7 +562,9 @@ mod tests {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match self {
                 Event::Stop => write!(f, "Stop"),
+                Event::Accept => write!(f, "Accept"),
                 Event::Authenticate => write!(f, "Authenticate"),
+                Event::Send(msg) => write!(f, "Send({msg:?})"),
                 Event::Subscribe(sub) => write!(f, "Subscribe({sub:?})"),
                 Event::Start => write!(f, "Start"),
                 Event::SendRecord(_) => write!(f, "SendRecord"),
@@ -576,6 +581,8 @@ mod tests {
                 loop {
                     match recv.recv().await {
                         Some(Event::Authenticate) => mock.authenticate().await,
+                        Some(Event::Accept) => mock.accept().await,
+                        Some(Event::Send(msg)) => mock.send(&msg).await,
                         Some(Event::Subscribe(sub)) => mock.subscribe(sub).await,
                         Some(Event::Start) => mock.start().await,
                         Some(Event::SendRecord(rec)) => mock.send_record(rec).await,
@@ -586,6 +593,12 @@ mod tests {
             Self { task, port, send }
         }
 
+        /// Accept but don't authenticate
+        pub fn accept(&mut self) {
+            self.send.send(Event::Accept).unwrap();
+        }
+
+        /// Accept and authenticate
         pub fn authenticate(&mut self) {
             self.send.send(Event::Authenticate).unwrap();
         }
@@ -596,6 +609,10 @@ mod tests {
 
         pub fn start(&mut self) {
             self.send.send(Event::Start).unwrap();
+        }
+
+        pub fn send(&mut self, msg: String) {
+            self.send.send(Event::Send(msg)).unwrap();
         }
 
         pub fn send_record<R>(&mut self, record: R)
@@ -615,12 +632,12 @@ mod tests {
 
     async fn setup(dataset: Dataset, send_ts_out: bool) -> (Fixture, Client) {
         let _ = env_logger::try_init();
-        let mut fixture = Fixture::new(dataset.as_str().to_owned(), send_ts_out).await;
+        let mut fixture = Fixture::new(dataset.to_string(), send_ts_out).await;
         fixture.authenticate();
         let target = Client::connect_with_addr(
             format!("127.0.0.1:{}", fixture.port),
             "32-character-with-lots-of-filler".to_owned(),
-            dataset.as_str().to_owned(),
+            dataset.to_string(),
             send_ts_out,
         )
         .await
@@ -792,5 +809,34 @@ mod tests {
         client.start().await.unwrap();
         client.close().await.unwrap();
         fixture.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_error_without_success() {
+        const DATASET: Dataset = Dataset::OpraPillar;
+        let mut fixture = Fixture::new(DATASET.to_string(), false).await;
+        let client_task = tokio::spawn(async move {
+            let res = Client::connect_with_addr(
+                format!("127.0.0.1:{}", fixture.port),
+                "32-character-with-lots-of-filler".to_owned(),
+                DATASET.to_string(),
+                false,
+            )
+            .await;
+            if let Err(e) = &res {
+                dbg!(e);
+            }
+            assert!(matches!(res, Err(e) if e.to_string().contains("Unknown failure")));
+        });
+        let fixture_task = tokio::spawn(async move {
+            fixture.accept();
+
+            fixture.send("lsg-test\n".to_owned());
+            fixture.send("cram=t7kNhwj4xqR0QYjzFKtBEG2ec2pXJ4FK\n".to_owned());
+            fixture.send("Unknown failure\n".to_owned());
+        });
+        let (r1, r2) = join!(client_task, fixture_task);
+        r1.unwrap();
+        r2.unwrap();
     }
 }
