@@ -3,7 +3,7 @@
 [![build](https://github.com/databento/databento-rs/actions/workflows/build.yaml/badge.svg)](https://github.com/databento/dbn/actions/workflows/build.yaml)
 [![license](https://img.shields.io/github/license/databento/databento-rs?color=blue)](./LICENSE)
 [![Current Crates.io Version](https://img.shields.io/crates/v/databento.svg)](https://crates.io/crates/databento)
-[![Slack](https://img.shields.io/badge/join_Slack-community-darkblue.svg?logo=slack)](https://join.slack.com/t/databento-hq/shared_invite/zt-1xk498wxs-9fUs_xhz5ypaGD~mhI_hVQ)
+[![Slack](https://img.shields.io/badge/join_Slack-community-darkblue.svg?logo=slack)](https://join.slack.com/t/databento-hq/shared_invite/zt-24oqyrub9-MellISM2cdpQ7s_7wcXosw)
 
 The official Rust client library for [Databento](https://databento.com).
 The clients support fast and safe streaming of both real-time and historical market data
