@@ -252,6 +252,9 @@ impl Client {
     /// Fetches the next record. This method should only be called after the session has
     /// been [started](Self::start).
     ///
+    /// Returns `Ok(None)` if the gateway closed the connection and no more records
+    /// can be read.
+    ///
     /// # Errors
     /// This function returns an error when it's unable to decode the next record
     /// or it's unable to read from the TCP stream.
