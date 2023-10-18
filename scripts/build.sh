@@ -1,4 +1,5 @@
 #! /usr/bin/env bash
+cargo --version
 echo build all
 cargo build --all-features
 echo build historical
