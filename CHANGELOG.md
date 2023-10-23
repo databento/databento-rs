@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.2 - 2023-10-23
+
+#### Enhancemets
+- Upgraded `dbn` to 0.13.0 for improvements to symbology helpers
+- Upgraded `tokio` to 1.33
+- Upgraded `typed-builder` to 0.17
+
+##### Deprecations
+- Deprecated `live::SymbolMap` in favor of `databento::dbn::PitSymbolMap`
+
+#### Bug fixes
+- Fixed panic in `LiveClient` when gateway returned an auth response without the
+  `success` key
+
 ## 0.4.1 - 2023-10-06
 
 #### Enhancements
