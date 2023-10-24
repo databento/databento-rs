@@ -6,7 +6,7 @@ use databento::{
     historical::timeseries::GetRangeParams,
     HistoricalClient, Symbols,
 };
-use time::macros::datetime;
+use time::macros::{date, datetime};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -25,8 +25,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .build(),
         )
         .await?;
+    let symbol_map = decoder
+        .metadata()
+        .symbol_map_for_date(date!(2022 - 06 - 10))?;
     while let Some(trade) = decoder.decode_record::<TradeMsg>().await? {
-        println!("{trade:?}");
+        let symbol = &symbol_map[trade];
+        println!("Received trade for {symbol}: {trade:?}");
     }
     Ok(())
 }

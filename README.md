@@ -27,8 +27,8 @@ Here is a simple program that fetches the next ES mini futures trade:
 use std::error::Error;
 
 use databento::{
-    dbn::{Dataset, SType, Schema, TradeMsg},
-    live::{Subscription, SymbolMap},
+    dbn::{Dataset, PitSymbolMap, SType, Schema, TradeMsg},
+    live::Subscription,
     LiveClient,
 };
 
@@ -51,13 +51,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .unwrap();
     client.start().await?;
 
-    let mut symbol_map = SymbolMap::new();
+    let mut symbol_map = PitSymbolMap::new();
     // Get the next trade
     loop {
         let rec = client.next_record().await?.unwrap();
         if let Some(trade) = rec.get::<TradeMsg>() {
-            let symbol = &symbol_map[trade.hd.instrument_id];
-            println!("Received trade for {symbol}: {trade:?}",);
+            let symbol = &symbol_map[trade];
+            println!("Received trade for {symbol}: {trade:?}");
             break;
         }
         symbol_map.on_record(rec)?;
@@ -78,7 +78,7 @@ use databento::{
     historical::timeseries::GetRangeParams,
     HistoricalClient, Symbols,
 };
-use time::macros::datetime;
+use time::macros::{date, datetime};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -97,8 +97,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .build(),
         )
         .await?;
+    let symbol_map = decoder
+        .metadata()
+        .symbol_map_for_date(date!(2022 - 06 - 10))?;
     while let Some(trade) = decoder.decode_record::<TradeMsg>().await? {
-        println!("{trade:?}");
+        let symbol = &symbol_map[trade];
+        println!("Received trade for {symbol}: {trade:?}");
     }
     Ok(())
 }
