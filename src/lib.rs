@@ -4,8 +4,8 @@
 //! The library is built on top of the tokio asynchronous runtime and
 //! [Databento's efficient binary encoding](https://docs.databento.com/knowledge-base/new-users/dbn-encoding).
 //!
-//! You can find getting started tutorials, full API method documentation, example
-//! code and output on the [Databento docs site](https://docs.databento.com/?historical=rust&live=rust).
+//! You can find getting started tutorials, full API method documentation, examples
+//! with output on the [Databento docs site](https://docs.databento.com/?historical=rust&live=rust).
 //!
 //! # Feature flags
 //! By default both features are enabled.
