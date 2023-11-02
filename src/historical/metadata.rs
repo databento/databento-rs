@@ -9,7 +9,7 @@ use typed_builder::TypedBuilder;
 
 use crate::Symbols;
 
-use super::{AddToQuery, DateRange, DateTimeRange};
+use super::{handle_response, AddToQuery, DateRange, DateTimeRange};
 
 /// A client for the metadata group of Historical API endpoints.
 pub struct MetadataClient<'a> {
@@ -22,13 +22,8 @@ impl MetadataClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API.
     pub async fn list_publishers(&mut self) -> crate::Result<Vec<PublisherDetail>> {
-        Ok(self
-            .get("list_publishers")?
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?)
+        let resp = self.get("list_publishers")?.send().await?;
+        handle_response(resp).await
     }
 
     /// Lists all available dataset codes on Databento.
@@ -44,7 +39,8 @@ impl MetadataClient<'_> {
         if let Some(date_range) = date_range {
             builder = builder.add_to_query(&date_range);
         }
-        Ok(builder.send().await?.error_for_status()?.json().await?)
+        let resp = builder.send().await?;
+        handle_response(resp).await
     }
 
     /// Lists all available schemas for the given `dataset`.
@@ -53,14 +49,12 @@ impl MetadataClient<'_> {
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
     pub async fn list_schemas(&mut self, dataset: &str) -> crate::Result<Vec<Schema>> {
-        Ok(self
+        let resp = self
             .get("list_schemas")?
             .query(&[("dataset", dataset)])
             .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?)
+            .await?;
+        handle_response(resp).await
     }
 
     /// Lists all fields for a schema and encoding.
@@ -76,7 +70,8 @@ impl MetadataClient<'_> {
             ("encoding", params.encoding.as_str()),
             ("schema", params.schema.as_str()),
         ]);
-        Ok(builder.send().await?.error_for_status()?.json().await?)
+        let resp = builder.send().await?;
+        handle_response(resp).await
     }
 
     /// Lists unit prices for each data schema and feed mode in US dollars per gigabyte.
@@ -91,7 +86,8 @@ impl MetadataClient<'_> {
         let builder = self
             .get("list_unit_prices")?
             .query(&[("dataset", &dataset)]);
-        Ok(builder.send().await?.error_for_status()?.json().await?)
+        let resp = builder.send().await?;
+        handle_response(resp).await
     }
 
     /// Gets the dataset condition from Databento.
@@ -111,7 +107,8 @@ impl MetadataClient<'_> {
         if let Some(ref date_range) = params.date_range {
             builder = builder.add_to_query(date_range);
         }
-        Ok(builder.send().await?.error_for_status()?.json().await?)
+        let resp = builder.send().await?;
+        handle_response(resp).await
     }
 
     /// Gets the available range for the dataset from Databento.
@@ -122,14 +119,12 @@ impl MetadataClient<'_> {
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
     pub async fn get_dataset_range(&mut self, dataset: &str) -> crate::Result<DatasetRange> {
-        Ok(self
+        let resp = self
             .get("get_dataset_range")?
             .query(&[("dataset", dataset)])
             .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?)
+            .await?;
+        handle_response(resp).await
     }
 
     /// Gets the record count of the time series data query.
@@ -138,14 +133,12 @@ impl MetadataClient<'_> {
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
     pub async fn get_record_count(&mut self, params: &GetRecordCountParams) -> crate::Result<u64> {
-        Ok(self
+        let resp = self
             .get("get_record_count")?
             .add_to_query(params)
             .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?)
+            .await?;
+        handle_response(resp).await
     }
 
     /// Gets the billable uncompressed raw binary size for historical streaming or
@@ -158,14 +151,12 @@ impl MetadataClient<'_> {
         &mut self,
         params: &GetBillableSizeParams,
     ) -> crate::Result<u64> {
-        Ok(self
+        let resp = self
             .get("get_billable_size")?
             .add_to_query(params)
             .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?)
+            .await?;
+        handle_response(resp).await
     }
 
     /// Gets the cost in US dollars for a historical streaming or batch download
@@ -175,14 +166,8 @@ impl MetadataClient<'_> {
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
     pub async fn get_cost(&mut self, params: &GetCostParams) -> crate::Result<f64> {
-        Ok(self
-            .get("get_cost")?
-            .add_to_query(params)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?)
+        let resp = self.get("get_cost")?.add_to_query(params).send().await?;
+        handle_response(resp).await
     }
 
     fn get(&mut self, slug: &str) -> crate::Result<RequestBuilder> {

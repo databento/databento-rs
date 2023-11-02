@@ -19,6 +19,10 @@ pub enum Error {
     #[cfg(feature = "historical")]
     #[error("HTTP error: {0:?}")]
     Http(#[from] reqwest::Error),
+    /// An error from the Databento API.
+    #[cfg(feature = "historical")]
+    #[error("API error: {0}")]
+    Api(ApiError),
     /// An error internal to the client.
     #[error("internal error: {0}")]
     Internal(String),
@@ -31,6 +35,20 @@ pub enum Error {
 }
 /// An alias for a `Result` with [`databento::Error`](crate::Error) as the error type.
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// An error from the Databento API.
+#[cfg(feature = "historical")]
+#[derive(Debug)]
+pub struct ApiError {
+    /// The request ID.
+    pub request_id: Option<String>,
+    /// The HTTP status code of the response.
+    pub status_code: reqwest::StatusCode,
+    /// The message from the Databento API.
+    pub message: String,
+    /// The link to documentation related to the error.
+    pub docs_url: Option<String>,
+}
 
 impl Error {
     pub(crate) fn bad_arg(param_name: impl ToString, desc: impl ToString) -> Self {
@@ -51,6 +69,24 @@ impl From<dbn::Error> for Error {
             // Convert to our own error type.
             dbn::Error::Io { source, .. } => Self::Io(source),
             dbn_err => Self::Dbn(dbn_err),
+        }
+    }
+}
+
+#[cfg(feature = "historical")]
+impl std::fmt::Display for ApiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let doc = if let Some(ref docs_url) = self.docs_url {
+            format!(" See {docs_url} for documentation.")
+        } else {
+            String::new()
+        };
+        let status = self.status_code;
+        let msg = &self.message;
+        if let Some(ref request_id) = self.request_id {
+            write!(f, "{request_id} failed with {status} {msg}{doc}")
+        } else {
+            write!(f, "{status} {msg}{doc}")
         }
     }
 }

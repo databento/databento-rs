@@ -10,7 +10,7 @@ use typed_builder::TypedBuilder;
 
 use crate::Symbols;
 
-use super::DateTimeRange;
+use super::{check_http_error, DateTimeRange};
 
 // Re-export because it's returned.
 pub use dbn::decode::AsyncDbnDecoder;
@@ -46,12 +46,14 @@ impl TimeseriesClient<'_> {
         if let Some(limit) = params.limit {
             form.push(("limit", limit.to_string()));
         }
-        let stream = self
+        let resp = self
             .post("get_range")?
             // unlike almost every other request, it's not JSON
             .header(ACCEPT, "application/octet-stream")
             .form(&form)
             .send()
+            .await?;
+        let stream = check_http_error(resp)
             .await?
             .error_for_status()?
             .bytes_stream()

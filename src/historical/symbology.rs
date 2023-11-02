@@ -9,7 +9,7 @@ use typed_builder::TypedBuilder;
 
 use crate::Symbols;
 
-use super::DateRange;
+use super::{handle_response, DateRange};
 
 /// A client for the symbology group of Historical API endpoints.
 pub struct SymbologyClient<'a> {
@@ -32,14 +32,8 @@ impl SymbologyClient<'_> {
             ("symbols", params.symbols.to_api_string()),
         ];
         params.date_range.add_to_form(&mut form);
-        Ok(self
-            .post("resolve")?
-            .form(&form)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?)
+        let resp = self.post("resolve")?.form(&form).send().await?;
+        handle_response(resp).await
     }
 
     fn post(&mut self, slug: &str) -> crate::Result<RequestBuilder> {

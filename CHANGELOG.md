@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0 - TBD
+
+#### Enhancements
+- Improved error reporting for `HistoricalClient` when receiving an error from
+  Databento's API
+- Added support for emitting warnings from historical API response headers, such as for
+  future deprecations
+
 ## 0.4.2 - 2023-10-23
 
 #### Enhancemets
