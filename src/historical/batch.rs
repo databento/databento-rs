@@ -241,7 +241,7 @@ pub enum JobState {
 
 /// The parameters for [`BatchClient::submit_job()`]. Use [`SubmitJobParams::builder()`] to
 /// get a builder type with all the preset defaults.
-#[derive(Debug, Clone, TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
 pub struct SubmitJobParams {
     /// The dataset code.
     #[builder(setter(transform = |dt: impl ToString| dt.to_string()))]
@@ -384,7 +384,7 @@ pub struct BatchJob {
 
 /// The parameters for [`BatchClient::list_jobs()`]. Use [`ListJobsParams::builder()`] to
 /// get a builder type with all the preset defaults.
-#[derive(Debug, Clone, Default, TypedBuilder)]
+#[derive(Debug, Clone, Default, TypedBuilder, PartialEq, Eq)]
 pub struct ListJobsParams {
     /// The optional filter for job states.
     #[builder(default, setter(strip_option))]
@@ -410,11 +410,13 @@ pub struct BatchFileDesc {
 
 /// The parameters for [`BatchClient::download()`]. Use [`DownloadParams::builder()`] to
 /// get a builder type with all the preset defaults.
-#[derive(Debug, Clone, TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
 pub struct DownloadParams {
     /// The directory to download the file(s) to.
+    #[builder(setter(transform = |dt: impl Into<PathBuf>| dt.into()))]
     pub output_dir: PathBuf,
     /// The batch job identifier.
+    #[builder(setter(transform = |dt: impl ToString| dt.to_string()))]
     pub job_id: String,
     /// `None` means all files associated with the job will be downloaded.
     #[builder(default, setter(strip_option))]

@@ -43,7 +43,7 @@ impl SymbologyClient<'_> {
 
 /// The parameters for [`SymbologyClient::resolve()`]. Use [`ResolveParams::builder()`]
 /// to get a builder type with all the preset defaults.
-#[derive(Debug, Clone, TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
 pub struct ResolveParams {
     /// The dataset code.
     #[builder(setter(transform = |dt: impl ToString| dt.to_string()))]

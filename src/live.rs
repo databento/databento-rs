@@ -264,7 +264,7 @@ impl Client {
 }
 
 /// A subscription for real-time or intraday historical data.
-#[derive(Debug, Clone, TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
 pub struct Subscription {
     /// The symbols of the instruments to subscribe to.
     #[builder(setter(into))]

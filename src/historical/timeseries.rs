@@ -69,7 +69,7 @@ impl TimeseriesClient<'_> {
 
 /// The parameters for [`TimeseriesClient::get_range()`]. Use
 /// [`GetRangeParams::builder()`] to get a builder type with all the preset defaults.
-#[derive(Debug, Clone, TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
 pub struct GetRangeParams {
     /// The dataset code.
     #[builder(setter(transform = |dt: impl ToString| dt.to_string()))]

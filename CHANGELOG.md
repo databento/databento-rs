@@ -7,6 +7,7 @@
   Databento's API
 - Added support for emitting warnings from historical API response headers, such as for
   future deprecations
+- Added `PartialEq` and `Eq` implementations for parameter builder classes
 
 ## 0.4.2 - 2023-10-23
 

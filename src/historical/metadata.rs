@@ -215,7 +215,7 @@ pub struct PublisherDetail {
 
 /// The parameters for [`MetadataClient::list_fields()`]. Use
 /// [`ListFieldsParams::builder()`] to get a builder type with all the preset defaults.
-#[derive(Debug, Clone, TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
 pub struct ListFieldsParams {
     /// The encoding to request fields for.
     pub encoding: Encoding,
@@ -245,7 +245,7 @@ pub struct UnitPricesForMode {
 /// The parameters for [`MetadataClient::get_dataset_condition()`]. Use
 /// [`GetDatasetConditionParams::builder()`] to get a builder type with all the preset
 /// defaults.
-#[derive(Debug, Clone, TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
 pub struct GetDatasetConditionParams {
     /// The dataset code.
     #[builder(setter(transform = |dataset: impl ToString| dataset.to_string()))]
@@ -282,7 +282,7 @@ pub struct DatasetRange {
 }
 
 /// The parameters for several metadata requests.
-#[derive(Debug, Clone, TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
 pub struct GetQueryParams {
     /// The dataset code.
     #[builder(setter(transform = |dataset: impl ToString| dataset.to_string()))]
