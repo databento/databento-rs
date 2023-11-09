@@ -5,7 +5,7 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum Error {
     /// An invalid argument was passed to a function.
-    #[error("bad argument {param_name}: {desc}")]
+    #[error("bad argument `{param_name}`: {desc}")]
     BadArgument {
         /// The name of the parameter to which the bad argument was passed.
         param_name: String,
