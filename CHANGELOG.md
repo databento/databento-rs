@@ -6,6 +6,7 @@
 - Improved error reporting for `HistoricalClient` when receiving an error from
   Databento's API
 - Improved error messages around API keys
+- Improved performance of CSV and JSON encoding
 - Added support for emitting warnings from historical API response headers, such as for
   future deprecations
 - Added `PartialEq` and `Eq` implementations for parameter builder classes
