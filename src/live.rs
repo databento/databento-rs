@@ -437,16 +437,16 @@ impl std::ops::Index<u32> for SymbolMap {
 
 #[cfg(test)]
 mod tests {
-    use std::{ffi::c_char, fmt};
+    use std::{ffi::c_char, fmt, time::Duration};
 
     use dbn::{
         encode::AsyncDbnMetadataEncoder,
         enums::rtype,
         publishers::Dataset,
         record::{HasRType, OhlcvMsg, RecordHeader, TradeMsg, WithTsOut},
-        MetadataBuilder, UNDEF_TIMESTAMP,
+        Mbp10Msg, MetadataBuilder, Record, UNDEF_TIMESTAMP,
     };
-    use tokio::{join, net::TcpListener, sync::mpsc::UnboundedSender, task::JoinHandle};
+    use tokio::{join, net::TcpListener, select, sync::mpsc::UnboundedSender, task::JoinHandle};
 
     use super::*;
 
@@ -469,7 +469,9 @@ mod tests {
         }
 
         async fn accept(&mut self) {
-            self.stream = Some(BufReader::new(self.listener.accept().await.unwrap().0));
+            let stream = self.listener.accept().await.unwrap().0;
+            stream.set_nodelay(true).unwrap();
+            self.stream = Some(BufReader::new(stream));
         }
 
         async fn authenticate(&mut self) {
@@ -530,7 +532,11 @@ mod tests {
 
         async fn send_record(&mut self, record: Box<dyn AsRef<[u8]> + Send>) {
             let bytes = (*record).as_ref();
-            self.stream().write_all(bytes).await.unwrap()
+            // test for partial read bugs
+            let half = bytes.len() / 2;
+            self.stream().write_all(&bytes[..half]).await.unwrap();
+            self.stream().flush().await.unwrap();
+            self.stream().write_all(&bytes[half..]).await.unwrap();
         }
 
         async fn read_line(&mut self) -> String {
@@ -693,7 +699,7 @@ mod tests {
         let (mut fixture, mut client) = setup(Dataset::GlbxMdp3, false).await;
         fixture.start();
         let metadata = client.start().await.unwrap();
-        assert_eq!(metadata.version, 1);
+        assert_eq!(metadata.version, dbn::DBN_VERSION);
         assert!(metadata.schema.is_none());
         assert_eq!(metadata.dataset, Dataset::GlbxMdp3.as_str());
         fixture.send_record(REC);
@@ -722,7 +728,7 @@ mod tests {
         let (mut fixture, mut client) = setup(Dataset::GlbxMdp3, true).await;
         fixture.start();
         let metadata = client.start().await.unwrap();
-        assert_eq!(metadata.version, 1);
+        assert_eq!(metadata.version, dbn::DBN_VERSION);
         assert!(metadata.schema.is_none());
         assert_eq!(metadata.dataset, Dataset::GlbxMdp3.as_str());
         fixture.send_record(expected.clone());
@@ -841,5 +847,52 @@ mod tests {
         let (r1, r2) = join!(client_task, fixture_task);
         r1.unwrap();
         r2.unwrap();
+    }
+
+    #[tokio::test]
+    #[ignore = "waiting for new DBN release"]
+    async fn test_cancellation_safety() {
+        let (mut fixture, mut client) = setup(Dataset::GlbxMdp3, true).await;
+        fixture.start();
+        let metadata = client.start().await.unwrap();
+        assert_eq!(metadata.version, dbn::DBN_VERSION);
+        assert!(metadata.schema.is_none());
+        assert_eq!(metadata.dataset, Dataset::GlbxMdp3.as_str());
+        fixture.send_record(Mbp10Msg::default());
+
+        let mut int_1 = tokio::time::interval(Duration::from_millis(1));
+        let mut int_2 = tokio::time::interval(Duration::from_millis(1));
+        let mut int_3 = tokio::time::interval(Duration::from_millis(1));
+        let mut int_4 = tokio::time::interval(Duration::from_millis(1));
+        let mut int_5 = tokio::time::interval(Duration::from_millis(1));
+        let mut int_6 = tokio::time::interval(Duration::from_millis(1));
+        for _ in 0..1_000 {
+            select! {
+                _ =  int_1.tick() => {
+                    fixture.send_record(Mbp10Msg::default());
+                }
+                _ =  int_2.tick() => {
+                    fixture.send_record(Mbp10Msg::default());
+                }
+                _ =  int_3.tick() => {
+                    fixture.send_record(Mbp10Msg::default());
+                }
+                _ =  int_4.tick() => {
+                    fixture.send_record(Mbp10Msg::default());
+                }
+                _ =  int_5.tick() => {
+                    fixture.send_record(Mbp10Msg::default());
+                }
+                _ =  int_6.tick() => {
+                    fixture.send_record(Mbp10Msg::default());
+                }
+                res = client.next_record() => {
+                    let rec = res.unwrap().unwrap();
+                    dbg!(rec.header());
+                    assert_eq!(*rec.get::<Mbp10Msg>().unwrap(), Mbp10Msg::default());
+                }
+            }
+        }
+        fixture.stop().await;
     }
 }
