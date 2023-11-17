@@ -180,7 +180,7 @@ impl BatchClient<'_> {
         Ok(())
     }
 
-    const PATH_PREFIX: &str = "batch";
+    const PATH_PREFIX: &'static str = "batch";
 
     fn get(&mut self, slug: &str) -> crate::Result<RequestBuilder> {
         self.inner.get(&format!("{}.{slug}", Self::PATH_PREFIX))
