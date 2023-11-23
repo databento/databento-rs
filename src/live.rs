@@ -3,8 +3,9 @@
 use std::collections::HashMap;
 
 use dbn::{
+    compat::SymbolMappingMsgV1,
     decode::dbn::{AsyncMetadataDecoder, AsyncRecordDecoder},
-    Metadata, RecordRef, SType, Schema, SymbolMappingMsg,
+    Metadata, PitSymbolMap, RecordRef, SType, Schema, SymbolMappingMsg, VersionUpgradePolicy,
 };
 use hex::ToHex;
 use log::{debug, error, info};
@@ -26,6 +27,7 @@ pub struct Client {
     key: String,
     dataset: String,
     send_ts_out: bool,
+    upgrade_policy: VersionUpgradePolicy,
     connection: WriteHalf<TcpStream>,
     decoder: AsyncRecordDecoder<BufReader<ReadHalf<TcpStream>>>,
     session_id: String,
@@ -45,8 +47,20 @@ impl Client {
     /// # Errors
     /// This function returns an error when `key` is invalid or its unable to connect
     /// and authenticate with the Live gateway.
-    pub async fn connect(key: String, dataset: String, send_ts_out: bool) -> crate::Result<Self> {
-        Self::connect_with_addr(Self::determine_gateway(&dataset), key, dataset, send_ts_out).await
+    pub async fn connect(
+        key: String,
+        dataset: String,
+        send_ts_out: bool,
+        upgrade_policy: VersionUpgradePolicy,
+    ) -> crate::Result<Self> {
+        Self::connect_with_addr(
+            Self::determine_gateway(&dataset),
+            key,
+            dataset,
+            send_ts_out,
+            upgrade_policy,
+        )
+        .await
     }
 
     /// Creates a new client connected to the Live gateway at `addr`. This is an advanced method and generally
@@ -60,6 +74,7 @@ impl Client {
         key: String,
         dataset: String,
         send_ts_out: bool,
+        upgrade_policy: VersionUpgradePolicy,
     ) -> crate::Result<Self> {
         let key = validate_key(key)?;
         let stream = TcpStream::connect(addr).await?;
@@ -74,8 +89,12 @@ impl Client {
             key,
             dataset,
             send_ts_out,
+            upgrade_policy,
             connection: writer,
-            decoder: AsyncRecordDecoder::new(reader),
+            // Pass a placeholder DBN version and should never fail because DBN_VERSION
+            // is a valid DBN version. Correct version set in `start()`.
+            decoder: AsyncRecordDecoder::with_version(reader, dbn::DBN_VERSION, upgrade_policy)
+                .unwrap(),
             session_id,
         })
     }
@@ -99,6 +118,11 @@ impl Client {
     /// with each message.
     pub fn send_ts_out(&self) -> bool {
         self.send_ts_out
+    }
+
+    /// Returns the upgrade policy for decoding DBN from previous versions.
+    pub fn upgrade_policy(&self) -> VersionUpgradePolicy {
+        self.upgrade_policy
     }
 
     fn determine_gateway(dataset: &str) -> String {
@@ -244,9 +268,12 @@ impl Client {
     pub async fn start(&mut self) -> crate::Result<Metadata> {
         info!("[{}] Starting session", self.dataset);
         self.connection.write_all(b"start_session\n").await?;
-        Ok(AsyncMetadataDecoder::new(self.decoder.get_mut())
+        let mut metadata = AsyncMetadataDecoder::new(self.decoder.get_mut())
             .decode()
-            .await?)
+            .await?;
+        self.decoder.set_version(metadata.version)?;
+        metadata.upgrade(self.upgrade_policy);
+        Ok(metadata)
     }
 
     /// Fetches the next record. This method should only be called after the session has
@@ -264,7 +291,7 @@ impl Client {
 }
 
 /// A subscription for real-time or intraday historical data.
-#[derive(Debug, Clone, TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
 pub struct Subscription {
     /// The symbols of the instruments to subscribe to.
     #[builder(setter(into))]
@@ -294,6 +321,7 @@ pub struct ClientBuilder<AK, D> {
     key: AK,
     dataset: D,
     send_ts_out: bool,
+    upgrade_policy: VersionUpgradePolicy,
 }
 
 impl Default for ClientBuilder<Unset, Unset> {
@@ -302,6 +330,7 @@ impl Default for ClientBuilder<Unset, Unset> {
             key: Unset,
             dataset: Unset,
             send_ts_out: false,
+            upgrade_policy: VersionUpgradePolicy::AsIs,
         }
     }
 }
@@ -311,6 +340,13 @@ impl<AK, D> ClientBuilder<AK, D> {
     /// after every record. These can be decoded with the special [`WithTsOut`](dbn::record::WithTsOut) type.
     pub fn send_ts_out(mut self, send_ts_out: bool) -> Self {
         self.send_ts_out = send_ts_out;
+        self
+    }
+
+    /// Sets `upgrade_policy`, which controls how to decode data from prior DBN
+    /// versions. The current default is to decode them as-is.
+    pub fn upgrade_policy(mut self, upgrade_policy: VersionUpgradePolicy) -> Self {
+        self.upgrade_policy = upgrade_policy;
         self
     }
 }
@@ -332,6 +368,7 @@ impl<D> ClientBuilder<Unset, D> {
             key: crate::validate_key(key.to_string())?,
             dataset: self.dataset,
             send_ts_out: self.send_ts_out,
+            upgrade_policy: self.upgrade_policy,
         })
     }
 
@@ -354,6 +391,7 @@ impl<AK> ClientBuilder<AK, Unset> {
             key: self.key,
             dataset: dataset.to_string(),
             send_ts_out: self.send_ts_out,
+            upgrade_policy: self.upgrade_policy,
         }
     }
 }
@@ -365,67 +403,79 @@ impl ClientBuilder<String, String> {
     /// This function returns an error when its unable
     /// to connect and authenticate with the Live gateway.
     pub async fn build(self) -> crate::Result<Client> {
-        Client::connect(self.key, self.dataset, self.send_ts_out).await
+        Client::connect(
+            self.key,
+            self.dataset,
+            self.send_ts_out,
+            self.upgrade_policy,
+        )
+        .await
     }
 }
 
 /// Manages the mapping between the instrument IDs included in each record and
 /// a text symbology.
 #[derive(Debug, Clone, Default)]
+#[deprecated(
+    since = "0.5.0",
+    note = "dbn::PitSymbolMap provides identical functionality and also works with historical data"
+)]
 pub struct SymbolMap {
-    symbol_map: HashMap<u32, String>,
+    inner: PitSymbolMap,
 }
 
+#[allow(deprecated)]
 impl SymbolMap {
     /// Creates a new `SymbolMap` instance.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Handles updating the mappings (if required) for a generic record.
+    /// Handles updating the mappings (if required) from a generic record.
     ///
     /// # Errors
     /// This function returns an error when `record` contains a [`SymbolMappingMsg`] but
     /// it contains invalid UTF-8.
     pub fn on_record(&mut self, record: RecordRef) -> crate::Result<()> {
-        if let Some(symbol_mapping) = record.get::<SymbolMappingMsg>() {
-            self.on_symbol_mapping(symbol_mapping)
-        } else {
-            Ok(())
-        }
+        Ok(self.inner.on_record(record)?)
     }
 
-    /// Handles updating the mappings for a .
+    /// Handles updating the mappings from a [`SymbolMappingMsg`].
     ///
     /// # Errors
     /// This function returns an error when `symbol_mapping` contains invalid UTF-8.
     pub fn on_symbol_mapping(&mut self, symbol_mapping: &SymbolMappingMsg) -> crate::Result<()> {
-        let stype_out_symbol = symbol_mapping.stype_out_symbol()?;
-        info!(
-            "Updated symbol mapping for {} to {}",
-            symbol_mapping.hd.instrument_id, stype_out_symbol
-        );
-        self.symbol_map
-            .insert(symbol_mapping.hd.instrument_id, stype_out_symbol.to_owned());
-        Ok(())
+        Ok(self.inner.on_symbol_mapping(symbol_mapping)?)
+    }
+
+    /// Handles updating the mappings from a [`SymbolMappingMsgV1`].
+    ///
+    /// # Errors
+    /// This function returns an error when `symbol_mapping` contains invalid UTF-8.
+    pub fn on_symbol_mapping_v1(
+        &mut self,
+        symbol_mapping: &SymbolMappingMsgV1,
+    ) -> crate::Result<()> {
+        Ok(self.inner.on_symbol_mapping(symbol_mapping)?)
     }
 
     /// Returns a reference to the mapping for the given instrument ID.
     pub fn get(&self, instrument_id: u32) -> Option<&String> {
-        self.symbol_map.get(&instrument_id)
+        self.inner.get(instrument_id)
     }
 
     /// Returns a reference to the inner map.
     pub fn inner(&self) -> &HashMap<u32, String> {
-        &self.symbol_map
+        self.inner.inner()
     }
 
     /// Returns a mutable reference to the inner map.
     pub fn inner_mut(&mut self) -> &mut HashMap<u32, String> {
-        &mut self.symbol_map
+        self.inner.inner_mut()
     }
 }
 
+#[allow(deprecated)]
 impl std::ops::Index<u32> for SymbolMap {
     type Output = String;
 
@@ -436,17 +486,18 @@ impl std::ops::Index<u32> for SymbolMap {
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
-    use std::{ffi::c_char, fmt};
+    use std::{ffi::c_char, fmt, time::Duration};
 
     use dbn::{
         encode::AsyncDbnMetadataEncoder,
         enums::rtype,
         publishers::Dataset,
         record::{HasRType, OhlcvMsg, RecordHeader, TradeMsg, WithTsOut},
-        MetadataBuilder, UNDEF_TIMESTAMP,
+        Mbp10Msg, MetadataBuilder, Record, UNDEF_TIMESTAMP,
     };
-    use tokio::{join, net::TcpListener, sync::mpsc::UnboundedSender, task::JoinHandle};
+    use tokio::{join, net::TcpListener, select, sync::mpsc::UnboundedSender, task::JoinHandle};
 
     use super::*;
 
@@ -469,7 +520,9 @@ mod tests {
         }
 
         async fn accept(&mut self) {
-            self.stream = Some(BufReader::new(self.listener.accept().await.unwrap().0));
+            let stream = self.listener.accept().await.unwrap().0;
+            stream.set_nodelay(true).unwrap();
+            self.stream = Some(BufReader::new(stream));
         }
 
         async fn authenticate(&mut self) {
@@ -530,7 +583,11 @@ mod tests {
 
         async fn send_record(&mut self, record: Box<dyn AsRef<[u8]> + Send>) {
             let bytes = (*record).as_ref();
-            self.stream().write_all(bytes).await.unwrap()
+            // test for partial read bugs
+            let half = bytes.len() / 2;
+            self.stream().write_all(&bytes[..half]).await.unwrap();
+            self.stream().flush().await.unwrap();
+            self.stream().write_all(&bytes[half..]).await.unwrap();
         }
 
         async fn read_line(&mut self) -> String {
@@ -642,6 +699,7 @@ mod tests {
             "32-character-with-lots-of-filler".to_owned(),
             dataset.to_string(),
             send_ts_out,
+            VersionUpgradePolicy::AsIs,
         )
         .await
         .unwrap();
@@ -693,7 +751,7 @@ mod tests {
         let (mut fixture, mut client) = setup(Dataset::GlbxMdp3, false).await;
         fixture.start();
         let metadata = client.start().await.unwrap();
-        assert_eq!(metadata.version, 1);
+        assert_eq!(metadata.version, dbn::DBN_VERSION);
         assert!(metadata.schema.is_none());
         assert_eq!(metadata.dataset, Dataset::GlbxMdp3.as_str());
         fixture.send_record(REC);
@@ -722,7 +780,7 @@ mod tests {
         let (mut fixture, mut client) = setup(Dataset::GlbxMdp3, true).await;
         fixture.start();
         let metadata = client.start().await.unwrap();
-        assert_eq!(metadata.version, 1);
+        assert_eq!(metadata.version, dbn::DBN_VERSION);
         assert!(metadata.schema.is_none());
         assert_eq!(metadata.dataset, Dataset::GlbxMdp3.as_str());
         fixture.send_record(expected.clone());
@@ -740,7 +798,9 @@ mod tests {
         fixture.send_record(SymbolMappingMsg::new(
             1,
             2,
+            SType::RawSymbol,
             "",
+            SType::RawSymbol,
             "AAPL",
             UNDEF_TIMESTAMP,
             UNDEF_TIMESTAMP,
@@ -748,7 +808,9 @@ mod tests {
         fixture.send_record(SymbolMappingMsg::new(
             2,
             2,
+            SType::RawSymbol,
             "",
+            SType::RawSymbol,
             "TSLA",
             UNDEF_TIMESTAMP,
             UNDEF_TIMESTAMP,
@@ -756,7 +818,9 @@ mod tests {
         fixture.send_record(SymbolMappingMsg::new(
             3,
             2,
+            SType::RawSymbol,
             "",
+            SType::RawSymbol,
             "MSFT",
             UNDEF_TIMESTAMP,
             UNDEF_TIMESTAMP,
@@ -775,7 +839,9 @@ mod tests {
         fixture.send_record(SymbolMappingMsg::new(
             10,
             2,
+            SType::RawSymbol,
             "",
+            SType::RawSymbol,
             "AAPL",
             UNDEF_TIMESTAMP,
             UNDEF_TIMESTAMP,
@@ -792,7 +858,9 @@ mod tests {
         fixture.send_record(SymbolMappingMsg::new(
             9,
             2,
+            SType::RawSymbol,
             "",
+            SType::RawSymbol,
             "MSFT",
             UNDEF_TIMESTAMP,
             UNDEF_TIMESTAMP,
@@ -824,6 +892,7 @@ mod tests {
                 "32-character-with-lots-of-filler".to_owned(),
                 DATASET.to_string(),
                 false,
+                VersionUpgradePolicy::AsIs,
             )
             .await;
             if let Err(e) = &res {
@@ -841,5 +910,51 @@ mod tests {
         let (r1, r2) = join!(client_task, fixture_task);
         r1.unwrap();
         r2.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_cancellation_safety() {
+        let (mut fixture, mut client) = setup(Dataset::GlbxMdp3, true).await;
+        fixture.start();
+        let metadata = client.start().await.unwrap();
+        assert_eq!(metadata.version, dbn::DBN_VERSION);
+        assert!(metadata.schema.is_none());
+        assert_eq!(metadata.dataset, Dataset::GlbxMdp3.as_str());
+        fixture.send_record(Mbp10Msg::default());
+
+        let mut int_1 = tokio::time::interval(Duration::from_millis(1));
+        let mut int_2 = tokio::time::interval(Duration::from_millis(1));
+        let mut int_3 = tokio::time::interval(Duration::from_millis(1));
+        let mut int_4 = tokio::time::interval(Duration::from_millis(1));
+        let mut int_5 = tokio::time::interval(Duration::from_millis(1));
+        let mut int_6 = tokio::time::interval(Duration::from_millis(1));
+        for _ in 0..5_000 {
+            select! {
+                _ =  int_1.tick() => {
+                    fixture.send_record(Mbp10Msg::default());
+                }
+                _ =  int_2.tick() => {
+                    fixture.send_record(Mbp10Msg::default());
+                }
+                _ =  int_3.tick() => {
+                    fixture.send_record(Mbp10Msg::default());
+                }
+                _ =  int_4.tick() => {
+                    fixture.send_record(Mbp10Msg::default());
+                }
+                _ =  int_5.tick() => {
+                    fixture.send_record(Mbp10Msg::default());
+                }
+                _ =  int_6.tick() => {
+                    fixture.send_record(Mbp10Msg::default());
+                }
+                res = client.next_record() => {
+                    let rec = res.unwrap().unwrap();
+                    dbg!(rec.header());
+                    assert_eq!(*rec.get::<Mbp10Msg>().unwrap(), Mbp10Msg::default());
+                }
+            }
+        }
+        fixture.stop().await;
     }
 }

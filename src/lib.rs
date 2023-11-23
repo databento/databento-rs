@@ -4,8 +4,8 @@
 //! The library is built on top of the tokio asynchronous runtime and
 //! [Databento's efficient binary encoding](https://docs.databento.com/knowledge-base/new-users/dbn-encoding).
 //!
-//! You can find getting started tutorials, full API method documentation, example
-//! code and output on the [Databento docs site](https://docs.databento.com/?historical=rust&live=rust).
+//! You can find getting started tutorials, full API method documentation, examples
+//! with output on the [Databento docs site](https://docs.databento.com/?historical=rust&live=rust).
 //!
 //! # Feature flags
 //! By default both features are enabled.
@@ -161,8 +161,19 @@ impl From<Vec<&str>> for Symbols {
 }
 
 pub(crate) fn validate_key(key: String) -> crate::Result<String> {
-    if key.len() != API_KEY_LENGTH {
-        Err(Error::bad_arg("key", "expected to be 32-characters long"))
+    if key == "$YOUR_API_KEY" {
+        Err(Error::bad_arg(
+            "key",
+            "got placeholder API key '$YOUR_API_KEY'. Please pass a real API key",
+        ))
+    } else if key.len() != API_KEY_LENGTH {
+        Err(Error::bad_arg(
+            "key",
+            format!(
+                "expected to be 32-characters long, got {} characters",
+                key.len()
+            ),
+        ))
     } else if !key.is_ascii() {
         error!("API key '{key}' contains non-ASCII characters");
         Err(Error::bad_arg(
@@ -175,7 +186,17 @@ pub(crate) fn validate_key(key: String) -> crate::Result<String> {
 }
 
 pub(crate) fn key_from_env() -> crate::Result<String> {
-    std::env::var("DATABENTO_API_KEY").map_err(|e| Error::bad_arg("key", format!("{e:?}")))
+    std::env::var("DATABENTO_API_KEY").map_err(|e| {
+        Error::bad_arg(
+            "key",
+            match e {
+                std::env::VarError::NotPresent => "tried to read API key from environment variable DATABENTO_API_KEY but it is not set",
+                std::env::VarError::NotUnicode(_) => {
+                    "environment variable DATABENTO_API_KEY contains invalid unicode"
+                }
+            },
+        )
+    })
 }
 
 #[cfg(feature = "historical")]

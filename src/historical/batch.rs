@@ -18,9 +18,9 @@ use time::OffsetDateTime;
 use tokio::io::BufWriter;
 use typed_builder::TypedBuilder;
 
-use crate::{Error, Symbols};
+use crate::{historical::check_http_error, Error, Symbols};
 
-use super::DateTimeRange;
+use super::{handle_response, DateTimeRange};
 
 /// A client for the batch group of Historical API endpoints.
 pub struct BatchClient<'a> {
@@ -63,7 +63,8 @@ impl BatchClient<'_> {
             form.push(("limit", limit.to_string()));
         }
         let builder = self.post("submit_job")?.form(&form);
-        Ok(builder.send().await?.error_for_status()?.json().await?)
+        let resp = builder.send().await?;
+        handle_response(resp).await
     }
 
     /// Lists previous batch jobs with filtering by `params`.
@@ -87,7 +88,8 @@ impl BatchClient<'_> {
         if let Some(ref since) = params.since {
             builder = builder.query(&[("since", &since.unix_timestamp_nanos().to_string())]);
         }
-        Ok(builder.send().await?.error_for_status()?.json().await?)
+        let resp = builder.send().await?;
+        handle_response(resp).await
     }
 
     /// Lists all files associated with the batch job with ID `job_id`.
@@ -96,14 +98,12 @@ impl BatchClient<'_> {
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
     pub async fn list_files(&mut self, job_id: &str) -> crate::Result<Vec<BatchFileDesc>> {
-        Ok(self
+        let resp = self
             .get("list_files")?
             .query(&[("job_id", job_id)])
             .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?)
+            .await?;
+        handle_response(resp).await
     }
 
     /// Downloads the file specified in `params` or all files associated with the job ID.
@@ -163,13 +163,8 @@ impl BatchClient<'_> {
     async fn download_file(&mut self, url: &str, path: impl AsRef<Path>) -> crate::Result<()> {
         let url = reqwest::Url::parse(url)
             .map_err(|e| Error::internal(format!("Unable to parse URL: {e:?}")))?;
-        let mut stream = self
-            .inner
-            .get_with_path(url.path())?
-            .send()
-            .await?
-            .error_for_status()?
-            .bytes_stream();
+        let resp = self.inner.get_with_path(url.path())?.send().await?;
+        let mut stream = check_http_error(resp).await?.bytes_stream();
         info!("Saving {url} to {}", path.as_ref().display());
         let mut output = BufWriter::new(
             tokio::fs::OpenOptions::new()
@@ -185,7 +180,7 @@ impl BatchClient<'_> {
         Ok(())
     }
 
-    const PATH_PREFIX: &str = "batch";
+    const PATH_PREFIX: &'static str = "batch";
 
     fn get(&mut self, slug: &str) -> crate::Result<RequestBuilder> {
         self.inner.get(&format!("{}.{slug}", Self::PATH_PREFIX))
@@ -246,7 +241,7 @@ pub enum JobState {
 
 /// The parameters for [`BatchClient::submit_job()`]. Use [`SubmitJobParams::builder()`] to
 /// get a builder type with all the preset defaults.
-#[derive(Debug, Clone, TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
 pub struct SubmitJobParams {
     /// The dataset code.
     #[builder(setter(transform = |dt: impl ToString| dt.to_string()))]
@@ -389,7 +384,7 @@ pub struct BatchJob {
 
 /// The parameters for [`BatchClient::list_jobs()`]. Use [`ListJobsParams::builder()`] to
 /// get a builder type with all the preset defaults.
-#[derive(Debug, Clone, Default, TypedBuilder)]
+#[derive(Debug, Clone, Default, TypedBuilder, PartialEq, Eq)]
 pub struct ListJobsParams {
     /// The optional filter for job states.
     #[builder(default, setter(strip_option))]
@@ -415,11 +410,13 @@ pub struct BatchFileDesc {
 
 /// The parameters for [`BatchClient::download()`]. Use [`DownloadParams::builder()`] to
 /// get a builder type with all the preset defaults.
-#[derive(Debug, Clone, TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
 pub struct DownloadParams {
     /// The directory to download the file(s) to.
+    #[builder(setter(transform = |dt: impl Into<PathBuf>| dt.into()))]
     pub output_dir: PathBuf,
     /// The batch job identifier.
+    #[builder(setter(transform = |dt: impl ToString| dt.to_string()))]
     pub job_id: String,
     /// `None` means all files associated with the job will be downloaded.
     #[builder(default, setter(strip_option))]

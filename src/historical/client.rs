@@ -1,6 +1,8 @@
+use log::warn;
 use reqwest::{header::ACCEPT, IntoUrl, RequestBuilder, Url};
+use serde::Deserialize;
 
-use crate::Error;
+use crate::{error::ApiError, Error};
 
 use super::{
     batch::BatchClient, metadata::MetadataClient, symbology::SymbologyClient,
@@ -25,7 +27,22 @@ pub struct Client {
     client: reqwest::Client,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub(crate) enum ApiErrorResponse {
+    Simple { detail: String },
+    Business { detail: BusinessErrorDetails },
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct BusinessErrorDetails {
+    message: String,
+    docs: String,
+}
+
 const USER_AGENT: &str = concat!("Databento/", env!("CARGO_PKG_VERSION"), " Rust");
+const WARNING_HEADER: &str = "X-Warning";
+const REQUEST_ID_HEADER: &str = "request-id";
 
 impl Client {
     /// Returns a type-safe builder for setting the required parameters
@@ -131,6 +148,59 @@ impl Client {
             )
             .basic_auth(&self.key, Option::<&str>::None))
     }
+}
+
+pub(crate) async fn check_http_error(
+    response: reqwest::Response,
+) -> crate::Result<reqwest::Response> {
+    if response.status().is_success() {
+        Ok(response)
+    } else {
+        let request_id = response
+            .headers()
+            .get(REQUEST_ID_HEADER)
+            .and_then(|header| header.to_str().ok().map(ToOwned::to_owned));
+        let status_code = response.status();
+        Err(Error::Api(
+            match response.json::<ApiErrorResponse>().await? {
+                ApiErrorResponse::Simple { detail: message } => ApiError {
+                    request_id,
+                    status_code,
+                    message,
+                    docs_url: None,
+                },
+                ApiErrorResponse::Business { detail } => ApiError {
+                    request_id,
+                    status_code,
+                    message: detail.message,
+                    docs_url: Some(detail.docs),
+                },
+            },
+        ))
+    }
+}
+
+pub(crate) async fn handle_response<R: serde::de::DeserializeOwned>(
+    response: reqwest::Response,
+) -> crate::Result<R> {
+    check_warnings(&response);
+    let response = check_http_error(response).await?;
+    Ok(response.json::<R>().await?)
+}
+
+fn check_warnings(response: &reqwest::Response) {
+    if let Some(header) = response.headers().get(WARNING_HEADER) {
+        match serde_json::from_slice::<Vec<String>>(header.as_bytes()) {
+            Ok(warnings) => {
+                for warning in warnings {
+                    warn!("{warning}");
+                }
+            }
+            Err(err) => {
+                warn!("Failed to parse server warnings from HTTP header: {err:?}");
+            }
+        };
+    };
 }
 
 #[doc(hidden)]

@@ -1,15 +1,15 @@
 //! The historical symbology API.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
-use dbn::{MappingInterval, SType};
+use dbn::{MappingInterval, SType, TsSymbolMap};
 use reqwest::RequestBuilder;
 use serde::Deserialize;
 use typed_builder::TypedBuilder;
 
 use crate::Symbols;
 
-use super::DateRange;
+use super::{handle_response, DateRange};
 
 /// A client for the symbology group of Historical API endpoints.
 pub struct SymbologyClient<'a> {
@@ -32,14 +32,19 @@ impl SymbologyClient<'_> {
             ("symbols", params.symbols.to_api_string()),
         ];
         params.date_range.add_to_form(&mut form);
-        Ok(self
-            .post("resolve")?
-            .form(&form)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?)
+        let resp = self.post("resolve")?.form(&form).send().await?;
+        let ResolutionResp {
+            mappings,
+            partial,
+            not_found,
+        } = handle_response(resp).await?;
+        Ok(Resolution {
+            mappings,
+            partial,
+            not_found,
+            stype_in: params.stype_in,
+            stype_out: params.stype_out,
+        })
     }
 
     fn post(&mut self, slug: &str) -> crate::Result<RequestBuilder> {
@@ -49,7 +54,7 @@ impl SymbologyClient<'_> {
 
 /// The parameters for [`SymbologyClient::resolve()`]. Use [`ResolveParams::builder()`]
 /// to get a builder type with all the preset defaults.
-#[derive(Debug, Clone, TypedBuilder)]
+#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
 pub struct ResolveParams {
     /// The dataset code.
     #[builder(setter(transform = |dt: impl ToString| dt.to_string()))]
@@ -71,16 +76,72 @@ pub struct ResolveParams {
 }
 
 /// A symbology resolution from one symbology type to another.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Resolution {
     /// A mapping from input symbol to a list of resolved symbols in the output
     /// symbology.
-    #[serde(rename = "result")]
     pub mappings: HashMap<String, Vec<MappingInterval>>,
     /// A list of symbols that were resolved for part, but not all of the date range
     /// from the request.
     pub partial: Vec<String>,
     /// A list of symbols that were not resolved.
+    pub not_found: Vec<String>,
+    /// The input symbology type.
+    pub stype_in: SType,
+    /// The output symbology type.
+    pub stype_out: SType,
+}
+
+impl Resolution {
+    /// Creates a symbology mapping from instrument ID and date to text symbol.
+    ///
+    /// # Errors
+    /// This function returns an error if it's unable to parse a symbol into an
+    /// instrument ID.
+    pub fn symbol_map(&self) -> crate::Result<TsSymbolMap> {
+        let mut map = TsSymbolMap::new();
+        if self.stype_in == SType::InstrumentId {
+            for (iid, intervals) in self.mappings.iter() {
+                let iid = iid.parse().map_err(|_| {
+                    crate::Error::internal(format!("Unable to parse '{iid}' to an instrument ID",))
+                })?;
+                for interval in intervals {
+                    map.insert(
+                        iid,
+                        interval.start_date,
+                        interval.end_date,
+                        Arc::new(interval.symbol.clone()),
+                    )?;
+                }
+            }
+        } else {
+            for (raw_symbol, intervals) in self.mappings.iter() {
+                let raw_symbol = Arc::new(raw_symbol.clone());
+                for interval in intervals {
+                    let iid = interval.symbol.parse().map_err(|_| {
+                        crate::Error::internal(format!(
+                            "Unable to parse '{}' to an instrument ID",
+                            interval.symbol
+                        ))
+                    })?;
+                    map.insert(
+                        iid,
+                        interval.start_date,
+                        interval.end_date,
+                        raw_symbol.clone(),
+                    )?;
+                }
+            }
+        }
+        Ok(map)
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct ResolutionResp {
+    #[serde(rename = "result")]
+    pub mappings: HashMap<String, Vec<MappingInterval>>,
+    pub partial: Vec<String>,
     pub not_found: Vec<String>,
 }
 

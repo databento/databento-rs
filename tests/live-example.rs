@@ -2,8 +2,8 @@
 use std::error::Error;
 
 use databento::{
-    dbn::{Dataset, SType, Schema, TradeMsg},
-    live::{Subscription, SymbolMap},
+    dbn::{Dataset, PitSymbolMap, SType, Schema, TradeMsg},
+    live::Subscription,
     LiveClient,
 };
 
@@ -26,13 +26,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .unwrap();
     client.start().await?;
 
-    let mut symbol_map = SymbolMap::new();
+    let mut symbol_map = PitSymbolMap::new();
     // Get the next trade
     loop {
         let rec = client.next_record().await?.unwrap();
         if let Some(trade) = rec.get::<TradeMsg>() {
-            let symbol = &symbol_map[trade.hd.instrument_id];
-            println!("Received trade for {symbol}: {trade:?}",);
+            let symbol = &symbol_map[trade];
+            println!("Received trade for {symbol}: {trade:?}");
             break;
         }
         symbol_map.on_record(rec)?;
