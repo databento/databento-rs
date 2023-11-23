@@ -2,7 +2,7 @@
 
 use std::num::NonZeroU64;
 
-use dbn::{Compression, Encoding, SType, Schema};
+use dbn::{Compression, Encoding, SType, Schema, VersionUpgradePolicy};
 use futures::TryStreamExt;
 use reqwest::{header::ACCEPT, RequestBuilder};
 use tokio::io::AsyncReadExt;
@@ -59,7 +59,9 @@ impl TimeseriesClient<'_> {
             .bytes_stream()
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
         let reader = tokio_util::io::StreamReader::new(stream);
-        Ok(AsyncDbnDecoder::with_zstd_buffer(reader).await?)
+        let mut decoder: AsyncDbnDecoder<_> = AsyncDbnDecoder::with_zstd_buffer(reader).await?;
+        decoder.set_upgrade_policy(params.upgrade_policy);
+        Ok(decoder)
     }
 
     fn post(&mut self, slug: &str) -> crate::Result<RequestBuilder> {
@@ -93,6 +95,9 @@ pub struct GetRangeParams {
     /// The optional maximum number of records to return. Defaults to no limit.
     #[builder(default)]
     pub limit: Option<NonZeroU64>,
+    /// How to decode DBN from prior versions. Defaults to as-is.
+    #[builder(default)]
+    pub upgrade_policy: VersionUpgradePolicy,
 }
 
 #[cfg(test)]

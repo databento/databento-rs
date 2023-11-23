@@ -3,6 +3,7 @@ use thiserror::Error;
 
 /// An error that can occur while working with Databento's API.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum Error {
     /// An invalid argument was passed to a function.
     #[error("bad argument `{param_name}`: {desc}")]

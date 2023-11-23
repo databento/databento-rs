@@ -1,8 +1,22 @@
 # Changelog
 
-## 0.5.0 - TBD
+## 0.5.0 - 2023-11-23
+
+This release adds support for DBN v2.
+
+DBN v2 delivers improvements to the `Metadata` header symbology, new `stype_in` and `stype_out`
+fields for `SymbolMappingMsg`, and extends the symbol field length for `SymbolMappingMsg` and
+`InstrumentDefMsg`. The entire change notes are available [here](https://github.com/databento/dbn/releases/tag/v0.14.0).
+Users who wish to convert DBN v1 files to v2 can use the `dbn-cli` tool available in the [databento-dbn](https://github.com/databento/dbn/) crate.
+On a future date, the Databento live and historical APIs will stop serving DBN v1.
+
+This release is fully compatible with both DBN v1 and v2, and so should be seamless for most users.
 
 #### Enhancements
+- Made `LiveClient::next_record`, `dbn::decode::AsyncDbnDecoder::decode_record` and
+  `decode_record_ref`, and `dbn::decode::AsyncRecordDecoder::decode` and `decode_ref`
+  cancel safe. This makes them safe to use within a
+  [`tokio::select!`](https://docs.rs/tokio/latest/tokio/macro.select.html) statement
 - Improved error reporting for `HistoricalClient` when receiving an error from
   Databento's API
 - Improved error messages around API keys
@@ -12,6 +26,28 @@
 - Added `symbol_map` method to the `Resolution` struct returned by `symbology::resolve`
   that returns a `TsSymbolMap`
 - Added `PartialEq` and `Eq` implementations for parameter builder classes
+- Added `upgrade_policy` setter to the `LiveClient` builder and a getter to the
+  `LiveClient`
+- Added `upgrade_policy` optional setter to the `timeseries::GetRangeParams` builder
+
+#### Breaking changes
+- Upgraded `dbn` to 0.14.2. There are several breaking changes in this release as we
+  begin migrating to DBN encoding version 2 (DBNv2) in order to support the ICE
+  exchange:
+  - Renamed `dbn::InstrumentDefMsg` to `dbn::compat::InstrumentDefMsgV1` and added a
+    new `dbn::InstrumentDefMsg` with a longer `raw_symbol` field
+  - Renamed `dbn::SymbolMappingMsg` to `dbn::compat::SymbolMappingMsgV1` and added a
+    new `dbn::SymbolMappingMsg` with longer symbol fields and new `stype_in` and
+    `stype_out` fields
+  - Added `symbol_cstr_len` field to `dbn::Metadata`
+- Made `Error` non-exhaustive, meaning it no longer be exhaustively matched against, and
+  new variants can be added in the future without a breaking change
+- Added an `upgrade_policy` parameter to `LiveClient::connect` and `connect_with_addr`.
+  The builder provides a more stable API since new parameters are usually introduced as
+  optional
+
+#### Deprecations
+- Deprecated `live::SymbolMap` in favor of `databento::dbn::PitSymbolMap`
 
 ## 0.4.2 - 2023-10-23
 
@@ -19,9 +55,6 @@
 - Upgraded `dbn` to 0.13.0 for improvements to symbology helpers
 - Upgraded `tokio` to 1.33
 - Upgraded `typed-builder` to 0.17
-
-##### Deprecations
-- Deprecated `live::SymbolMap` in favor of `databento::dbn::PitSymbolMap`
 
 #### Bug fixes
 - Fixed panic in `LiveClient` when gateway returned an auth response without the
