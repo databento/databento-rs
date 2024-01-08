@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1 - TBD
+
+#### Bug fixes
+- Fixed documentation for `end` in `DateTimeRange::Closed`
+
 ## 0.5.0 - 2023-11-23
 
 This release adds support for DBN v2.
