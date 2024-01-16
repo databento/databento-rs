@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.0 - 2024-01-16
+
+#### Enhancements
+- Relaxed version requirements for `tokio`, `tokio-util`, and `thiserror`
+
+#### Breaking changes
+- Updated DBN version to 0.15.0
+  - Added support for larger `SystemMsg` and `ErrorMsg` records
+  - Improved `Debug` implementations for records and `RecordRef`
+  - Improved panic messages for `RecordRef::get`
+- Upgraded `typed-builder` to 0.18
+
+#### Bug fixes
+- Fixed documentation for `end` in `DateRange::Closed` and `DateTimeRange::Closed`
+
 ## 0.5.0 - 2023-11-23
 
 This release adds support for DBN v2.

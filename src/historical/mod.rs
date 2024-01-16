@@ -22,13 +22,16 @@ pub enum HistoricalGateway {
     Bo1,
 }
 
-/// A date range query. It can either be closed, or use
-/// forward fill behavior.
+// TODO(carter): update doc comment after refactor
+/// A date range query. It can either be half-closed, or use forward fill behavior.
+///
+/// Note: This enum will be reworked in the future.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DateRange {
     /// An interval where `end` is unspecified.
     Open(time::Date),
-    /// A closed interval with an inclusive start date and an exclusive end date.
+    /// A **half**-closed interval with an inclusive start date and an exclusive end
+    /// date.
     Closed {
         /// The start date (inclusive).
         start: time::Date,
@@ -37,17 +40,20 @@ pub enum DateRange {
     },
 }
 
-/// A date time range query. It can either be closed, or use
-/// forward fill behavior.
+// TODO(carter): update doc comment after refactor
+/// A date time range query. It can either be half-closed, or use forward fill behavior.
+///
+/// Note: This enum will be reworked in the future.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DateTimeRange {
     /// An interval where `end` is implied.
     FwdFill(time::OffsetDateTime),
-    /// A closed interval with an inclusive start time and an exclusive end time.
+    /// A **half**-closed interval with an inclusive start time and an exclusive end
+    /// time.
     Closed {
         /// The start date time (inclusive).
         start: time::OffsetDateTime,
-        /// The end date time (inclusive).
+        /// The end date time (exclusive).
         end: time::OffsetDateTime,
     },
 }
