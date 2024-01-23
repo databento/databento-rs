@@ -95,8 +95,8 @@ pub struct GetRangeParams {
     /// The optional maximum number of records to return. Defaults to no limit.
     #[builder(default)]
     pub limit: Option<NonZeroU64>,
-    /// How to decode DBN from prior versions. Defaults to as-is.
-    #[builder(default)]
+    /// How to decode DBN from prior versions. Defaults to upgrade.
+    #[builder(default = VersionUpgradePolicy::Upgrade)]
     pub upgrade_policy: VersionUpgradePolicy,
 }
 

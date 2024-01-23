@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0 - TBD
+
+### Breaking changes
+- Changed default `upgrade_policy` in `LiveBuilder` and `GetRangeParams` to `Upgrade` so
+  by default the primary record types can always be used
+
 ## 0.6.0 - 2024-01-16
 
 #### Enhancements

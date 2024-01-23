@@ -330,7 +330,7 @@ impl Default for ClientBuilder<Unset, Unset> {
             key: Unset,
             dataset: Unset,
             send_ts_out: false,
-            upgrade_policy: VersionUpgradePolicy::AsIs,
+            upgrade_policy: VersionUpgradePolicy::Upgrade,
         }
     }
 }
