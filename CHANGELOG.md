@@ -132,4 +132,4 @@ This release is fully compatible with both DBN v1 and v2, and so should be seaml
   - Removed `mode` and `schema` parameters
 
 ## 0.1.0 - 2023-08-02
-- Initial release with support for historial and live data
+- Initial release with support for historical and live data
