@@ -285,6 +285,10 @@ impl Client {
     /// # Errors
     /// This function returns an error when it's unable to decode the next record
     /// or it's unable to read from the TCP stream.
+    ///
+    /// # Cancel safety
+    /// This method is cancel safe. It can be used within a `tokio::select!` statement
+    /// without the potential for corrupting the input stream.
     pub async fn next_record(&mut self) -> crate::Result<Option<RecordRef>> {
         Ok(self.decoder.decode_ref().await?)
     }
