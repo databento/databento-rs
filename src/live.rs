@@ -233,6 +233,12 @@ impl Client {
     ///
     /// # Errors
     /// This function returns an error if it's unable to communicate with the gateway.
+    ///
+    /// # Cancel safety
+    /// This method is not cancellation safe. If this method is used in a
+    /// [`tokio::select!`] statement and another branch completes first, the subscription
+    /// may have been partially sent, resulting in the gateway rejecting the
+    /// subscription, sending an error, and closing the connection.
     pub async fn subscribe(&mut self, sub: &Subscription) -> crate::Result<()> {
         let Subscription {
             schema, stype_in, ..
@@ -265,6 +271,12 @@ impl Client {
     /// # Errors
     /// This function returns an error if it's unable to communicate with
     /// the gateway or there was an error decoding the DBN metadata.
+    ///
+    /// # Cancel safety
+    /// This method is not cancellation safe. If this method is used in a
+    /// [`tokio::select!`] statement and another branch completes first, the live
+    /// gateway may only receive a partial message, resulting in it sending an error and
+    /// closing the connection.
     pub async fn start(&mut self) -> crate::Result<Metadata> {
         info!("[{}] Starting session", self.dataset);
         self.connection.write_all(b"start_session\n").await?;
@@ -285,6 +297,10 @@ impl Client {
     /// # Errors
     /// This function returns an error when it's unable to decode the next record
     /// or it's unable to read from the TCP stream.
+    ///
+    /// # Cancel safety
+    /// This method is cancel safe. It can be used within a [`tokio::select!`] statement
+    /// without the potential for corrupting the input stream.
     pub async fn next_record(&mut self) -> crate::Result<Option<RecordRef>> {
         Ok(self.decoder.decode_ref().await?)
     }

@@ -2,6 +2,9 @@
 
 ## 0.7.0 - TBD
 
+#### Enhancements
+- Document cancellation safety of `LiveClient` methods (credit: @yongqli)
+
 ### Breaking changes
 - Changed default `upgrade_policy` in `LiveBuilder` and `GetRangeParams` to `Upgrade` so
   by default the primary record types can always be used
