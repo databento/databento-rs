@@ -4,8 +4,9 @@
 
 #### Enhancements
 - Document cancellation safety of `LiveClient` methods (credit: @yongqli)
+- Document `live::Subscription::start` is based on `ts_event`
 
-### Breaking changes
+#### Breaking changes
 - Changed default `upgrade_policy` in `LiveBuilder` and `GetRangeParams` to `Upgrade` so
   by default the primary record types can always be used
 

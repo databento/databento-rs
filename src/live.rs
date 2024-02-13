@@ -317,8 +317,8 @@ pub struct Subscription {
     /// The symbology type of the symbols in [`symbols`](Self::symbols).
     #[builder(default = SType::RawSymbol)]
     pub stype_in: SType,
-    /// If specified, requests available data since that time. When `None`,
-    /// only real-time data is sent.
+    /// If specified, requests available data since that time (inclusive), based on
+    /// [`ts_event`](dbn::RecordHeader::ts_event). When `None`, only real-time data is sent.
     ///
     /// Setting this field is not supported once the session has been started with
     /// [`LiveClient::start`](crate::LiveClient::start).
