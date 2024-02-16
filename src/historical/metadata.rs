@@ -426,7 +426,7 @@ mod tests {
     use serde_json::json;
     use time::macros::date;
     use wiremock::{
-        matchers::{basic_auth, method, path, query_param, query_param_is_missing},
+        matchers::{basic_auth, method, path, query_param},
         Mock, MockServer, ResponseTemplate,
     };
 
@@ -566,7 +566,7 @@ mod tests {
             )))
             .and(query_param("dataset", DATASET))
             .and(query_param("start_date", "2022-05-17"))
-            .and(query_param_is_missing("end_date"))
+            .and(query_param("end_date", "2022-05-18"))
             .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_json(json!([
                 {
                     "date": "2022-05-17",
@@ -592,7 +592,7 @@ mod tests {
             .get_dataset_condition(
                 &GetDatasetConditionParams::builder()
                     .dataset(DATASET.to_owned())
-                    .date_range(date!(2022 - 05 - 17))
+                    .date_range((date!(2022 - 05 - 17), time::Duration::DAY))
                     .build(),
             )
             .await
