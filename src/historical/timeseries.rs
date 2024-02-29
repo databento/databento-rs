@@ -142,7 +142,7 @@ mod tests {
             // // default
             .and(body_contains("stype_in", "raw_symbol"))
             .and(body_contains("stype_out", "instrument_id"))
-            .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_bytes(bytes))
+            .respond_with(ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_bytes(bytes))
             .mount(&mock_server)
             .await;
         let mut target = HistoricalClient::with_url(

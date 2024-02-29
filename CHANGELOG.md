@@ -1,11 +1,12 @@
 # Changelog
 
-## 0.7.0 - TBD
+## 0.7.0 - 2024-03-01
 
 #### Enhancements
 - Document cancellation safety of `LiveClient` methods (credit: @yongqli)
 - Document `live::Subscription::start` is based on `ts_event`
-- Allow constructing a `DateRange` and `DateTimeRange` with an `end` based on a `time::Duration`
+- Allow constructing a `DateRange` and `DateTimeRange` with an `end` based on a
+  `time::Duration`
 - Implemented `Debug` for `LiveClient`, `LiveClientBuilder`, `HistoricalClient`,
   `HistoricalClientBuilder`, `BatchClient`, `MetadataClient`, `SymbologyClient`, and
   `TimeseriesClient`
@@ -15,7 +16,12 @@
 #### Breaking changes
 - Changed default `upgrade_policy` in `LiveBuilder` and `GetRangeParams` to `Upgrade` so
   by default the primary record types can always be used
-- Simplify `DateRange` and `DateTimeRange` by removing `FwdFill` variant that didn't work correctly
+- Simplified `DateRange` and `DateTimeRange` by removing `FwdFill` variant that didn't
+  work correctly
+- Upgraded DBN version to 0.16.0
+  - Updated `StatusMsg` in preparation for status schema release
+  - Fixed handling of `ts_out` when upgrading DBNv1 records to version 2
+  - Fixed handling of `ErrorMsgV1` and `SystemMsgV1` in `rtype` dispatch macros
 
 ## 0.6.0 - 2024-01-16
 

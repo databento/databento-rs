@@ -679,36 +679,38 @@ mod tests {
             // // default
             .and(body_contains("stype_in", "raw_symbol"))
             .and(body_contains("stype_out", "instrument_id"))
-            .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_json(json!({
-                "id": "123",
-                "user_id": "test_user",
-                "bill_id": "345",
-                "cost_usd": 10.50,
-                "dataset": "XNAS.ITCH",
-                "symbols": ["TSLA"],
-                "stype_in": "raw_symbol",
-                "stype_out": "instrument_id",
-                "schema": SCHEMA.as_str(),
-                "start": "2023-06-14T00:00:00.000000000Z",
-                "end": "2023-06-17 00:00:00.000000+00:00",
-                "limit": null,
-                "encoding": "dbn",
-                "compression": "zstd",
-                "pretty_px": false,
-                "pretty_ts": false,
-                "map_symbols": false,
-                "split_symbols": false,
-                "split_duration": "day",
-                "split_size": null,
-                "packaging": null,
-                "delivery": "download",
-                "state": "queued",
-                 "ts_received": "2023-07-19T23:00:04.095538123Z",
-                 "ts_queued": null,
-                 "ts_process_start": null,
-                 "ts_process_done": null,
-                 "ts_expiration": null
-            })))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!({
+                    "id": "123",
+                    "user_id": "test_user",
+                    "bill_id": "345",
+                    "cost_usd": 10.50,
+                    "dataset": "XNAS.ITCH",
+                    "symbols": ["TSLA"],
+                    "stype_in": "raw_symbol",
+                    "stype_out": "instrument_id",
+                    "schema": SCHEMA.as_str(),
+                    "start": "2023-06-14T00:00:00.000000000Z",
+                    "end": "2023-06-17 00:00:00.000000+00:00",
+                    "limit": null,
+                    "encoding": "dbn",
+                    "compression": "zstd",
+                    "pretty_px": false,
+                    "pretty_ts": false,
+                    "map_symbols": false,
+                    "split_symbols": false,
+                    "split_duration": "day",
+                    "split_size": null,
+                    "packaging": null,
+                    "delivery": "download",
+                    "state": "queued",
+                     "ts_received": "2023-07-19T23:00:04.095538123Z",
+                     "ts_queued": null,
+                     "ts_process_start": null,
+                     "ts_process_done": null,
+                     "ts_expiration": null
+                })),
+            )
             .mount(&mock_server)
             .await;
         let mut target = HistoricalClient::with_url(
@@ -741,37 +743,39 @@ mod tests {
             .and(path(format!("/v{API_VERSION}/batch.list_jobs")))
             .and(query_param_is_missing("states"))
             .and(query_param_is_missing("since"))
-            .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_json(json!([{
-                "id": "123",
-                "user_id": "test_user",
-                "bill_id": "345",
-                "cost_usd": 10.50,
-                "dataset": "XNAS.ITCH",
-                "symbols": "TSLA",
-                "stype_in": "raw_symbol",
-                "stype_out": "instrument_id",
-                "schema": SCHEMA.as_str(),
-                // test both time formats
-                "start": "2023-06-14 00:00:00+00:00",
-                "end": "2023-06-17T00:00:00.012345678Z",
-                "limit": null,
-                "encoding": "json",
-                "compression": "zstd",
-                "pretty_px": true,
-                "pretty_ts": false,
-                "map_symbols": true,
-                "split_symbols": false,
-                "split_duration": "day",
-                "split_size": null,
-                "packaging": null,
-                "delivery": "download",
-                "state": "processing",
-                 "ts_received": "2023-07-19 23:00:04.095538+00:00",
-                 "ts_queued": "2023-07-19T23:00:08.095538123Z",
-                 "ts_process_start": "2023-07-19 23:01:04.000000+00:00",
-                 "ts_process_done": null,
-                 "ts_expiration": null
-            }])))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!([{
+                    "id": "123",
+                    "user_id": "test_user",
+                    "bill_id": "345",
+                    "cost_usd": 10.50,
+                    "dataset": "XNAS.ITCH",
+                    "symbols": "TSLA",
+                    "stype_in": "raw_symbol",
+                    "stype_out": "instrument_id",
+                    "schema": SCHEMA.as_str(),
+                    // test both time formats
+                    "start": "2023-06-14 00:00:00+00:00",
+                    "end": "2023-06-17T00:00:00.012345678Z",
+                    "limit": null,
+                    "encoding": "json",
+                    "compression": "zstd",
+                    "pretty_px": true,
+                    "pretty_ts": false,
+                    "map_symbols": true,
+                    "split_symbols": false,
+                    "split_duration": "day",
+                    "split_size": null,
+                    "packaging": null,
+                    "delivery": "download",
+                    "state": "processing",
+                     "ts_received": "2023-07-19 23:00:04.095538+00:00",
+                     "ts_queued": "2023-07-19T23:00:08.095538123Z",
+                     "ts_process_start": "2023-07-19 23:01:04.000000+00:00",
+                     "ts_process_done": null,
+                     "ts_expiration": null
+                }])),
+            )
             .mount(&mock_server)
             .await;
         let mut target = HistoricalClient::with_url(

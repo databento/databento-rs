@@ -91,8 +91,13 @@ impl Client {
             connection: writer,
             // Pass a placeholder DBN version and should never fail because DBN_VERSION
             // is a valid DBN version. Correct version set in `start()`.
-            decoder: AsyncRecordDecoder::with_version(reader, dbn::DBN_VERSION, upgrade_policy)
-                .unwrap(),
+            decoder: AsyncRecordDecoder::with_version(
+                reader,
+                dbn::DBN_VERSION,
+                upgrade_policy,
+                send_ts_out,
+            )
+            .unwrap(),
             session_id,
         })
     }
@@ -282,6 +287,8 @@ impl Client {
             .decode()
             .await?;
         self.decoder.set_version(metadata.version)?;
+        // Should match `send_ts_out` but set again here for safety
+        self.decoder.set_ts_out(metadata.ts_out);
         metadata.upgrade(self.upgrade_policy);
         Ok(metadata)
     }
