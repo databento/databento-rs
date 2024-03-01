@@ -33,7 +33,7 @@ pub use live::Client as LiveClient;
 // Re-export to keep versions synchronized
 pub use dbn;
 
-use std::fmt::{Display, Write};
+use std::fmt::{self, Display, Write};
 
 use log::error;
 #[cfg(feature = "historical")]
@@ -160,7 +160,7 @@ impl From<Vec<&str>> for Symbols {
     }
 }
 
-pub(crate) fn validate_key(key: String) -> crate::Result<String> {
+pub(crate) fn validate_key(key: String) -> crate::Result<ApiKey> {
     if key == "$YOUR_API_KEY" {
         Err(Error::bad_arg(
             "key",
@@ -181,7 +181,7 @@ pub(crate) fn validate_key(key: String) -> crate::Result<String> {
             "expected to be composed of only ASCII characters",
         ))
     } else {
-        Ok(key)
+        Ok(ApiKey(key))
     }
 }
 
@@ -224,6 +224,23 @@ impl<'de> Deserialize<'de> for Symbols {
     }
 }
 
+/// A struct for holding an API key that implements Debug, but will only print the last
+/// five characters of the key.
+#[derive(Clone)]
+pub struct ApiKey(String);
+
+pub(crate) const BUCKET_ID_LENGTH: usize = 5;
+
+impl fmt::Debug for ApiKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "\"…{}\"",
+            &self.0[self.0.len().saturating_sub(BUCKET_ID_LENGTH)..]
+        )
+    }
+}
+
 #[cfg(test)]
 const TEST_DATA_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data");
 #[cfg(test)]
@@ -235,7 +252,7 @@ pub(crate) fn body_contains(
     key: impl Display,
     val: impl Display,
 ) -> wiremock::matchers::BodyContainsMatcher {
-    wiremock::matchers::body_string_contains(&format!("{key}={val}"))
+    wiremock::matchers::body_string_contains(format!("{key}={val}"))
 }
 
 #[cfg(test)]
@@ -255,5 +272,18 @@ mod tests {
         );
         assert_eq!(symbol_res[3], Symbols::Symbols(vec!["TSLA".to_owned()]));
         assert_eq!(symbol_res[4], Symbols::Ids(vec![1001]));
+    }
+
+    #[test]
+    fn test_key_debug_truncates() {
+        assert_eq!(
+            format!("{:?}", ApiKey("abcdefghijklmnopqrstuvwxyz".to_owned())),
+            "\"…vwxyz\""
+        );
+    }
+
+    #[test]
+    fn test_key_debug_doesnt_underflow() {
+        assert_eq!(format!("{:?}", ApiKey("test".to_owned())), "\"…test\"");
     }
 }

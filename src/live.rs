@@ -1,6 +1,6 @@
 //! The Live client and related API types. Used for both real-time data and intraday historical.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt};
 
 use dbn::{
     compat::SymbolMappingMsgV1,
@@ -17,14 +17,14 @@ use tokio::{
 };
 use typed_builder::TypedBuilder;
 
-use crate::{validate_key, Error, Symbols, API_KEY_LENGTH};
+use crate::{validate_key, ApiKey, Error, Symbols, API_KEY_LENGTH, BUCKET_ID_LENGTH};
 
 /// The Live client. Used for subscribing to real-time and intraday historical market data.
 ///
 /// Use [`LiveClient::builder()`](Client::builder) to get a type-safe builder for
 /// initializing the required parameters for the client.
 pub struct Client {
-    key: String,
+    key: ApiKey,
     dataset: String,
     send_ts_out: bool,
     upgrade_policy: VersionUpgradePolicy,
@@ -32,8 +32,6 @@ pub struct Client {
     decoder: AsyncRecordDecoder<BufReader<ReadHalf<TcpStream>>>,
     session_id: String,
 }
-
-const BUCKET_ID_LENGTH: usize = 5;
 
 impl Client {
     /// Returns a type-safe builder for setting the required parameters
@@ -83,7 +81,7 @@ impl Client {
 
         // Authenticate CRAM
         let session_id =
-            Self::cram_challenge(&mut reader, &mut writer, &key, &dataset, send_ts_out).await?;
+            Self::cram_challenge(&mut reader, &mut writer, &key.0, &dataset, send_ts_out).await?;
 
         Ok(Self {
             key,
@@ -93,15 +91,20 @@ impl Client {
             connection: writer,
             // Pass a placeholder DBN version and should never fail because DBN_VERSION
             // is a valid DBN version. Correct version set in `start()`.
-            decoder: AsyncRecordDecoder::with_version(reader, dbn::DBN_VERSION, upgrade_policy)
-                .unwrap(),
+            decoder: AsyncRecordDecoder::with_version(
+                reader,
+                dbn::DBN_VERSION,
+                upgrade_policy,
+                send_ts_out,
+            )
+            .unwrap(),
             session_id,
         })
     }
 
     /// Returns the API key used by the instance of the client.
     pub fn key(&self) -> &str {
-        &self.key
+        &self.key.0
     }
 
     /// Returns the dataset the client is configured for.
@@ -233,6 +236,12 @@ impl Client {
     ///
     /// # Errors
     /// This function returns an error if it's unable to communicate with the gateway.
+    ///
+    /// # Cancel safety
+    /// This method is not cancellation safe. If this method is used in a
+    /// [`tokio::select!`] statement and another branch completes first, the subscription
+    /// may have been partially sent, resulting in the gateway rejecting the
+    /// subscription, sending an error, and closing the connection.
     pub async fn subscribe(&mut self, sub: &Subscription) -> crate::Result<()> {
         let Subscription {
             schema, stype_in, ..
@@ -265,6 +274,12 @@ impl Client {
     /// # Errors
     /// This function returns an error if it's unable to communicate with
     /// the gateway or there was an error decoding the DBN metadata.
+    ///
+    /// # Cancel safety
+    /// This method is not cancellation safe. If this method is used in a
+    /// [`tokio::select!`] statement and another branch completes first, the live
+    /// gateway may only receive a partial message, resulting in it sending an error and
+    /// closing the connection.
     pub async fn start(&mut self) -> crate::Result<Metadata> {
         info!("[{}] Starting session", self.dataset);
         self.connection.write_all(b"start_session\n").await?;
@@ -272,6 +287,8 @@ impl Client {
             .decode()
             .await?;
         self.decoder.set_version(metadata.version)?;
+        // Should match `send_ts_out` but set again here for safety
+        self.decoder.set_ts_out(metadata.ts_out);
         metadata.upgrade(self.upgrade_policy);
         Ok(metadata)
     }
@@ -285,6 +302,10 @@ impl Client {
     /// # Errors
     /// This function returns an error when it's unable to decode the next record
     /// or it's unable to read from the TCP stream.
+    ///
+    /// # Cancel safety
+    /// This method is cancel safe. It can be used within a [`tokio::select!`] statement
+    /// without the potential for corrupting the input stream.
     pub async fn next_record(&mut self) -> crate::Result<Option<RecordRef>> {
         Ok(self.decoder.decode_ref().await?)
     }
@@ -301,8 +322,8 @@ pub struct Subscription {
     /// The symbology type of the symbols in [`symbols`](Self::symbols).
     #[builder(default = SType::RawSymbol)]
     pub stype_in: SType,
-    /// If specified, requests available data since that time. When `None`,
-    /// only real-time data is sent.
+    /// If specified, requests available data since that time (inclusive), based on
+    /// [`ts_event`](dbn::RecordHeader::ts_event). When `None`, only real-time data is sent.
     ///
     /// Setting this field is not supported once the session has been started with
     /// [`LiveClient::start`](crate::LiveClient::start).
@@ -311,12 +332,14 @@ pub struct Subscription {
 }
 
 #[doc(hidden)]
+#[derive(Debug, Copy, Clone)]
 pub struct Unset;
 
 /// A type-safe builder for the [`LiveClient`](Client). It will not allow you to call
 /// [`Self::build()`] before setting the required fields:
 /// - `key`
 /// - `dataset`
+#[derive(Debug, Clone)]
 pub struct ClientBuilder<AK, D> {
     key: AK,
     dataset: D,
@@ -330,7 +353,7 @@ impl Default for ClientBuilder<Unset, Unset> {
             key: Unset,
             dataset: Unset,
             send_ts_out: false,
-            upgrade_policy: VersionUpgradePolicy::AsIs,
+            upgrade_policy: VersionUpgradePolicy::Upgrade,
         }
     }
 }
@@ -363,7 +386,7 @@ impl<D> ClientBuilder<Unset, D> {
     ///
     /// # Errors
     /// This function returns an error when the API key is invalid.
-    pub fn key(self, key: impl ToString) -> crate::Result<ClientBuilder<String, D>> {
+    pub fn key(self, key: impl ToString) -> crate::Result<ClientBuilder<ApiKey, D>> {
         Ok(ClientBuilder {
             key: crate::validate_key(key.to_string())?,
             dataset: self.dataset,
@@ -378,7 +401,7 @@ impl<D> ClientBuilder<Unset, D> {
     /// # Errors
     /// This function returns an error when the environment variable is not set or the
     /// API key is invalid.
-    pub fn key_from_env(self) -> crate::Result<ClientBuilder<String, D>> {
+    pub fn key_from_env(self) -> crate::Result<ClientBuilder<ApiKey, D>> {
         let key = crate::key_from_env()?;
         self.key(key)
     }
@@ -396,7 +419,7 @@ impl<AK> ClientBuilder<AK, Unset> {
     }
 }
 
-impl ClientBuilder<String, String> {
+impl ClientBuilder<ApiKey, String> {
     /// Initializes the client and attempts to connect to the gateway.
     ///
     /// # Errors
@@ -404,7 +427,7 @@ impl ClientBuilder<String, String> {
     /// to connect and authenticate with the Live gateway.
     pub async fn build(self) -> crate::Result<Client> {
         Client::connect(
-            self.key,
+            self.key.0,
             self.dataset,
             self.send_ts_out,
             self.upgrade_policy,
@@ -482,6 +505,18 @@ impl std::ops::Index<u32> for SymbolMap {
     fn index(&self, instrument_id: u32) -> &Self::Output {
         self.get(instrument_id)
             .expect("symbol mapping for instrument ID")
+    }
+}
+
+impl fmt::Debug for Client {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LiveClient")
+            .field("key", &self.key)
+            .field("dataset", &self.dataset)
+            .field("send_ts_out", &self.send_ts_out)
+            .field("upgrade_policy", &self.upgrade_policy)
+            .field("session_id", &self.session_id)
+            .finish_non_exhaustive()
     }
 }
 

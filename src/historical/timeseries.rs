@@ -16,6 +16,7 @@ use super::{check_http_error, DateTimeRange};
 pub use dbn::decode::AsyncDbnDecoder;
 
 /// A client for the timeseries group of Historical API endpoints.
+#[derive(Debug)]
 pub struct TimeseriesClient<'a> {
     pub(crate) inner: &'a mut super::Client,
 }
@@ -95,8 +96,8 @@ pub struct GetRangeParams {
     /// The optional maximum number of records to return. Defaults to no limit.
     #[builder(default)]
     pub limit: Option<NonZeroU64>,
-    /// How to decode DBN from prior versions. Defaults to as-is.
-    #[builder(default)]
+    /// How to decode DBN from prior versions. Defaults to upgrade.
+    #[builder(default = VersionUpgradePolicy::Upgrade)]
     pub upgrade_policy: VersionUpgradePolicy,
 }
 
@@ -141,7 +142,7 @@ mod tests {
             // // default
             .and(body_contains("stype_in", "raw_symbol"))
             .and(body_contains("stype_out", "instrument_id"))
-            .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_bytes(bytes))
+            .respond_with(ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_bytes(bytes))
             .mount(&mock_server)
             .await;
         let mut target = HistoricalClient::with_url(

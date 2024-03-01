@@ -22,54 +22,41 @@ pub enum HistoricalGateway {
     Bo1,
 }
 
-// TODO(carter): update doc comment after refactor
-/// A date range query. It can either be half-closed, or use forward fill behavior.
-///
-/// Note: This enum will be reworked in the future.
+/// A **half**-closed date interval with an inclusive start date and an exclusive end
+/// date.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum DateRange {
-    /// An interval where `end` is unspecified.
-    Open(time::Date),
-    /// A **half**-closed interval with an inclusive start date and an exclusive end
-    /// date.
-    Closed {
-        /// The start date (inclusive).
-        start: time::Date,
-        /// The end date (exclusive).
-        end: time::Date,
-    },
+pub struct DateRange {
+    /// The start date (inclusive).
+    start: time::Date,
+    /// The end date (exclusive).
+    end: time::Date,
 }
 
-// TODO(carter): update doc comment after refactor
-/// A date time range query. It can either be half-closed, or use forward fill behavior.
-///
-/// Note: This enum will be reworked in the future.
+/// A **half**-closed datetime interval with an inclusive start time and an exclusive
+/// end time.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum DateTimeRange {
-    /// An interval where `end` is implied.
-    FwdFill(time::OffsetDateTime),
-    /// A **half**-closed interval with an inclusive start time and an exclusive end
-    /// time.
-    Closed {
-        /// The start date time (inclusive).
-        start: time::OffsetDateTime,
-        /// The end date time (exclusive).
-        end: time::OffsetDateTime,
-    },
+pub struct DateTimeRange {
+    /// The start date time (inclusive).
+    start: time::OffsetDateTime,
+    /// The end date time (exclusive).
+    end: time::OffsetDateTime,
 }
 
 impl From<(time::Date, time::Date)> for DateRange {
     fn from(value: (time::Date, time::Date)) -> Self {
-        Self::Closed {
+        Self {
             start: value.0,
             end: value.1,
         }
     }
 }
 
-impl From<time::Date> for DateRange {
-    fn from(value: time::Date) -> Self {
-        Self::Open(value)
+impl From<(time::Date, time::Duration)> for DateRange {
+    fn from(value: (time::Date, time::Duration)) -> Self {
+        Self {
+            start: value.0,
+            end: value.0 + value.1,
+        }
     }
 }
 
@@ -77,16 +64,19 @@ pub(crate) const DATE_FORMAT: &[FormatItem<'_>] = format_description!("[year]-[m
 
 impl From<(time::OffsetDateTime, time::OffsetDateTime)> for DateTimeRange {
     fn from(value: (time::OffsetDateTime, time::OffsetDateTime)) -> Self {
-        Self::Closed {
+        Self {
             start: value.0,
             end: value.1,
         }
     }
 }
 
-impl From<time::OffsetDateTime> for DateTimeRange {
-    fn from(value: time::OffsetDateTime) -> Self {
-        Self::FwdFill(value)
+impl From<(time::OffsetDateTime, time::Duration)> for DateTimeRange {
+    fn from(value: (time::OffsetDateTime, time::Duration)) -> Self {
+        Self {
+            start: value.0,
+            end: value.0 + value.1,
+        }
     }
 }
 
@@ -98,7 +88,7 @@ impl TryFrom<(u64, u64)> for DateTimeRange {
             .map_err(|e| Error::bad_arg("first UNIX nanos", format!("{e:?}")))?;
         let end = time::OffsetDateTime::from_unix_timestamp_nanos(value.1 as i128)
             .map_err(|e| Error::bad_arg("second UNIX nanos", format!("{e:?}")))?;
-        Ok(Self::Closed { start, end })
+        Ok(Self { start, end })
     }
 }
 
@@ -108,27 +98,19 @@ trait AddToQuery<T> {
 
 impl AddToQuery<DateRange> for reqwest::RequestBuilder {
     fn add_to_query(self, param: &DateRange) -> Self {
-        match param {
-            DateRange::Open(start) => {
-                self.query(&[("start_date", start.format(DATE_FORMAT).unwrap())])
-            }
-            DateRange::Closed { start, end } => self.query(&[
-                ("start_date", start.format(DATE_FORMAT).unwrap()),
-                ("end_date", end.format(DATE_FORMAT).unwrap()),
-            ]),
-        }
+        self.query(&[
+            ("start_date", param.start.format(DATE_FORMAT).unwrap()),
+            ("end_date", param.end.format(DATE_FORMAT).unwrap()),
+        ])
     }
 }
 
 impl AddToQuery<DateTimeRange> for reqwest::RequestBuilder {
     fn add_to_query(self, param: &DateTimeRange) -> Self {
-        match param {
-            DateTimeRange::FwdFill(start) => self.query(&[("start", start.unix_timestamp_nanos())]),
-            DateTimeRange::Closed { start, end } => self.query(&[
-                ("start", start.unix_timestamp_nanos()),
-                ("end", end.unix_timestamp_nanos()),
-            ]),
-        }
+        self.query(&[
+            ("start", param.start.unix_timestamp_nanos()),
+            ("end", param.end.unix_timestamp_nanos()),
+        ])
     }
 }
 
@@ -140,28 +122,33 @@ impl AddToQuery<Symbols> for reqwest::RequestBuilder {
 
 impl DateRange {
     pub(crate) fn add_to_form(&self, form: &mut Vec<(&'static str, String)>) {
-        match self {
-            DateRange::Open(start) => {
-                form.push(("start_date", start.format(DATE_FORMAT).unwrap()));
-            }
-            DateRange::Closed { start, end } => {
-                form.push(("start_date", start.format(DATE_FORMAT).unwrap()));
-                form.push(("end_date", end.format(DATE_FORMAT).unwrap()));
-            }
-        }
+        form.push(("start_date", self.start.format(DATE_FORMAT).unwrap()));
+        form.push(("end_date", self.end.format(DATE_FORMAT).unwrap()));
     }
 }
 
 impl DateTimeRange {
     pub(crate) fn add_to_form(&self, form: &mut Vec<(&'static str, String)>) {
-        match self {
-            DateTimeRange::FwdFill(start) => {
-                form.push(("start", start.unix_timestamp_nanos().to_string()));
+        form.push(("start", self.start.unix_timestamp_nanos().to_string()));
+        form.push(("end", self.end.unix_timestamp_nanos().to_string()));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use time::macros::date;
+
+    #[test]
+    fn date_range_from_lt_day_duration() {
+        let target = DateRange::from((date!(2024 - 02 - 16), time::Duration::SECOND));
+        assert_eq!(
+            target,
+            DateRange {
+                start: date!(2024 - 02 - 16),
+                end: date!(2024 - 02 - 16)
             }
-            DateTimeRange::Closed { start, end } => {
-                form.push(("start", start.unix_timestamp_nanos().to_string()));
-                form.push(("end", end.unix_timestamp_nanos().to_string()));
-            }
-        }
+        )
     }
 }

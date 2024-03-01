@@ -12,6 +12,7 @@ use crate::Symbols;
 use super::{handle_response, DateRange};
 
 /// A client for the symbology group of Historical API endpoints.
+#[derive(Debug)]
 pub struct SymbologyClient<'a> {
     pub(crate) inner: &'a mut super::Client,
 }
@@ -177,24 +178,26 @@ mod tests {
             .and(body_contains("stype_out", "instrument_id"))
             .and(body_contains("start_date", "2023-06-14"))
             .and(body_contains("end_date", "2023-06-17"))
-            .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_json(json!({
-                "result": {
-                    "ES.c.0": [
-                        {
-                            "d0": "2023-06-14",
-                            "d1": "2023-06-15",
-                            "s": "10245"
-                        },
-                        {
-                            "d0": "2023-06-15",
-                            "d1": "2023-06-16",
-                            "s": "10248"
-                        }
-                    ]
-                },
-                "partial": [],
-                "not_found": ["ES.d.0"]
-            })))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!({
+                    "result": {
+                        "ES.c.0": [
+                            {
+                                "d0": "2023-06-14",
+                                "d1": "2023-06-15",
+                                "s": "10245"
+                            },
+                            {
+                                "d0": "2023-06-15",
+                                "d1": "2023-06-16",
+                                "s": "10248"
+                            }
+                        ]
+                    },
+                    "partial": [],
+                    "not_found": ["ES.d.0"]
+                })),
+            )
             .mount(&mock_server)
             .await;
         let mut target = HistoricalClient::with_url(

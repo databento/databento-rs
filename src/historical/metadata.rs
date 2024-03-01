@@ -12,6 +12,7 @@ use crate::Symbols;
 use super::{handle_response, AddToQuery, DateRange, DateTimeRange};
 
 /// A client for the metadata group of Historical API endpoints.
+#[derive(Debug)]
 pub struct MetadataClient<'a> {
     pub(crate) inner: &'a mut super::Client,
 }
@@ -426,7 +427,7 @@ mod tests {
     use serde_json::json;
     use time::macros::date;
     use wiremock::{
-        matchers::{basic_auth, method, path, query_param, query_param_is_missing},
+        matchers::{basic_auth, method, path, query_param},
         Mock, MockServer, ResponseTemplate,
     };
 
@@ -448,15 +449,17 @@ mod tests {
             .and(path(format!("/v{API_VERSION}/metadata.list_fields")))
             .and(query_param("encoding", ENC.as_str()))
             .and(query_param("schema", SCHEMA.as_str()))
-            .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_json(json!([
-                {"name":"ts_event", "type": "uint64_t"},
-                {"name":"rtype", "type": "uint8_t"},
-                {"name":"open", "type": "int64_t"},
-                {"name":"high", "type": "int64_t"},
-                {"name":"low", "type": "int64_t"},
-                {"name":"close", "type": "int64_t"},
-                {"name":"volume", "type": "uint64_t"},
-            ])))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!([
+                    {"name":"ts_event", "type": "uint64_t"},
+                    {"name":"rtype", "type": "uint8_t"},
+                    {"name":"open", "type": "int64_t"},
+                    {"name":"high", "type": "int64_t"},
+                    {"name":"low", "type": "int64_t"},
+                    {"name":"close", "type": "int64_t"},
+                    {"name":"volume", "type": "uint64_t"},
+                ])),
+            )
             .mount(&mock_server)
             .await;
         let mut target = HistoricalClient::with_url(
@@ -517,20 +520,22 @@ mod tests {
             .and(basic_auth(API_KEY, ""))
             .and(path(format!("/v{API_VERSION}/metadata.list_unit_prices")))
             .and(query_param("dataset", DATASET))
-            .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_json(json!([
-                {
-                    "mode": "historical",
-                    "unit_prices": {
-                        SCHEMA.as_str(): 17.89
+            .respond_with(
+                ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!([
+                    {
+                        "mode": "historical",
+                        "unit_prices": {
+                            SCHEMA.as_str(): 17.89
+                        }
+                    },
+                    {
+                        "mode": "live",
+                        "unit_prices": {
+                            SCHEMA.as_str(): 34.22
+                        }
                     }
-                },
-                {
-                    "mode": "live",
-                    "unit_prices": {
-                        SCHEMA.as_str(): 34.22
-                    }
-                }
-            ])))
+                ])),
+            )
             .mount(&mock_server)
             .await;
         let mut target = HistoricalClient::with_url(
@@ -566,19 +571,21 @@ mod tests {
             )))
             .and(query_param("dataset", DATASET))
             .and(query_param("start_date", "2022-05-17"))
-            .and(query_param_is_missing("end_date"))
-            .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_json(json!([
-                {
-                    "date": "2022-05-17",
-                    "condition": "available",
-                    "last_modified_date": "2023-07-11",
-                },
-                {
-                    "date": "2022-05-18",
-                    "condition": "degraded",
-                    "last_modified_date": "2022-05-19",
-                }
-            ])))
+            .and(query_param("end_date", "2022-05-18"))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!([
+                    {
+                        "date": "2022-05-17",
+                        "condition": "available",
+                        "last_modified_date": "2023-07-11",
+                    },
+                    {
+                        "date": "2022-05-18",
+                        "condition": "degraded",
+                        "last_modified_date": "2022-05-19",
+                    }
+                ])),
+            )
             .mount(&mock_server)
             .await;
         let mut target = HistoricalClient::with_url(
@@ -592,7 +599,7 @@ mod tests {
             .get_dataset_condition(
                 &GetDatasetConditionParams::builder()
                     .dataset(DATASET.to_owned())
-                    .date_range(date!(2022 - 05 - 17))
+                    .date_range((date!(2022 - 05 - 17), time::Duration::DAY))
                     .build(),
             )
             .await
@@ -624,10 +631,12 @@ mod tests {
             .and(basic_auth(API_KEY, ""))
             .and(path(format!("/v{API_VERSION}/metadata.get_dataset_range")))
             .and(query_param("dataset", DATASET))
-            .respond_with(ResponseTemplate::new(StatusCode::OK).set_body_json(json!({
-                "start_date": "2019-07-07",
-                "end_date": "2023-07-19",
-            })))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!({
+                    "start_date": "2019-07-07",
+                    "end_date": "2023-07-19",
+                })),
+            )
             .mount(&mock_server)
             .await;
         let mut target = HistoricalClient::with_url(
