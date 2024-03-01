@@ -2,7 +2,7 @@ use log::warn;
 use reqwest::{header::ACCEPT, IntoUrl, RequestBuilder, Url};
 use serde::Deserialize;
 
-use crate::{error::ApiError, Error};
+use crate::{error::ApiError, ApiKey, Error};
 
 use super::{
     batch::BatchClient, metadata::MetadataClient, symbology::SymbologyClient,
@@ -20,8 +20,9 @@ use super::{
 /// - [`timeseries()`](Self::timeseries)
 /// - [`symbology()`](Self::symbology)
 /// - [`batch()`](Self::batch)
+#[derive(Debug, Clone)]
 pub struct Client {
-    key: String,
+    key: ApiKey,
     base_url: Url,
     gateway: HistoricalGateway,
     client: reqwest::Client,
@@ -78,7 +79,7 @@ impl Client {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(ACCEPT, "application/json".parse().unwrap());
         Ok(Self {
-            key,
+            key: ApiKey(key),
             base_url,
             gateway,
             client: reqwest::ClientBuilder::new()
@@ -90,7 +91,7 @@ impl Client {
 
     /// Returns the API key used by the instance of the client.
     pub fn key(&self) -> &str {
-        &self.key
+        &self.key.0
     }
 
     /// Returns the configured Historical gateway.
@@ -130,7 +131,7 @@ impl Client {
                     .join(path)
                     .map_err(|e| Error::Internal(format!("created invalid URL: {e:?}")))?,
             )
-            .basic_auth(&self.key, Option::<&str>::None))
+            .basic_auth(self.key(), Option::<&str>::None))
     }
 
     pub(crate) fn post(&mut self, slug: &str) -> crate::Result<RequestBuilder> {
@@ -146,7 +147,7 @@ impl Client {
                     .join(&format!("v{API_VERSION}/{slug}"))
                     .map_err(|e| Error::Internal(format!("created invalid URL: {e:?}")))?,
             )
-            .basic_auth(&self.key, Option::<&str>::None))
+            .basic_auth(self.key(), Option::<&str>::None))
     }
 }
 
@@ -204,10 +205,12 @@ fn check_warnings(response: &reqwest::Response) {
 }
 
 #[doc(hidden)]
+#[derive(Debug, Copy, Clone)]
 pub struct Unset;
 
 /// A type-safe builder for the [`HistoricalClient`](Client). It will not allow you to
 /// call [`Self::build()`] before setting the required `key` field.
+#[derive(Clone)]
 pub struct ClientBuilder<AK> {
     key: AK,
     base_url: Option<Url>,
@@ -249,7 +252,7 @@ impl ClientBuilder<Unset> {
     ///
     /// # Errors
     /// This function returns an error when the API key is invalid.
-    pub fn key(self, key: impl ToString) -> crate::Result<ClientBuilder<String>> {
+    pub fn key(self, key: impl ToString) -> crate::Result<ClientBuilder<ApiKey>> {
         Ok(ClientBuilder {
             key: crate::validate_key(key.to_string())?,
             base_url: self.base_url,
@@ -263,22 +266,22 @@ impl ClientBuilder<Unset> {
     /// # Errors
     /// This function returns an error when the environment variable is not set or the
     /// API key is invalid.
-    pub fn key_from_env(self) -> crate::Result<ClientBuilder<String>> {
+    pub fn key_from_env(self) -> crate::Result<ClientBuilder<ApiKey>> {
         let key = crate::key_from_env()?;
         self.key(key)
     }
 }
 
-impl ClientBuilder<String> {
+impl ClientBuilder<ApiKey> {
     /// Initializes the client.
     ///
     /// # Errors
     /// This function returns an error when it fails to build the HTTP client.
     pub fn build(self) -> crate::Result<Client> {
         if let Some(url) = self.base_url {
-            Client::with_url(url, self.key, self.gateway)
+            Client::with_url(url, self.key.0, self.gateway)
         } else {
-            Client::new(self.key, self.gateway)
+            Client::new(self.key.0, self.gateway)
         }
     }
 }

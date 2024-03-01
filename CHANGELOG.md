@@ -6,6 +6,11 @@
 - Document cancellation safety of `LiveClient` methods (credit: @yongqli)
 - Document `live::Subscription::start` is based on `ts_event`
 - Allow constructing a `DateRange` and `DateTimeRange` with an `end` based on a `time::Duration`
+- Implemented `Debug` for `LiveClient`, `LiveClientBuilder`, `HistoricalClient`,
+  `HistoricalClientBuilder`, `BatchClient`, `MetadataClient`, `SymbologyClient`, and
+  `TimeseriesClient`
+- Derived `Clone` for `LiveClientBuilder` and `HistoricalClientBuilder`
+- Added `ApiKey` type for safely deriving `Debug` for types containing an API key
 
 #### Breaking changes
 - Changed default `upgrade_policy` in `LiveBuilder` and `GetRangeParams` to `Upgrade` so

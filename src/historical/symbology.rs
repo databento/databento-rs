@@ -12,6 +12,7 @@ use crate::Symbols;
 use super::{handle_response, DateRange};
 
 /// A client for the symbology group of Historical API endpoints.
+#[derive(Debug)]
 pub struct SymbologyClient<'a> {
     pub(crate) inner: &'a mut super::Client,
 }

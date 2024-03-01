@@ -23,6 +23,7 @@ use crate::{historical::check_http_error, Error, Symbols};
 use super::{handle_response, DateTimeRange};
 
 /// A client for the batch group of Historical API endpoints.
+#[derive(Debug)]
 pub struct BatchClient<'a> {
     pub(crate) inner: &'a mut super::Client,
 }

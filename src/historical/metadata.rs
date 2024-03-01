@@ -12,6 +12,7 @@ use crate::Symbols;
 use super::{handle_response, AddToQuery, DateRange, DateTimeRange};
 
 /// A client for the metadata group of Historical API endpoints.
+#[derive(Debug)]
 pub struct MetadataClient<'a> {
     pub(crate) inner: &'a mut super::Client,
 }

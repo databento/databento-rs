@@ -16,6 +16,7 @@ use super::{check_http_error, DateTimeRange};
 pub use dbn::decode::AsyncDbnDecoder;
 
 /// A client for the timeseries group of Historical API endpoints.
+#[derive(Debug)]
 pub struct TimeseriesClient<'a> {
     pub(crate) inner: &'a mut super::Client,
 }
