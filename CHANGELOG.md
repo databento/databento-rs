@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.1 - TBD
+## 0.7.1 - 2024-03-05
 
 #### Enhancements
 - Improve error handling when a historical HTTP error response is not in the
