@@ -162,22 +162,31 @@ pub(crate) async fn check_http_error(
             .get(REQUEST_ID_HEADER)
             .and_then(|header| header.to_str().ok().map(ToOwned::to_owned));
         let status_code = response.status();
-        Err(Error::Api(
-            match response.json::<ApiErrorResponse>().await? {
-                ApiErrorResponse::Simple { detail: message } => ApiError {
-                    request_id,
-                    status_code,
-                    message,
-                    docs_url: None,
-                },
-                ApiErrorResponse::Business { detail } => ApiError {
-                    request_id,
-                    status_code,
-                    message: detail.message,
-                    docs_url: Some(detail.docs),
-                },
+        let body = response.text().await.unwrap_or_default();
+        let err = match serde_json::from_str::<ApiErrorResponse>(&body) {
+            Ok(ApiErrorResponse::Simple { detail: message }) => ApiError {
+                request_id,
+                status_code,
+                message,
+                docs_url: None,
             },
-        ))
+            Ok(ApiErrorResponse::Business { detail }) => ApiError {
+                request_id,
+                status_code,
+                message: detail.message,
+                docs_url: Some(detail.docs),
+            },
+            Err(e) => {
+                warn!("Failed to deserialize error response to expected JSON format: {e:?}");
+                ApiError {
+                    request_id,
+                    status_code,
+                    message: body,
+                    docs_url: None,
+                }
+            }
+        };
+        Err(Error::Api(err))
     }
 }
 
@@ -283,5 +292,33 @@ impl ClientBuilder<ApiKey> {
         } else {
             Client::new(self.key.0, self.gateway)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use reqwest::StatusCode;
+    use wiremock::{matchers::method, Mock, MockServer, ResponseTemplate};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn check_http_error_non_json() {
+        const BODY: &str = "<html><body><h1>502 Bad Gateway</h1>
+The server returned an invalid or incomplete response.
+</body></html>";
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::BAD_GATEWAY.as_u16()).set_body_string(BODY),
+            )
+            .mount(&mock_server)
+            .await;
+        let resp = reqwest::get(mock_server.uri()).await.unwrap();
+        let err = check_http_error(resp).await.unwrap_err();
+        assert!(
+            matches!(err, Error::Api(api_err) if api_err.status_code == StatusCode::BAD_GATEWAY && api_err.message == BODY && api_err.docs_url.is_none())
+        );
     }
 }

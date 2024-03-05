@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.1 - 2024-03-05
+
+#### Enhancements
+- Improve error handling when a historical HTTP error response is not in the
+  expected JSON format
+
 ## 0.7.0 - 2024-03-01
 
 #### Enhancements
