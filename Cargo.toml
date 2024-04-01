@@ -1,7 +1,7 @@
 [package]
 name = "databento"
 authors = ["Databento <support@databento.com>"]
-version = "0.7.1"
+version = "0.8.0"
 edition = "2021"
 repository = "https://github.com/databento/databento-rs"
 description = "Official Databento client library"
@@ -24,12 +24,11 @@ live = ["dep:hex", "dep:sha2", "tokio/net"]
 
 [dependencies]
 # binary encoding
-dbn = { version = "0.16.0", features = ["async", "serde"] }
+dbn = { version = "0.17.0", features = ["async", "serde"] }
 # Async stream trait
 futures = { version = "0.3", optional = true }
-# Hex encoding used for Live authentication
+# Used for Live authentication
 hex = { version = "0.4", optional = true }
-# Logging
 log = "0.4"
 # HTTP client for historical API
 reqwest = { version = "0.11", optional = true, features = ["json", "stream"] }
@@ -38,21 +37,14 @@ serde = { version = "1.0", optional = true, features = ["derive"] }
 serde_json = { version = "1.0", optional = true }
 # Used for Live authentication
 sha2 = { version = "0.10", optional = true }
-# Error handling
 thiserror = "1.0"
-# Dates and datetimes
 time = { version = "0.3", features = ["macros", "parsing", "serde"] }
-# Async run time
 tokio = { version = "1", features = ["io-util", "macros"] }
 # Stream utils
 tokio-util = { version = "0.7", features = ["io"], optional = true }
-# Builders for method parameters
 typed-builder = "0.18"
 
 [dev-dependencies]
-# Basic logger
 env_logger = "0.11.2"
-# Enable all features
 tokio = { version = "1.36", features = ["full"] }
-# HTTP client testing
 wiremock = "0.6"

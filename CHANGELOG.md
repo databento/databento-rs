@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0 - 2024-04-01
+
+#### Enhancements
+- Upgraded DBN version to 0.17.0
+  - Added new record types and schema variants for consolidated BBO and subsampled BBO
+  - Added `Volatility` and `Delta` `StatType` variants
+
 ## 0.7.1 - 2024-03-05
 
 #### Enhancements
@@ -35,7 +42,7 @@
 - Relaxed version requirements for `tokio`, `tokio-util`, and `thiserror`
 
 #### Breaking changes
-- Updated DBN version to 0.15.0
+- Upgraded DBN version to 0.15.0
   - Added support for larger `SystemMsg` and `ErrorMsg` records
   - Improved `Debug` implementations for records and `RecordRef`
   - Improved panic messages for `RecordRef::get`
@@ -134,12 +141,12 @@ This release is fully compatible with both DBN v1 and v2, and so should be seaml
 #### Enhancements
 - Added `SymbolMap` type to help maintain up-to-date symbol mappings with live data
 - Added chunking to handle subscribing to many symbols for the Live client
-- Updated DBN version to 0.10.2 for easier historical symbology
+- Upgraded DBN version to 0.10.2 for easier historical symbology
 
 ## 0.2.1 - 2023-08-25
 
 #### Enhancements
-- Updated DBN version to 0.9.0 for publisher improvements to support OPRA
+- Upgraded DBN version to 0.9.0 for publisher improvements to support OPRA
 
 ## 0.2.0 - 2023-08-10
 
