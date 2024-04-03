@@ -113,7 +113,7 @@ To run this program, set the `DATABENTO_API_KEY` environment variable with an AP
 
 ## Documentation
 
-You can find more detailed examples and the full API documentation on the [Databento docs site](https://docs.databento.com/getting-started?historical=rust&live=rust).
+You can find more detailed examples and the full API documentation on the [Databento docs site](https://databento.com/docs/getting-started?historical=rust&live=rust).
 
 ## License
 
