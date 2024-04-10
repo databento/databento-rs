@@ -424,9 +424,9 @@ pub struct DownloadParams {
     pub filename_to_download: Option<String>,
 }
 
-const LEGACY_DATE_TIME_FORMAT: &[time::format_description::FormatItem<'static>] =
+const LEGACY_DATE_TIME_FORMAT: &[time::format_description::BorrowedFormatItem<'static>] =
     time::macros::format_description!("[year]-[month]-[day] [hour]:[minute]:[second][optional [.[subsecond digits:6]]][offset_hour]:[offset_minute]");
-const DATE_TIME_FORMAT: &[time::format_description::FormatItem<'static>] = time::macros::format_description!(
+const DATE_TIME_FORMAT: &[time::format_description::BorrowedFormatItem<'static>] = time::macros::format_description!(
     "[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:9]Z"
 );
 

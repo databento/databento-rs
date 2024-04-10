@@ -7,7 +7,7 @@ pub mod symbology;
 pub mod timeseries;
 
 pub use client::*;
-use time::{format_description::FormatItem, macros::format_description};
+use time::{format_description::BorrowedFormatItem, macros::format_description};
 
 use crate::{Error, Symbols};
 
@@ -60,7 +60,8 @@ impl From<(time::Date, time::Duration)> for DateRange {
     }
 }
 
-pub(crate) const DATE_FORMAT: &[FormatItem<'_>] = format_description!("[year]-[month]-[day]");
+pub(crate) const DATE_FORMAT: &[BorrowedFormatItem<'_>] =
+    format_description!("[year]-[month]-[day]");
 
 impl From<(time::OffsetDateTime, time::OffsetDateTime)> for DateTimeRange {
     fn from(value: (time::OffsetDateTime, time::OffsetDateTime)) -> Self {
