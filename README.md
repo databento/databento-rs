@@ -66,7 +66,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 ```
-To run this program, set the `DATABENTO_API_KEY` environment variable with an API key.
+To run this program, set the `DATABENTO_API_KEY` environment variable with an API key and run `cargo run --example historical`
 
 ### Historical
 
@@ -109,7 +109,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 ```
 
-To run this program, set the `DATABENTO_API_KEY` environment variable with an API key.
+To run this program, set the `DATABENTO_API_KEY` environment variable with an API key and run `cargo bin --example live`.
 
 ## Documentation
 
