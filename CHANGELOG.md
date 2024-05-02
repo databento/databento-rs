@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.0 - TBD
+
+#### Enhancements
+- Added `start` and `end` fields to the `DatasetRange` struct which provide time resolution and an exclusive end date
+
+#### Deprecations
+- The `start_date` and `end_date` fields of the `DatasetRange` struct are deprecated and will be removed in a future release
+
 ## 0.8.0 - 2024-04-01
 
 #### Enhancements

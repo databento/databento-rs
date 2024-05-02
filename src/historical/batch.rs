@@ -18,6 +18,7 @@ use time::OffsetDateTime;
 use tokio::io::BufWriter;
 use typed_builder::TypedBuilder;
 
+use crate::deserialize::{deserialize_date_time, deserialize_opt_date_time};
 use crate::{historical::check_http_error, Error, Symbols};
 
 use super::{handle_response, DateTimeRange};
@@ -422,36 +423,6 @@ pub struct DownloadParams {
     /// `None` means all files associated with the job will be downloaded.
     #[builder(default, setter(strip_option))]
     pub filename_to_download: Option<String>,
-}
-
-const LEGACY_DATE_TIME_FORMAT: &[time::format_description::BorrowedFormatItem<'static>] =
-    time::macros::format_description!("[year]-[month]-[day] [hour]:[minute]:[second][optional [.[subsecond digits:6]]][offset_hour]:[offset_minute]");
-const DATE_TIME_FORMAT: &[time::format_description::BorrowedFormatItem<'static>] = time::macros::format_description!(
-    "[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:9]Z"
-);
-
-fn deserialize_date_time<'de, D: serde::Deserializer<'de>>(
-    deserializer: D,
-) -> Result<time::OffsetDateTime, D::Error> {
-    let dt_str = String::deserialize(deserializer)?;
-    time::PrimitiveDateTime::parse(&dt_str, DATE_TIME_FORMAT)
-        .map(|dt| dt.assume_utc())
-        .or_else(|_| time::OffsetDateTime::parse(&dt_str, LEGACY_DATE_TIME_FORMAT))
-        .map_err(serde::de::Error::custom)
-}
-
-fn deserialize_opt_date_time<'de, D: serde::Deserializer<'de>>(
-    deserializer: D,
-) -> Result<Option<time::OffsetDateTime>, D::Error> {
-    if let Some(dt_str) = Option::<String>::deserialize(deserializer)? {
-        time::PrimitiveDateTime::parse(&dt_str, DATE_TIME_FORMAT)
-            .map(|dt| dt.assume_utc())
-            .or_else(|_| time::OffsetDateTime::parse(&dt_str, LEGACY_DATE_TIME_FORMAT))
-            .map(Some)
-            .map_err(serde::de::Error::custom)
-    } else {
-        Ok(None)
-    }
 }
 
 impl SplitDuration {
