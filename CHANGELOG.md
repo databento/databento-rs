@@ -7,6 +7,10 @@
   - Added new record types and schema variants for consolidated BBO and subsampled BBO
   - Added `Volatility` and `Delta` `StatType` variants
 
+#### Breaking changes
+- Removed previously-deprecated `live::SymbolMap`. Please use
+  `databento::dbn::PitSymbolMap` instead
+
 ## 0.7.1 - 2024-03-05
 
 #### Enhancements
