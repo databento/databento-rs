@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.9.0 - TBD
+## 0.9.0 - 2024-05-14
 
 #### Enhancements
 - Added `start` and `end` fields to the `DatasetRange` struct which provide time resolution and an exclusive end date
