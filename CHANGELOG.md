@@ -4,6 +4,7 @@
 
 #### Enhancements
 - Added `start` and `end` fields to the `DatasetRange` struct which provide time resolution and an exclusive end date
+- Upgraded DBN version to 0.17.1
 
 #### Deprecations
 - The `start_date` and `end_date` fields of the `DatasetRange` struct are deprecated and will be removed in a future release
