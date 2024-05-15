@@ -2,6 +2,7 @@
 
 pub mod batch;
 mod client;
+mod deserialize;
 pub mod metadata;
 pub mod symbology;
 pub mod timeseries;

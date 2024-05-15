@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.1 - 2024-05-15
+
+#### Bug fixes
+- Fixed build when only `live` feature is enabled
+
 ## 0.9.0 - 2024-05-14
 
 #### Enhancements
