@@ -2,10 +2,10 @@
 //! It provides clients for fast, safe streaming of both real-time and historical market data through
 //! similar interfaces.
 //! The library is built on top of the tokio asynchronous runtime and
-//! [Databento's efficient binary encoding](https://docs.databento.com/knowledge-base/new-users/dbn-encoding).
+//! [Databento's efficient binary encoding](https://databento.com/docs/knowledge-base/new-users/dbn-encoding).
 //!
 //! You can find getting started tutorials, full API method documentation, examples
-//! with output on the [Databento docs site](https://docs.databento.com/?historical=rust&live=rust).
+//! with output on the [Databento docs site](https://databento.com/docs/?historical=rust&live=rust).
 //!
 //! # Feature flags
 //! By default both features are enabled.
@@ -19,6 +19,7 @@
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::missing_errors_doc)]
 
+mod deserialize;
 pub mod error;
 #[cfg(feature = "historical")]
 pub mod historical;

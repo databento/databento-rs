@@ -1,11 +1,24 @@
 # Changelog
 
+## 0.9.0 - 2024-05-14
+
+#### Enhancements
+- Added `start` and `end` fields to the `DatasetRange` struct which provide time resolution and an exclusive end date
+- Upgraded DBN version to 0.17.1
+
+#### Deprecations
+- The `start_date` and `end_date` fields of the `DatasetRange` struct are deprecated and will be removed in a future release
+
 ## 0.8.0 - 2024-04-01
 
 #### Enhancements
 - Upgraded DBN version to 0.17.0
   - Added new record types and schema variants for consolidated BBO and subsampled BBO
   - Added `Volatility` and `Delta` `StatType` variants
+
+#### Breaking changes
+- Removed previously-deprecated `live::SymbolMap`. Please use
+  `databento::dbn::PitSymbolMap` instead
 
 ## 0.7.1 - 2024-03-05
 

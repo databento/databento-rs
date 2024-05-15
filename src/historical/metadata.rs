@@ -2,6 +2,7 @@
 
 use std::{collections::HashMap, num::NonZeroU64, str::FromStr};
 
+use crate::deserialize::deserialize_date_time;
 use dbn::{Encoding, SType, Schema};
 use reqwest::RequestBuilder;
 use serde::{Deserialize, Deserializer};
@@ -272,14 +273,42 @@ pub struct DatasetConditionDetail {
 }
 
 /// The available range for a dataset.
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DatasetRange {
+    /// The start of the available range.
+    pub start: time::OffsetDateTime,
     /// The start date of the available range.
-    #[serde(deserialize_with = "deserialize_date")]
+    #[deprecated(since = "0.9.0", note = "Use `start` instead.")]
     pub start_date: time::Date,
-    /// The end date of the available range.
-    #[serde(deserialize_with = "deserialize_date")]
+    /// The end of the available range (exclusive).
+    pub end: time::OffsetDateTime,
+    /// The end date of the available range (inclusive).
+    #[deprecated(since = "0.9.0", note = "Use `end` instead.")]
     pub end_date: time::Date,
+}
+
+#[allow(deprecated)]
+impl<'de> Deserialize<'de> for DatasetRange {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Helper {
+            #[serde(deserialize_with = "deserialize_date_time")]
+            start: time::OffsetDateTime,
+            #[serde(deserialize_with = "deserialize_date_time")]
+            end: time::OffsetDateTime,
+        }
+        let partial = Helper::deserialize(deserializer)?;
+
+        Ok(DatasetRange {
+            start: partial.start,
+            start_date: partial.start.date(),
+            end: partial.end,
+            end_date: (partial.end - time::Duration::days(1)).date(),
+        })
+    }
 }
 
 /// The parameters for several metadata requests.
@@ -425,7 +454,7 @@ impl AddToQuery<GetQueryParams> for reqwest::RequestBuilder {
 mod tests {
     use reqwest::StatusCode;
     use serde_json::json;
-    use time::macros::date;
+    use time::macros::{date, datetime};
     use wiremock::{
         matchers::{basic_auth, method, path, query_param},
         Mock, MockServer, ResponseTemplate,
@@ -633,7 +662,10 @@ mod tests {
             .and(query_param("dataset", DATASET))
             .respond_with(
                 ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!({
+                    "start": "2019-07-07T00:00:00.000000000Z",
                     "start_date": "2019-07-07",
+                    // test both time formats
+                    "end": "2023-07-20T00:00:00.000000000Z",
                     "end_date": "2023-07-19",
                 })),
             )
@@ -646,7 +678,38 @@ mod tests {
         )
         .unwrap();
         let range = target.metadata().get_dataset_range(DATASET).await.unwrap();
+        assert_eq!(range.start, datetime!(2019 - 07 - 07 00:00:00+00:00));
         assert_eq!(range.start_date, date!(2019 - 07 - 07));
+        assert_eq!(range.end, datetime!(2023 - 07 - 20 00:00:00.000000+00:00));
+        assert_eq!(range.end_date, date!(2023 - 07 - 19));
+    }
+
+    #[tokio::test]
+    async fn test_get_dataset_range_no_dates() {
+        const DATASET: &str = "XNAS.ITCH";
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(basic_auth(API_KEY, ""))
+            .and(path(format!("/v{API_VERSION}/metadata.get_dataset_range")))
+            .and(query_param("dataset", DATASET))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!({
+                    "start": "2019-07-07T00:00:00.000000000Z",
+                    "end": "2023-07-20T00:00:00.000000000Z",
+                })),
+            )
+            .mount(&mock_server)
+            .await;
+        let mut target = HistoricalClient::with_url(
+            mock_server.uri(),
+            API_KEY.to_owned(),
+            HistoricalGateway::Bo1,
+        )
+        .unwrap();
+        let range = target.metadata().get_dataset_range(DATASET).await.unwrap();
+        assert_eq!(range.start, datetime!(2019 - 07 - 07 00:00:00+00:00));
+        assert_eq!(range.start_date, date!(2019 - 07 - 07));
+        assert_eq!(range.end, datetime!(2023 - 07 - 20 00:00:00.000000+00:00));
         assert_eq!(range.end_date, date!(2023 - 07 - 19));
     }
 }
