@@ -2,7 +2,6 @@
 
 use std::{collections::HashMap, num::NonZeroU64, str::FromStr};
 
-use crate::deserialize::deserialize_date_time;
 use dbn::{Encoding, SType, Schema};
 use reqwest::RequestBuilder;
 use serde::{Deserialize, Deserializer};
@@ -10,7 +9,9 @@ use typed_builder::TypedBuilder;
 
 use crate::Symbols;
 
-use super::{handle_response, AddToQuery, DateRange, DateTimeRange};
+use super::{
+    deserialize::deserialize_date_time, handle_response, AddToQuery, DateRange, DateTimeRange,
+};
 
 /// A client for the metadata group of Historical API endpoints.
 #[derive(Debug)]
@@ -653,6 +654,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)]
     async fn test_get_dataset_range() {
         const DATASET: &str = "XNAS.ITCH";
         let mock_server = MockServer::start().await;
@@ -685,6 +687,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(deprecated)]
     async fn test_get_dataset_range_no_dates() {
         const DATASET: &str = "XNAS.ITCH";
         let mock_server = MockServer::start().await;

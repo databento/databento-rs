@@ -19,7 +19,6 @@
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::missing_errors_doc)]
 
-mod deserialize;
 pub mod error;
 #[cfg(feature = "historical")]
 pub mod historical;
