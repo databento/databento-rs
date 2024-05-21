@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.2 - TBD
+
+#### Enhancements
+- Added `use_snapshot` attribute to `Subscription`, defaults to false
+
 ## 0.9.1 - 2024-05-15
 
 #### Bug fixes

@@ -241,10 +241,26 @@ impl Client {
     /// subscription, sending an error, and closing the connection.
     pub async fn subscribe(&mut self, sub: &Subscription) -> crate::Result<()> {
         let Subscription {
-            schema, stype_in, ..
+            schema,
+            stype_in,
+            start,
+            use_snapshot,
+            ..
         } = &sub;
+
+        if *use_snapshot && start.is_some() {
+            return Err(Error::BadArgument {
+                param_name: "use_snapshot".to_string(),
+                desc: "cannot request snapshot with start time".to_string(),
+            });
+        }
+
         for sym_str in sub.symbols.to_chunked_api_string() {
-            let args = format!("schema={schema}|stype_in={stype_in}|symbols={sym_str}");
+            let snapshot = *use_snapshot as u8;
+
+            let args = format!(
+                "schema={schema}|stype_in={stype_in}|symbols={sym_str}|snapshot={snapshot}"
+            );
 
             let sub_str = if let Some(start) = sub.start.as_ref() {
                 format!("{args}|start={}\n", start.unix_timestamp_nanos())
@@ -395,6 +411,12 @@ mod tests {
             assert!(sub_line.contains(&format!("stype_in={}", subscription.stype_in)));
             if let Some(start) = subscription.start {
                 assert!(sub_line.contains(&format!("start={}", start.unix_timestamp_nanos())))
+            }
+
+            if subscription.use_snapshot {
+                assert!(sub_line.contains("snapshot=1"));
+            } else {
+                assert!(sub_line.contains("snapshot=0"));
             }
         }
 
@@ -558,6 +580,43 @@ mod tests {
             .build();
         fixture.expect_subscribe(subscription.clone());
         client.subscribe(&subscription).await.unwrap();
+        fixture.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_subscribe_snapshot() {
+        let (mut fixture, mut client) = setup(Dataset::XnasItch, false).await;
+        let subscription = Subscription::builder()
+            .symbols(vec!["MSFT", "TSLA", "QQQ"])
+            .schema(Schema::Ohlcv1M)
+            .stype_in(SType::RawSymbol)
+            .use_snapshot()
+            .build();
+        fixture.expect_subscribe(subscription.clone());
+        client.subscribe(&subscription).await.unwrap();
+        fixture.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_subscribe_snapshot_failed() {
+        let (fixture, mut client) = setup(Dataset::XnasItch, false).await;
+
+        let err = client
+            .subscribe(
+                &Subscription::builder()
+                    .symbols(vec!["MSFT", "TSLA", "QQQ"])
+                    .schema(Schema::Ohlcv1M)
+                    .stype_in(SType::RawSymbol)
+                    .start(time::OffsetDateTime::now_utc())
+                    .use_snapshot()
+                    .build(),
+            )
+            .await
+            .unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("cannot request snapshot with start time"));
+
         fixture.stop().await;
     }
 
