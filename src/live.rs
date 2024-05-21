@@ -27,6 +27,10 @@ pub struct Subscription {
     /// [`LiveClient::start`](crate::LiveClient::start).
     #[builder(default, setter(strip_option))]
     pub start: Option<OffsetDateTime>,
+    #[doc(hidden)]
+    /// Reserved for future use.
+    #[builder(setter(strip_bool))]
+    pub use_snapshot: bool,
 }
 
 #[doc(hidden)]
