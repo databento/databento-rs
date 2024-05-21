@@ -346,7 +346,7 @@ mod tests {
         enums::rtype,
         publishers::Dataset,
         record::{HasRType, OhlcvMsg, RecordHeader, TradeMsg, WithTsOut},
-        Mbp10Msg, MetadataBuilder, Record, SType, Schema,
+        FlagSet, Mbp10Msg, MetadataBuilder, Record, SType, Schema,
     };
     use tokio::{
         io::BufReader,
@@ -670,7 +670,7 @@ mod tests {
                 size: 2,
                 action: b'A' as c_char,
                 side: b'A' as c_char,
-                flags: 0,
+                flags: FlagSet::default(),
                 depth: 1,
                 ts_recv: 0,
                 ts_in_delta: 0,
