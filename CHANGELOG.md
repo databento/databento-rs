@@ -13,6 +13,7 @@
 #### Breaking changes
 - Added `heartbeat_interval` parameter to `LiveClient::connect` and
   `LiveClient::connect_with_addr`
+- Removed deprecated `start_date` and `end_date` fields from `DatasetRange` struct
 
 ## 0.10.0 - 2024-05-22
 
