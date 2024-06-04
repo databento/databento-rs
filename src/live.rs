@@ -77,7 +77,8 @@ impl<AK, D> ClientBuilder<AK, D> {
     }
 
     /// Sets `upgrade_policy`, which controls how to decode data from prior DBN
-    /// versions. The current default is to decode them as-is.
+    /// versions. The current default is to upgrade them to the latest version while
+    /// decoding.
     pub fn upgrade_policy(mut self, upgrade_policy: VersionUpgradePolicy) -> Self {
         self.upgrade_policy = upgrade_policy;
         self
