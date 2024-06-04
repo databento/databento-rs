@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.11.0 - 2024-06-04
+
+#### Enhancements
+- Added configurable `heartbeat_interval` parameter for live client that determines the
+  timeout before heartbeat `SystemMsg` records will be sent. It can be configured via
+  the `heartbeat_interval` and `heartbeat_interval_s` methods of the
+  `live::ClientBuilder`
+- Added `addr` function to `live::ClientBuilder` for configuring a custom gateway
+  address without using `LiveClient::connect_with_addr` directly
+- Upgraded DBN version to 0.18.1
+
+#### Breaking changes
+- Added `heartbeat_interval` parameter to `LiveClient::connect` and
+  `LiveClient::connect_with_addr`
+- Removed deprecated `start_date` and `end_date` fields from `DatasetRange` struct
+
 ## 0.10.0 - 2024-05-22
 
 #### Enhancements
@@ -56,10 +72,10 @@
 - Document `live::Subscription::start` is based on `ts_event`
 - Allow constructing a `DateRange` and `DateTimeRange` with an `end` based on a
   `time::Duration`
-- Implemented `Debug` for `LiveClient`, `LiveClientBuilder`, `HistoricalClient`,
-  `HistoricalClientBuilder`, `BatchClient`, `MetadataClient`, `SymbologyClient`, and
+- Implemented `Debug` for `LiveClient`, `live::ClientBuilder`, `HistoricalClient`,
+  `historical::ClientBuilder`, `BatchClient`, `MetadataClient`, `SymbologyClient`, and
   `TimeseriesClient`
-- Derived `Clone` for `LiveClientBuilder` and `HistoricalClientBuilder`
+- Derived `Clone` for `live::ClientBuilder` and `historical::ClientBuilder`
 - Added `ApiKey` type for safely deriving `Debug` for types containing an API key
 
 #### Breaking changes

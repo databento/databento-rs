@@ -278,14 +278,8 @@ pub struct DatasetConditionDetail {
 pub struct DatasetRange {
     /// The start of the available range.
     pub start: time::OffsetDateTime,
-    /// The start date of the available range.
-    #[deprecated(since = "0.9.0", note = "Use `start` instead.")]
-    pub start_date: time::Date,
     /// The end of the available range (exclusive).
     pub end: time::OffsetDateTime,
-    /// The end date of the available range (inclusive).
-    #[deprecated(since = "0.9.0", note = "Use `end` instead.")]
-    pub end_date: time::Date,
 }
 
 #[allow(deprecated)]
@@ -305,9 +299,7 @@ impl<'de> Deserialize<'de> for DatasetRange {
 
         Ok(DatasetRange {
             start: partial.start,
-            start_date: partial.start.date(),
             end: partial.end,
-            end_date: (partial.end - time::Duration::days(1)).date(),
         })
     }
 }
@@ -665,10 +657,8 @@ mod tests {
             .respond_with(
                 ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!({
                     "start": "2019-07-07T00:00:00.000000000Z",
-                    "start_date": "2019-07-07",
                     // test both time formats
                     "end": "2023-07-20T00:00:00.000000000Z",
-                    "end_date": "2023-07-19",
                 })),
             )
             .mount(&mock_server)
@@ -681,9 +671,7 @@ mod tests {
         .unwrap();
         let range = target.metadata().get_dataset_range(DATASET).await.unwrap();
         assert_eq!(range.start, datetime!(2019 - 07 - 07 00:00:00+00:00));
-        assert_eq!(range.start_date, date!(2019 - 07 - 07));
         assert_eq!(range.end, datetime!(2023 - 07 - 20 00:00:00.000000+00:00));
-        assert_eq!(range.end_date, date!(2023 - 07 - 19));
     }
 
     #[tokio::test]
@@ -711,8 +699,6 @@ mod tests {
         .unwrap();
         let range = target.metadata().get_dataset_range(DATASET).await.unwrap();
         assert_eq!(range.start, datetime!(2019 - 07 - 07 00:00:00+00:00));
-        assert_eq!(range.start_date, date!(2019 - 07 - 07));
         assert_eq!(range.end, datetime!(2023 - 07 - 20 00:00:00.000000+00:00));
-        assert_eq!(range.end_date, date!(2023 - 07 - 19));
     }
 }
