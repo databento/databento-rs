@@ -25,8 +25,8 @@
 #### Breaking changes
 - Upgraded DBN version to 0.18.0
   - Changed type of `flags` in `MboMsg`, `TradeMsg`, `Mbp1Msg`, `Mbp10Msg`, and `CbboMsg`
-    from `u8` to a new `FlagSet` type with predicate methods   for the various bit flags
-    as well as setters. The `u8` value can still be obtained by calling the `raw()` method.
+    from `u8` to a new `FlagSet` type with predicate methods for the various bit flags
+    as well as setters. The `u8` value can still be obtained by calling the `raw()` method
     - Improved `Debug` formatting
   - Switched `DecodeStream` from `streaming_iterator` crate to `fallible_streaming_iterator`
     to allow better notification of errors
