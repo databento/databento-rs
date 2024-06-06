@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.1 - TBD
+
+#### Bug fixes
+- Fixed potential incorrect DNS resolution when overriding the live gateway address
+  with `live::Builder::addr`
+
 ## 0.11.0 - 2024-06-04
 
 #### Enhancements
