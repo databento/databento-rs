@@ -2,6 +2,9 @@
 
 ## 0.11.1 - TBD
 
+#### Enhancements
+- Added getter for `heartbeat_interval` to `LiveClient`
+
 #### Bug fixes
 - Fixed potential incorrect DNS resolution when overriding the live gateway address
   with `live::Builder::addr`
