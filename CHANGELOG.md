@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.11.1 - TBD
+## 0.11.1 - 2024-06-11
 
 #### Enhancements
 - Added getter for `heartbeat_interval` to `LiveClient`
