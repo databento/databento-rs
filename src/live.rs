@@ -47,7 +47,7 @@ pub struct Unset;
 /// - `dataset`
 #[derive(Debug, Clone)]
 pub struct ClientBuilder<AK, D> {
-    addr: Option<Arc<SocketAddr>>,
+    addr: Option<Arc<Vec<SocketAddr>>>,
     key: AK,
     dataset: D,
     send_ts_out: bool,
@@ -77,7 +77,8 @@ impl<AK, D> ClientBuilder<AK, D> {
     }
 
     /// Sets `upgrade_policy`, which controls how to decode data from prior DBN
-    /// versions. The current default is to decode them as-is.
+    /// versions. The current default is to upgrade them to the latest version while
+    /// decoding.
     pub fn upgrade_policy(mut self, upgrade_policy: VersionUpgradePolicy) -> Self {
         self.upgrade_policy = upgrade_policy;
         self
@@ -107,16 +108,11 @@ impl<AK, D> ClientBuilder<AK, D> {
     /// This function returns an error when `addr` fails to resolve.
     pub async fn addr(mut self, addr: impl ToSocketAddrs) -> crate::Result<Self> {
         const PARAM_NAME: &str = "addr";
-        self.addr = Some(
-            lookup_host(addr)
-                .await
-                .map_err(|e| crate::Error::bad_arg(PARAM_NAME, format!("{e}")))?
-                .next()
-                .map(Arc::new)
-                .ok_or_else(|| {
-                    crate::Error::bad_arg(PARAM_NAME, "did not resolve to any host".to_owned())
-                })?,
-        );
+        let addrs: Vec<_> = lookup_host(addr)
+            .await
+            .map_err(|e| crate::Error::bad_arg(PARAM_NAME, format!("{e}")))?
+            .collect();
+        self.addr = Some(Arc::new(addrs));
         Ok(self)
     }
 }
@@ -179,7 +175,7 @@ impl ClientBuilder<ApiKey, String> {
     pub async fn build(self) -> crate::Result<Client> {
         if let Some(addr) = self.addr {
             Client::connect_with_addr(
-                *addr,
+                addr.as_slice(),
                 self.key.0,
                 self.dataset,
                 self.send_ts_out,

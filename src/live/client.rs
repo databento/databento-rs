@@ -26,6 +26,7 @@ pub struct Client {
     dataset: String,
     send_ts_out: bool,
     upgrade_policy: VersionUpgradePolicy,
+    heartbeat_interval: Option<Duration>,
     connection: WriteHalf<TcpStream>,
     decoder: AsyncRecordDecoder<BufReader<ReadHalf<TcpStream>>>,
     session_id: String,
@@ -98,6 +99,7 @@ impl Client {
             dataset,
             send_ts_out,
             upgrade_policy,
+            heartbeat_interval,
             connection: writer,
             // Pass a placeholder DBN version and should never fail because DBN_VERSION
             // is a valid DBN version. Correct version set in `start()`.
@@ -136,6 +138,11 @@ impl Client {
     /// Returns the upgrade policy for decoding DBN from previous versions.
     pub fn upgrade_policy(&self) -> VersionUpgradePolicy {
         self.upgrade_policy
+    }
+
+    /// Returns the heartbeat interval override if there is one, otherwise `None`.
+    pub fn heartbeat_interval(&self) -> Option<Duration> {
+        self.heartbeat_interval
     }
 
     fn determine_gateway(dataset: &str) -> String {
@@ -350,6 +357,7 @@ impl fmt::Debug for Client {
             .field("dataset", &self.dataset)
             .field("send_ts_out", &self.send_ts_out)
             .field("upgrade_policy", &self.upgrade_policy)
+            .field("heartbeat_interval", &self.heartbeat_interval)
             .field("session_id", &self.session_id)
             .finish_non_exhaustive()
     }
