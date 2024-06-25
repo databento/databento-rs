@@ -2,7 +2,7 @@
 //! It provides clients for fast, safe streaming of both real-time and historical market data through
 //! similar interfaces.
 //! The library is built on top of the tokio asynchronous runtime and
-//! [Databento's efficient binary encoding](https://databento.com/docs/knowledge-base/new-users/dbn-encoding).
+//! [Databento's efficient binary encoding](https://databento.com/docs/standards-and-conventions/databento-binary-encoding).
 //!
 //! You can find getting started tutorials, full API method documentation, examples
 //! with output on the [Databento docs site](https://databento.com/docs/?historical=rust&live=rust).
