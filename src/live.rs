@@ -32,7 +32,7 @@ pub struct Subscription {
     #[builder(default, setter(strip_option))]
     pub start: Option<OffsetDateTime>,
     #[doc(hidden)]
-    /// Reserved for future use.
+    /// Request subscription with snapshot. Defaults to `false`. Conflicts with the `start` parameter.
     #[builder(setter(strip_bool))]
     pub use_snapshot: bool,
 }
