@@ -1,10 +1,11 @@
 # Changelog
 
-## 0.11.2 - TBD
+## 0.11.2 - 2024-06-25
 
 #### Enhancements
 - Added `historical::timeseries::get_range_to_file` method to persist the data stream to
   a given path before returning an `AsyncDbnDecoder`
+- Upgraded DBN version to 0.18.2
 
 ## 0.11.1 - 2024-06-11
 
