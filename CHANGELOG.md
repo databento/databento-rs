@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.11.4 - 2024-07-16
+
+#### Enhancements
+- Upgraded DBN version to 0.19.1 with fixes for `BBOMsg` record struct
+
 ## 0.11.3 - 2024-07-09
 
 #### Enhancements
