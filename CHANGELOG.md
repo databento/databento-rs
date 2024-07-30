@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.12.0 - 2024-07-30
+
+#### Breaking changes
+- Upgraded DBN version to 0.20.0:
+  - Renamed `SType::Nasdaq` variant to `SType::NasdaqSymbol`
+  - Renamed `SType::Cms` variant to `SType::CmsSymbol`
+
 ## 0.11.4 - 2024-07-16
 
 #### Enhancements
