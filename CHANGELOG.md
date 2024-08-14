@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.1 - TBD
+
+#### Enhancements
+- Added `Intraday` variant to `DatasetCondition` in preparation for intraday data being
+  available from the historical API
+
 ## 0.12.0 - 2024-07-30
 
 #### Breaking changes
