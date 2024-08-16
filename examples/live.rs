@@ -28,8 +28,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let mut symbol_map = PitSymbolMap::new();
     // Get the next trade
-    loop {
-        let rec = client.next_record().await?.unwrap();
+    while let Some(rec) = client.next_record().await? {
         if let Some(trade) = rec.get::<TradeMsg>() {
             let symbol = &symbol_map[trade];
             println!("Received trade for {symbol}: {trade:?}");
