@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.1 - 2024-08-27
+
+#### Enhancements
+- Added `Intraday` variant to `DatasetCondition` in preparation for intraday data being
+  available from the historical API
+- Upgraded DBN version to 0.20.1 for new publisher values for `XCIS.BBOTRADES` and
+  `XNYS.BBOTRADES`
+
 ## 0.12.0 - 2024-07-30
 
 #### Breaking changes
