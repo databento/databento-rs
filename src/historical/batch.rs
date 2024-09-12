@@ -285,7 +285,7 @@ pub struct SubmitJobParams {
     #[builder(default)]
     pub split_duration: SplitDuration,
     /// The optional maximum size (in bytes) of each batched data file before being split.
-    /// Defaults to `None`.
+    /// Must be an integer between 1e9 and 10e9 inclusive (1GB - 10GB). Defaults to `None`.
     #[builder(default, setter(strip_option))]
     pub split_size: Option<NonZeroU64>,
     /// The optional archive type to package all batched data files in. Defaults to `None`.
