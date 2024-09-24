@@ -213,6 +213,7 @@ pub enum Packaging {
     /// ZIP compressed.
     Zip,
     /// Tarball.
+    #[deprecated(since = "0.13.0", note = "Users should use Zip instead")]
     Tar,
 }
 
@@ -475,6 +476,7 @@ impl Packaging {
     pub const fn as_str(&self) -> &'static str {
         match self {
             Packaging::Zip => "zip",
+            #[allow(deprecated)]
             Packaging::Tar => "tar",
         }
     }
@@ -492,6 +494,7 @@ impl FromStr for Packaging {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "zip" => Ok(Packaging::Zip),
+            #[allow(deprecated)]
             "tar" => Ok(Packaging::Tar),
             _ => Err(crate::Error::bad_arg(
                 "s",

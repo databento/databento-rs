@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.0 - TBD
+
+#### Deprecations
+- Deprecated `Packaging::Tar`. Users should switch to `Packaging::Zip`. This variant
+  will be removed in a future version when it is no longer supported by the API
+
 ## 0.12.1 - 2024-08-27
 
 #### Enhancements
