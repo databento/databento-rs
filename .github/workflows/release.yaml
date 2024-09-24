@@ -1,12 +1,13 @@
 name: release
-on:
-  workflow_run:
-    workflows: [build]
-    branches: [main]
-    types:
-      - completed
-  workflow_dispatch:
-    branches: [main]
+
+# on:
+#   workflow_run:
+#     workflows: [build]
+#     branches: [main]
+#     types:
+#       - completed
+#   workflow_dispatch:
+#     branches: [main]
 
 jobs:
   tag-release:
