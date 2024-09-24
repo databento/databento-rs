@@ -213,6 +213,7 @@ pub enum Packaging {
     /// ZIP compressed.
     Zip,
     /// Tarball.
+    #[deprecated(since = "0.13.0", note = "Users should use Zip instead")]
     Tar,
 }
 
@@ -285,7 +286,7 @@ pub struct SubmitJobParams {
     #[builder(default)]
     pub split_duration: SplitDuration,
     /// The optional maximum size (in bytes) of each batched data file before being split.
-    /// Defaults to `None`.
+    /// Must be an integer between 1e9 and 10e9 inclusive (1GB - 10GB). Defaults to `None`.
     #[builder(default, setter(strip_option))]
     pub split_size: Option<NonZeroU64>,
     /// The optional archive type to package all batched data files in. Defaults to `None`.
@@ -475,6 +476,7 @@ impl Packaging {
     pub const fn as_str(&self) -> &'static str {
         match self {
             Packaging::Zip => "zip",
+            #[allow(deprecated)]
             Packaging::Tar => "tar",
         }
     }
@@ -492,6 +494,7 @@ impl FromStr for Packaging {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "zip" => Ok(Packaging::Zip),
+            #[allow(deprecated)]
             "tar" => Ok(Packaging::Tar),
             _ => Err(crate::Error::bad_arg(
                 "s",

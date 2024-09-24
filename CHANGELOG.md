@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.13.0 - 2024-09-24
+
+#### Enhancements
+- Upgraded DBN version to 0.21.0 for:
+  - Changed the layout of `CbboMsg` to better match `BboMsg`
+  - Renamed `Schema::Cbbo` to `Schema::Cmbp1`
+- Upgraded `typed-builder` version to 0.20
+
+#### Deprecations
+- Deprecated `Packaging::Tar`. Users should switch to `Packaging::Zip`. This variant
+  will be removed in a future version when it is no longer supported by the API
+
 ## 0.12.1 - 2024-08-27
 
 #### Enhancements
