@@ -71,7 +71,9 @@ impl Symbols {
     }
 
     #[cfg(feature = "live")]
-    pub(crate) fn to_chunked_api_string(&self) -> Vec<String> {
+    /// Splits the symbol into chunks to stay within the message length requirements of
+    /// the live gateway.
+    pub fn to_chunked_api_string(&self) -> Vec<String> {
         const CHUNK_SIZE: usize = 128;
         match self {
             Symbols::All => vec![ALL_SYMBOLS.to_owned()],
@@ -160,31 +162,6 @@ impl From<Vec<&str>> for Symbols {
     }
 }
 
-pub(crate) fn validate_key(key: String) -> crate::Result<ApiKey> {
-    if key == "$YOUR_API_KEY" {
-        Err(Error::bad_arg(
-            "key",
-            "got placeholder API key '$YOUR_API_KEY'. Please pass a real API key",
-        ))
-    } else if key.len() != API_KEY_LENGTH {
-        Err(Error::bad_arg(
-            "key",
-            format!(
-                "expected to be 32-characters long, got {} characters",
-                key.len()
-            ),
-        ))
-    } else if !key.is_ascii() {
-        error!("API key '{key}' contains non-ASCII characters");
-        Err(Error::bad_arg(
-            "key",
-            "expected to be composed of only ASCII characters",
-        ))
-    } else {
-        Ok(ApiKey(key))
-    }
-}
-
 pub(crate) fn key_from_env() -> crate::Result<String> {
     std::env::var("DATABENTO_API_KEY").map_err(|e| {
         Error::bad_arg(
@@ -238,6 +215,49 @@ impl fmt::Debug for ApiKey {
             "\"…{}\"",
             &self.0[self.0.len().saturating_sub(BUCKET_ID_LENGTH)..]
         )
+    }
+}
+
+impl ApiKey {
+    /// Validates `key` meets requirements of an API key.
+    ///
+    /// # Errors
+    /// This function returns an error if the key is invalid.
+    pub fn new(key: String) -> crate::Result<ApiKey> {
+        if key == "$YOUR_API_KEY" {
+            Err(Error::bad_arg(
+                "key",
+                "got placeholder API key '$YOUR_API_KEY'. Please pass a real API key",
+            ))
+        } else if key.len() != API_KEY_LENGTH {
+            Err(Error::bad_arg(
+                "key",
+                format!(
+                    "expected to be 32-characters long, got {} characters",
+                    key.len()
+                ),
+            ))
+        } else if !key.is_ascii() {
+            error!("API key '{key}' contains non-ASCII characters");
+            Err(Error::bad_arg(
+                "key",
+                "expected to be composed of only ASCII characters",
+            ))
+        } else {
+            Ok(ApiKey(key))
+        }
+    }
+
+    /// Returns a slice of the last 5 characters of the key.
+    #[cfg(feature = "live")]
+    pub fn bucket_id(&self) -> &str {
+        // Safe to splice because validated as only containing ASCII characters in [`Self::new()`]
+        &self.0[API_KEY_LENGTH - BUCKET_ID_LENGTH..]
+    }
+
+    /// Returns the entire key as a slice.
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
     }
 }
 

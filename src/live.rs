@@ -1,6 +1,7 @@
 //! The Live client and related API types. Used for both real-time data and intraday historical.
 
 mod client;
+pub mod protocol;
 
 use std::{net::SocketAddr, sync::Arc};
 
@@ -11,6 +12,7 @@ use tokio::net::{lookup_host, ToSocketAddrs};
 use typed_builder::TypedBuilder;
 
 use crate::{ApiKey, Symbols};
+
 pub use client::Client;
 
 /// A subscription for real-time or intraday historical data.
@@ -132,7 +134,7 @@ impl<D> ClientBuilder<Unset, D> {
     pub fn key(self, key: impl ToString) -> crate::Result<ClientBuilder<ApiKey, D>> {
         Ok(ClientBuilder {
             addr: self.addr,
-            key: crate::validate_key(key.to_string())?,
+            key: ApiKey::new(key.to_string())?,
             dataset: self.dataset,
             send_ts_out: self.send_ts_out,
             upgrade_policy: self.upgrade_policy,

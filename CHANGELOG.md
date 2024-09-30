@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.14.0 - TBD
+
+#### Enhancements
+- Made several previously internal functions public to allow advanced users more
+  customization and piecemeal usage of the live API:
+  - `ApiKey`
+  - `Symbols::to_chunked_api_string()`
+  - `live::protocol` module containing implementations of the raw API messages
+
 ## 0.13.0 - 2024-09-25
 
 #### Enhancements

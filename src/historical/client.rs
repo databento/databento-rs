@@ -263,7 +263,7 @@ impl ClientBuilder<Unset> {
     /// This function returns an error when the API key is invalid.
     pub fn key(self, key: impl ToString) -> crate::Result<ClientBuilder<ApiKey>> {
         Ok(ClientBuilder {
-            key: crate::validate_key(key.to_string())?,
+            key: ApiKey::new(key.to_string())?,
             base_url: self.base_url,
             gateway: self.gateway,
         })
