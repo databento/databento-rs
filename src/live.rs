@@ -6,9 +6,9 @@ pub mod protocol;
 use std::{net::SocketAddr, sync::Arc};
 
 use dbn::{SType, Schema, VersionUpgradePolicy};
-use log::warn;
 use time::{Duration, OffsetDateTime};
 use tokio::net::{lookup_host, ToSocketAddrs};
+use tracing::warn;
 use typed_builder::TypedBuilder;
 
 use crate::{ApiKey, Symbols};

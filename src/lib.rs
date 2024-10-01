@@ -35,9 +35,9 @@ pub use dbn;
 
 use std::fmt::{self, Display, Write};
 
-use log::error;
 #[cfg(feature = "historical")]
 use serde::{Deserialize, Deserializer};
+use tracing::error;
 
 /// A set of symbols for a particular [`SType`](dbn::enums::SType).
 #[derive(Debug, Clone, PartialEq, Eq)]

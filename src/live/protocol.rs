@@ -11,9 +11,9 @@ use std::{
 
 use dbn::{SType, Schema};
 use hex::ToHex;
-use log::{debug, error};
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+use tracing::{debug, error, instrument};
 
 use crate::{ApiKey, Error};
 
@@ -55,6 +55,7 @@ where
     /// [`tokio::select!`] statement and another branch completes first, the
     /// authentication may have been only partially sent, resulting in the gateway
     /// rejecting the authentication and closing the connection.
+    #[instrument(skip(self, recver, key))]
     pub async fn authenticate<R>(
         &mut self,
         recver: &mut R,
@@ -71,7 +72,7 @@ where
         recver.read_line(&mut greeting).await?;
         greeting.pop(); // remove newline
 
-        debug!("[{dataset}] Greeting: {greeting}");
+        debug!(greeting);
         let mut response = String::new();
         // Challenge
         recver.read_line(&mut response).await?;
@@ -79,26 +80,25 @@ where
 
         // Parse challenge
         let challenge = Challenge::parse(&response).inspect_err(|_| {
-            error!("[{dataset}] No CRAM challenge in response from gateway: {response}");
+            error!(?response, "No CRAM challenge in response from gateway");
         })?;
-        debug!("[{dataset}] Received CRAM challenge: {}", challenge.0);
+        debug!(%challenge, "Received CRAM challenge");
 
         // Send CRAM reply/auth request
         let auth_req =
             AuthRequest::new(key, dataset, send_ts_out, heartbeat_interval_s, &challenge);
-        debug!("[{dataset}] Sending CRAM reply: {auth_req:?}");
+        debug!(?auth_req, "Sending CRAM reply");
         self.sender.write_all(auth_req.as_bytes()).await.unwrap();
 
         response.clear();
         recver.read_line(&mut response).await?;
         debug!(
-            "[{dataset}] Received auth response: {}",
-            &response[..response.len() - 1]
+            auth_resp = &response[..response.len() - 1],
+            "Received auth response"
         );
         response.pop(); // remove newline
 
         let auth_resp = AuthResponse::parse(&response)?;
-        debug!("[{dataset}] {response}");
         Ok(auth_resp
             .0
             .get("session_id")
@@ -108,8 +108,6 @@ where
 
     /// Sends one or more subscription messages for `sub` depending on the number of symbols.
     ///
-    /// `dataset` is only used for logging.
-    ///
     /// # Errors
     /// This function returns an error if it's unable to communicate with the gateway.
     ///
@@ -118,7 +116,7 @@ where
     /// [`tokio::select!`] statement and another branch completes first, the subscription
     /// may have been partially sent, resulting in the gateway rejecting the
     /// subscription, sending an error, and closing the connection.
-    pub async fn subscribe(&mut self, dataset: &str, sub: &Subscription) -> crate::Result<()> {
+    pub async fn subscribe(&mut self, sub: &Subscription) -> crate::Result<()> {
         let Subscription {
             schema,
             stype_in,
@@ -137,7 +135,7 @@ where
 
         for sym_str in sub.symbols.to_chunked_api_string() {
             let sub_req = SubRequest::new(*schema, *stype_in, start_nanos, *use_snapshot, &sym_str);
-            debug!("[{dataset}] Subscribing: {sub_req:?}");
+            debug!(?sub_req, "Sending subscription request");
             self.sender.write_all(sub_req.as_bytes()).await?;
         }
         Ok(())

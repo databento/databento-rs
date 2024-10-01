@@ -8,6 +8,7 @@
   - `ApiKey`
   - `Symbols::to_chunked_api_string()`
   - `live::protocol` module containing implementations of the raw API messages
+- Changed from `log` crate to `tracing` for better diagnostics
 
 ## 0.13.0 - 2024-09-25
 

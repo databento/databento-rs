@@ -4,12 +4,12 @@ use dbn::{
     decode::dbn::{AsyncMetadataDecoder, AsyncRecordDecoder},
     Metadata, RecordRef, VersionUpgradePolicy,
 };
-use log::info;
 use time::Duration;
 use tokio::{
     io::{AsyncWriteExt, BufReader, ReadHalf, WriteHalf},
     net::{TcpStream, ToSocketAddrs},
 };
+use tracing::{info, info_span, instrument, Span};
 
 use crate::ApiKey;
 
@@ -31,6 +31,7 @@ pub struct Client {
     protocol: Protocol<WriteHalf<TcpStream>>,
     decoder: AsyncRecordDecoder<BufReader<ReadHalf<TcpStream>>>,
     session_id: String,
+    span: Span,
 }
 
 impl Client {
@@ -87,7 +88,7 @@ impl Client {
                 heartbeat_interval.map(|i| i.whole_seconds()),
             )
             .await?;
-
+        let span = info_span!("LiveClient", %dataset, session_id);
         Ok(Self {
             key,
             dataset,
@@ -105,6 +106,7 @@ impl Client {
             )
             .unwrap(),
             session_id,
+            span,
         })
     }
 
@@ -175,8 +177,9 @@ impl Client {
     /// [`tokio::select!`] statement and another branch completes first, the subscription
     /// may have been partially sent, resulting in the gateway rejecting the
     /// subscription, sending an error, and closing the connection.
+    #[instrument(parent = &self.span, skip_all)]
     pub async fn subscribe(&mut self, sub: &Subscription) -> crate::Result<()> {
-        self.protocol.subscribe(&self.dataset, sub).await
+        self.protocol.subscribe(sub).await
     }
 
     /// Instructs the gateway to start sending data, starting the session. This method
@@ -194,8 +197,9 @@ impl Client {
     /// [`tokio::select!`] statement and another branch completes first, the live
     /// gateway may only receive a partial message, resulting in it sending an error and
     /// closing the connection.
+    #[instrument(parent = &self.span, skip_all)]
     pub async fn start(&mut self) -> crate::Result<Metadata> {
-        info!("[{}] Starting session", self.dataset);
+        info!("Starting session");
         self.protocol.start_session().await?;
         let mut metadata = AsyncMetadataDecoder::new(self.decoder.get_mut())
             .decode()
@@ -220,6 +224,7 @@ impl Client {
     /// # Cancel safety
     /// This method is cancel safe. It can be used within a [`tokio::select!`] statement
     /// without the potential for corrupting the input stream.
+    #[instrument(parent = &self.span, skip_all)]
     pub async fn next_record(&mut self) -> crate::Result<Option<RecordRef>> {
         Ok(self.decoder.decode_ref().await?)
     }
@@ -259,6 +264,7 @@ mod tests {
         sync::mpsc::UnboundedSender,
         task::JoinHandle,
     };
+    use tracing::level_filters::LevelFilter;
 
     use super::*;
 
@@ -472,7 +478,10 @@ mod tests {
         send_ts_out: bool,
         heartbeat_interval: Option<Duration>,
     ) -> (Fixture, Client) {
-        let _ = env_logger::try_init();
+        let _ = tracing_subscriber::FmtSubscriber::builder()
+            .with_max_level(LevelFilter::DEBUG)
+            .with_test_writer()
+            .try_init();
         let mut fixture = Fixture::new(dataset.to_string(), send_ts_out).await;
         fixture.authenticate(heartbeat_interval);
         let builder = Client::builder()

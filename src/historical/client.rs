@@ -1,6 +1,6 @@
-use log::warn;
 use reqwest::{header::ACCEPT, IntoUrl, RequestBuilder, Url};
 use serde::Deserialize;
+use tracing::warn;
 
 use crate::{error::ApiError, ApiKey, Error};
 
@@ -207,7 +207,7 @@ fn check_warnings(response: &reqwest::Response) {
                 }
             }
             Err(err) => {
-                warn!("Failed to parse server warnings from HTTP header: {err:?}");
+                warn!(?err, "Failed to parse server warnings from HTTP header");
             }
         };
     };
