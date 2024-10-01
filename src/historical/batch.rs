@@ -11,11 +11,11 @@ use std::{
 
 use dbn::{Compression, Encoding, SType, Schema};
 use futures::StreamExt;
-use log::info;
 use reqwest::RequestBuilder;
 use serde::{de, Deserialize, Deserializer};
 use time::OffsetDateTime;
 use tokio::io::BufWriter;
+use tracing::info;
 use typed_builder::TypedBuilder;
 
 use crate::{historical::check_http_error, Error, Symbols};
@@ -169,7 +169,7 @@ impl BatchClient<'_> {
             .map_err(|e| Error::internal(format!("Unable to parse URL: {e:?}")))?;
         let resp = self.inner.get_with_path(url.path())?.send().await?;
         let mut stream = check_http_error(resp).await?.bytes_stream();
-        info!("Saving {url} to {}", path.as_ref().display());
+        info!(%url, path=%path.as_ref().display(), "Downloading file");
         let mut output = BufWriter::new(
             tokio::fs::OpenOptions::new()
                 .create(true)

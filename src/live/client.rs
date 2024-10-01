@@ -1,21 +1,22 @@
-use std::{collections::HashMap, fmt};
+use std::fmt;
 
 use dbn::{
     decode::dbn::{AsyncMetadataDecoder, AsyncRecordDecoder},
     Metadata, RecordRef, VersionUpgradePolicy,
 };
-use hex::ToHex;
-use log::{debug, error, info};
-use sha2::{Digest, Sha256};
 use time::Duration;
 use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf},
+    io::{AsyncWriteExt, BufReader, ReadHalf, WriteHalf},
     net::{TcpStream, ToSocketAddrs},
 };
+use tracing::{info, info_span, instrument, Span};
 
-use crate::{validate_key, ApiKey, Error, API_KEY_LENGTH, BUCKET_ID_LENGTH};
+use crate::ApiKey;
 
-use super::{ClientBuilder, Subscription, Unset};
+use super::{
+    protocol::{self, Protocol},
+    ClientBuilder, Subscription, Unset,
+};
 
 /// The Live client. Used for subscribing to real-time and intraday historical market data.
 ///
@@ -27,18 +28,13 @@ pub struct Client {
     send_ts_out: bool,
     upgrade_policy: VersionUpgradePolicy,
     heartbeat_interval: Option<Duration>,
-    connection: WriteHalf<TcpStream>,
+    protocol: Protocol<WriteHalf<TcpStream>>,
     decoder: AsyncRecordDecoder<BufReader<ReadHalf<TcpStream>>>,
     session_id: String,
+    span: Span,
 }
 
 impl Client {
-    /// Returns a type-safe builder for setting the required parameters
-    /// for initializing a [`LiveClient`](Client).
-    pub fn builder() -> ClientBuilder<Unset, Unset> {
-        ClientBuilder::default()
-    }
-
     /// Creates a new client connected to a Live gateway.
     ///
     /// # Errors
@@ -54,7 +50,7 @@ impl Client {
         heartbeat_interval: Option<Duration>,
     ) -> crate::Result<Self> {
         Self::connect_with_addr(
-            Self::determine_gateway(&dataset),
+            protocol::determine_gateway(&dataset),
             key,
             dataset,
             send_ts_out,
@@ -78,42 +74,50 @@ impl Client {
         upgrade_policy: VersionUpgradePolicy,
         heartbeat_interval: Option<Duration>,
     ) -> crate::Result<Self> {
-        let key = validate_key(key)?;
+        let key = ApiKey::new(key)?;
         let stream = TcpStream::connect(addr).await?;
-        let (reader, mut writer) = tokio::io::split(stream);
-        let mut reader = BufReader::new(reader);
-
-        // Authenticate CRAM
-        let session_id = Self::cram_challenge(
-            &mut reader,
-            &mut writer,
-            &key.0,
-            &dataset,
-            send_ts_out,
-            heartbeat_interval,
-        )
-        .await?;
-
+        let (recver, sender) = tokio::io::split(stream);
+        let mut recver = BufReader::new(recver);
+        let mut protocol = Protocol::new(sender);
+        let session_id = protocol
+            .authenticate(
+                &mut recver,
+                &key,
+                &dataset,
+                send_ts_out,
+                heartbeat_interval.map(|i| i.whole_seconds()),
+            )
+            .await?;
+        let span = info_span!("LiveClient", %dataset, session_id);
         Ok(Self {
             key,
             dataset,
             send_ts_out,
             upgrade_policy,
             heartbeat_interval,
-            connection: writer,
+            protocol,
             // Pass a placeholder DBN version and should never fail because DBN_VERSION
             // is a valid DBN version. Correct version set in `start()`.
             decoder: AsyncRecordDecoder::with_version(
-                reader,
+                recver,
                 dbn::DBN_VERSION,
                 upgrade_policy,
                 send_ts_out,
             )
             .unwrap(),
             session_id,
+            span,
         })
     }
 
+    /// Returns a type-safe builder for setting the required parameters
+    /// for initializing a [`LiveClient`](Client).
+    pub fn builder() -> ClientBuilder<Unset, Unset> {
+        ClientBuilder::default()
+    }
+}
+
+impl Client {
     /// Returns the API key used by the instance of the client.
     pub fn key(&self) -> &str {
         &self.key.0
@@ -145,112 +149,20 @@ impl Client {
         self.heartbeat_interval
     }
 
-    fn determine_gateway(dataset: &str) -> String {
-        const DEFAULT_PORT: u16 = 13_000;
-
-        let dataset_subdomain: String = dataset
-            .chars()
-            .map(|c| {
-                if c == '.' {
-                    '-'
-                } else {
-                    c.to_ascii_lowercase()
-                }
-            })
-            .collect();
-        format!("{dataset_subdomain}.lsg.databento.com:{DEFAULT_PORT}")
-    }
-
-    async fn cram_challenge(
-        reader: &mut BufReader<ReadHalf<TcpStream>>,
-        writer: &mut WriteHalf<TcpStream>,
-        key: &str,
-        dataset: &str,
-        send_ts_out: bool,
-        heartbeat_interval: Option<Duration>,
-    ) -> crate::Result<String> {
-        let mut greeting = String::new();
-        // Greeting
-        reader.read_line(&mut greeting).await?;
-        greeting.pop(); // remove newline
-        debug!("[{dataset}] Greeting: {greeting}");
-        let mut response = String::new();
-        // Challenge
-        reader.read_line(&mut response).await?;
-        response.pop(); // remove newline
-
-        let challenge = if response.starts_with("cram=") {
-            response.split_once('=').unwrap().1
-        } else {
-            error!("[{dataset}] No CRAM challenge in response from gateway: {response}");
-            return Err(Error::internal(
-                "no CRAM challenge in response from gateway",
-            ));
-        };
-
-        // Parse challenge
-        debug!("[{dataset}] Received CRAM challenge: {challenge}");
-
-        // Construct reply
-        let challenge_key = format!("{challenge}|{key}");
-        let mut hasher = Sha256::new();
-        hasher.update(challenge_key.as_bytes());
-        let result = hasher.finalize();
-        // Safe to slice because Databento only uses ASCII characters in API keys
-        let bucket_id = &key[API_KEY_LENGTH - BUCKET_ID_LENGTH..];
-        let encoded_response = result.encode_hex::<String>();
-        let send_ts_out = send_ts_out as i32;
-        let mut reply =
-                format!("auth={encoded_response}-{bucket_id}|dataset={dataset}|encoding=dbn|ts_out={send_ts_out}|client=Rust {}", env!("CARGO_PKG_VERSION"));
-        if let Some(heartbeat_interval_s) = heartbeat_interval.map(|i| i.whole_seconds()) {
-            reply = format!("{reply}|heartbeat_interval_s={heartbeat_interval_s}\n")
-        } else {
-            reply.push('\n');
-        }
-
-        // Send CRAM reply
-        debug!(
-            "[{dataset}] Sending CRAM reply: {}",
-            &reply[..reply.len() - 1]
-        );
-        writer.write_all(reply.as_bytes()).await.unwrap();
-
-        response.clear();
-        reader.read_line(&mut response).await?;
-
-        debug!(
-            "[{dataset}] Received auth response: {}",
-            &response[..response.len() - 1]
-        );
-
-        response.pop(); // remove newline
-
-        let mut auth_keys: HashMap<String, String> = response
-            .split('|')
-            .filter_map(|kvp| kvp.split_once('='))
-            .map(|(key, val)| (key.to_owned(), val.to_owned()))
-            .collect();
-        // Lack of success key also indicates something went wrong
-        if auth_keys.get("success").map(|v| v != "1").unwrap_or(true) {
-            return Err(Error::Auth(
-                auth_keys
-                    .get("error")
-                    .map(ToOwned::to_owned)
-                    .unwrap_or_else(|| response),
-            ));
-        }
-        debug!("[{dataset}] {response}");
-        Ok(auth_keys.remove("session_id").unwrap_or_default())
-    }
-
     /// Closes the connection with the gateway, ending the session and all subscriptions. Consumes
     /// the client.
     ///
     /// # Errors
     /// This function returns an error if the shutdown of the TCP stream is unsuccessful, this usually
     /// means the stream is no longer usable.
-    pub async fn close(mut self) -> crate::Result<()> {
-        Ok(self.connection.shutdown().await?)
+    pub async fn close(self) -> crate::Result<()> {
+        Ok(self
+            .decoder
+            .into_inner()
+            .into_inner()
+            .unsplit(self.protocol.into_inner())
+            .shutdown()
+            .await?)
     }
 
     /// Attempts to add a new subscription to the session. Note that
@@ -265,43 +177,9 @@ impl Client {
     /// [`tokio::select!`] statement and another branch completes first, the subscription
     /// may have been partially sent, resulting in the gateway rejecting the
     /// subscription, sending an error, and closing the connection.
+    #[instrument(parent = &self.span, skip_all)]
     pub async fn subscribe(&mut self, sub: &Subscription) -> crate::Result<()> {
-        let Subscription {
-            schema,
-            stype_in,
-            start,
-            use_snapshot,
-            ..
-        } = &sub;
-
-        if *use_snapshot && start.is_some() {
-            return Err(Error::BadArgument {
-                param_name: "use_snapshot".to_string(),
-                desc: "cannot request snapshot with start time".to_string(),
-            });
-        }
-
-        for sym_str in sub.symbols.to_chunked_api_string() {
-            let snapshot = *use_snapshot as u8;
-
-            let args = format!(
-                "schema={schema}|stype_in={stype_in}|symbols={sym_str}|snapshot={snapshot}"
-            );
-
-            let sub_str = if let Some(start) = sub.start.as_ref() {
-                format!("{args}|start={}\n", start.unix_timestamp_nanos())
-            } else {
-                format!("{args}\n")
-            };
-
-            debug!(
-                "[{}] Subscribing: {}",
-                self.dataset,
-                &sub_str[..sub_str.len() - 1]
-            );
-            self.connection.write_all(sub_str.as_bytes()).await?;
-        }
-        Ok(())
+        self.protocol.subscribe(sub).await
     }
 
     /// Instructs the gateway to start sending data, starting the session. This method
@@ -319,9 +197,10 @@ impl Client {
     /// [`tokio::select!`] statement and another branch completes first, the live
     /// gateway may only receive a partial message, resulting in it sending an error and
     /// closing the connection.
+    #[instrument(parent = &self.span, skip_all)]
     pub async fn start(&mut self) -> crate::Result<Metadata> {
-        info!("[{}] Starting session", self.dataset);
-        self.connection.write_all(b"start_session\n").await?;
+        info!("Starting session");
+        self.protocol.start_session().await?;
         let mut metadata = AsyncMetadataDecoder::new(self.decoder.get_mut())
             .decode()
             .await?;
@@ -345,6 +224,7 @@ impl Client {
     /// # Cancel safety
     /// This method is cancel safe. It can be used within a [`tokio::select!`] statement
     /// without the potential for corrupting the input stream.
+    #[instrument(parent = &self.span, skip_all)]
     pub async fn next_record(&mut self) -> crate::Result<Option<RecordRef>> {
         Ok(self.decoder.decode_ref().await?)
     }
@@ -377,13 +257,14 @@ mod tests {
     };
     use time::Duration;
     use tokio::{
-        io::BufReader,
+        io::{AsyncBufReadExt, BufReader},
         join,
         net::{TcpListener, TcpStream},
         select,
         sync::mpsc::UnboundedSender,
         task::JoinHandle,
     };
+    use tracing::level_filters::LevelFilter;
 
     use super::*;
 
@@ -597,7 +478,10 @@ mod tests {
         send_ts_out: bool,
         heartbeat_interval: Option<Duration>,
     ) -> (Fixture, Client) {
-        let _ = env_logger::try_init();
+        let _ = tracing_subscriber::FmtSubscriber::builder()
+            .with_max_level(LevelFilter::DEBUG)
+            .with_test_writer()
+            .try_init();
         let mut fixture = Fixture::new(dataset.to_string(), send_ts_out).await;
         fixture.authenticate(heartbeat_interval);
         let builder = Client::builder()
