@@ -9,8 +9,6 @@
   - `Symbols::to_chunked_api_string()`
   - `live::protocol` module containing implementations of the raw API messages
 - Changed from `log` crate to `tracing` for better diagnostics
-- Upgraded DBN version to 0.22.0 for combined `_reserved3` and
-  `_reserved4` fields in `CbboMsg`
 
 ## 0.13.0 - 2024-09-25
 
