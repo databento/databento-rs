@@ -1,7 +1,7 @@
 [package]
 name = "databento"
 authors = ["Databento <support@databento.com>"]
-version = "0.14.0"
+version = "0.14.1"
 edition = "2021"
 repository = "https://github.com/databento/databento-rs"
 description = "Official Databento client library"
@@ -23,7 +23,7 @@ historical = ["dep:futures", "dep:reqwest", "dep:serde", "dep:tokio-util", "dep:
 live = ["dep:hex", "dep:sha2", "tokio/net"]
 
 [dependencies]
-dbn = { version = "0.21.0", features = ["async", "serde"] }
+dbn = { version = "0.22.1", features = ["async", "serde"] }
 # Async stream trait
 futures = { version = "0.3", optional = true }
 # Used for Live authentication
