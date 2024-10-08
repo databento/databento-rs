@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.1 - 2024-10-08
+
+#### Enhancements
+- Upgraded DBN version to 0.22.1:
+  - Fixed buffer overrun
+  - Combined `_reserved3` and `reserved4` fields in `CbboMsg`
+
 ## 0.14.0 - 2024-10-01
 
 #### Enhancements
