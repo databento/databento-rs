@@ -43,6 +43,7 @@ typed-builder = "0.20"
 
 [dev-dependencies]
 anyhow = "1.0.91"
+async-compression = { version = "0.4.13", features = ["tokio", "zstd"] }
 clap = { version = "4.5.20", features = ["derive"] }
 tempfile = "3.13.0"
 tokio = { version = "1.41", features = ["full"] }
