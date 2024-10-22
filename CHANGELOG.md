@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.15.0 - TBD
+
+#### Enhancements
+- Upgraded DBN version to 0.23.0:
+  - Added new `None` `Action` variant that will be gradually rolled out
+    to historical and live `GLBX.MDP3` data
+  - Added consistent escaping of non-printable and non-ASCII values when text encoding
+    `c_char` fields
+  - Implemented `Default` for `Action` and `Side`
+  - Implemented missing `Serialize` for (with `serde` feature enabled) for `Venue`,
+    `Dataset`, `Publisher`, `Compression`, `SType`, `Schema`, and `Encoding`
+
 ## 0.14.1 - 2024-10-08
 
 #### Enhancements
