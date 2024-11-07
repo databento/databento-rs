@@ -1,5 +1,7 @@
 //! The historical batch download API.
 
+#![allow(deprecated)] // Packaging
+
 use core::fmt;
 use std::{
     collections::HashMap,
@@ -209,6 +211,10 @@ pub enum SplitDuration {
 
 /// How the batch job will be packaged.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[deprecated(
+    since = "0.16.0",
+    note = "Use the `download()` method to download the whole job`"
+)]
 pub enum Packaging {
     /// ZIP compressed.
     Zip,
@@ -291,6 +297,10 @@ pub struct SubmitJobParams {
     pub split_size: Option<NonZeroU64>,
     /// The optional archive type to package all batched data files in. Defaults to `None`.
     #[builder(default, setter(strip_option))]
+    #[deprecated(
+        since = "0.16.0",
+        note = "Use the `download()` method to download the whole job`"
+    )]
     pub packaging: Option<Packaging>,
     /// The delivery mechanism for the batched data files once processed. Defaults to
     /// [`Download`](Delivery::Download).
@@ -357,6 +367,10 @@ pub struct BatchJob {
     /// The maximum size for an individual file before splitting into multiple files.
     pub split_size: Option<NonZeroU64>,
     /// The packaging method of the batch data.
+    #[deprecated(
+        since = "0.16.0",
+        note = "Use the `download()` method to download the whole job`"
+    )]
     pub packaging: Option<Packaging>,
     /// The delivery mechanism of the batch data.
     pub delivery: Delivery,
@@ -476,7 +490,6 @@ impl Packaging {
     pub const fn as_str(&self) -> &'static str {
         match self {
             Packaging::Zip => "zip",
-            #[allow(deprecated)]
             Packaging::Tar => "tar",
         }
     }
@@ -494,7 +507,6 @@ impl FromStr for Packaging {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "zip" => Ok(Packaging::Zip),
-            #[allow(deprecated)]
             "tar" => Ok(Packaging::Tar),
             _ => Err(crate::Error::bad_arg(
                 "s",

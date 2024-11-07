@@ -1,6 +1,13 @@
 # Changelog
 
-## 0.15.0 - TBD
+## 0.16.0 - TBD
+
+#### Deprecations
+- Deprecated `Packaging` enum and `packaging` field on `SubmitJobParams` and `BatchJob`.
+  These will be removed in a future version. All files from a batch job can be downloaded
+  with the `batch().download()` method on the historical client
+
+## 0.15.0 - 2024-10-22
 
 #### Enhancements
 - Upgraded DBN version to 0.23.0:
