@@ -2,6 +2,12 @@
 
 ## 0.16.0 - TBD
 
+#### Enhancements
+- Upgraded DBN version to 0.23.1:
+  - Added floating-point getters for price fields
+  - Added new IntelligentCross venues `ASPN`, `ASMT`, and `ASPI`
+  - Upgraded `thiserror` version to 2.0
+
 #### Deprecations
 - Deprecated `Packaging` enum and `packaging` field on `SubmitJobParams` and `BatchJob`.
   These will be removed in a future version. All files from a batch job can be downloaded
