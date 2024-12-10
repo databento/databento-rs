@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.16.0 - TBD
+## 0.16.0 - 2024-11-12
 
 #### Enhancements
 - Upgraded DBN version to 0.23.1:
