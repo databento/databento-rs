@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.17.0 - TBD
+
+### Breaking changes
+- Removed deprecated `Packaging` enum and `packaging` field that's no longer supported
+  by the API
+
 ## 0.16.0 - 2024-11-12
 
 #### Enhancements
