@@ -160,7 +160,7 @@ pub struct GetRangeParams {
     #[builder(default)]
     pub limit: Option<NonZeroU64>,
     /// How to decode DBN from prior versions. Defaults to upgrade.
-    #[builder(default = VersionUpgradePolicy::Upgrade)]
+    #[builder(default = VersionUpgradePolicy::UpgradeToV2)]
     pub upgrade_policy: VersionUpgradePolicy,
 }
 
@@ -191,7 +191,7 @@ pub struct GetRangeToFileParams {
     #[builder(default)]
     pub limit: Option<NonZeroU64>,
     /// How to decode DBN from prior versions. Defaults to upgrade.
-    #[builder(default = VersionUpgradePolicy::Upgrade)]
+    #[builder(default = VersionUpgradePolicy::UpgradeToV2)]
     pub upgrade_policy: VersionUpgradePolicy,
     /// The file path to persist the stream data to.
     #[builder(default, setter(transform = |p: impl Into<PathBuf>| p.into()))]
@@ -285,7 +285,7 @@ mod tests {
             .timeseries()
             .get_range(
                 &GetRangeParams::builder()
-                    .dataset(dbn::datasets::XNAS_ITCH)
+                    .dataset(dbn::Dataset::XnasItch)
                     .schema(SCHEMA)
                     .symbols(vec!["SPOT", "AAPL"])
                     .date_time_range((START, END))

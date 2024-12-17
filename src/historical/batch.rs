@@ -633,14 +633,14 @@ mod tests {
             .batch()
             .submit_job(
                 &SubmitJobParams::builder()
-                    .dataset(dbn::datasets::XNAS_ITCH)
+                    .dataset(dbn::Dataset::XnasItch)
                     .schema(SCHEMA)
                     .symbols("TSLA")
                     .date_time_range((START, END))
                     .build(),
             )
             .await?;
-        assert_eq!(job_desc.dataset, dbn::datasets::XNAS_ITCH);
+        assert_eq!(job_desc.dataset, dbn::Dataset::XnasItch.as_str());
         Ok(())
     }
 
