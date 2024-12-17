@@ -1,6 +1,26 @@
 # Changelog
 
-## 0.16.0 - TBD
+## 0.17.0 - 2024-12-17
+
+### Enhancements
+- Upgraded DBN version to 0.25.0:
+  - Added `v1` and `v2` namespaces in DBN to allow unambiguously referring to the record
+    types for a given DBN version regardless of whether the record type has changed
+  - Changed `dataset()` method on `MetadataBuilder` to accept an `impl ToString` so now
+    `Dataset` and `&str` can be passed directly
+  - Changed async DBN decoding to return `Ok(None)` when an incomplete record remains in
+    the stream. This matches the existing behavior of sync DBN decoding
+- Upgraded `thiserror` version to 2.0
+
+### Breaking changes
+- Removed deprecated `Packaging` enum and `packaging` field that's no longer supported
+  by the API
+- As part of the DBN version upgrade:
+  - `VersionUpgradePolicy::Upgrade` was renamed to `UpgradeToV2`
+  - Changed async DBN decoding to return `Ok(None)` when an incomplete record remains in
+    the stream
+
+## 0.16.0 - 2024-11-12
 
 #### Enhancements
 - Upgraded DBN version to 0.23.1:

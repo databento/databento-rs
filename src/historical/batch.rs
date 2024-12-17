@@ -1,7 +1,5 @@
 //! The historical batch download API.
 
-#![allow(deprecated)] // Packaging
-
 use core::fmt;
 use std::{
     collections::HashMap,
@@ -50,12 +48,6 @@ impl BatchClient<'_> {
             ("map_symbols", params.map_symbols.to_string()),
             ("split_symbols", params.split_symbols.to_string()),
             ("split_duration", params.split_duration.to_string()),
-            (
-                "packaging",
-                params
-                    .packaging
-                    .map_or_else(|| "none".to_owned(), |p| p.to_string()),
-            ),
             ("delivery", params.delivery.to_string()),
             ("stype_in", params.stype_in.to_string()),
             ("stype_out", params.stype_out.to_string()),
@@ -209,20 +201,6 @@ pub enum SplitDuration {
     Month,
 }
 
-/// How the batch job will be packaged.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[deprecated(
-    since = "0.16.0",
-    note = "Use the `download()` method to download the whole job`"
-)]
-pub enum Packaging {
-    /// ZIP compressed.
-    Zip,
-    /// Tarball.
-    #[deprecated(since = "0.13.0", note = "Users should use Zip instead")]
-    Tar,
-}
-
 /// How the batch job will be delivered.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Delivery {
@@ -295,13 +273,6 @@ pub struct SubmitJobParams {
     /// Must be an integer between 1e9 and 10e9 inclusive (1GB - 10GB). Defaults to `None`.
     #[builder(default, setter(strip_option))]
     pub split_size: Option<NonZeroU64>,
-    /// The optional archive type to package all batched data files in. Defaults to `None`.
-    #[builder(default, setter(strip_option))]
-    #[deprecated(
-        since = "0.16.0",
-        note = "Use the `download()` method to download the whole job`"
-    )]
-    pub packaging: Option<Packaging>,
     /// The delivery mechanism for the batched data files once processed. Defaults to
     /// [`Download`](Delivery::Download).
     #[builder(default)]
@@ -366,12 +337,6 @@ pub struct BatchJob {
     pub split_duration: SplitDuration,
     /// The maximum size for an individual file before splitting into multiple files.
     pub split_size: Option<NonZeroU64>,
-    /// The packaging method of the batch data.
-    #[deprecated(
-        since = "0.16.0",
-        note = "Use the `download()` method to download the whole job`"
-    )]
-    pub packaging: Option<Packaging>,
     /// The delivery mechanism of the batch data.
     pub delivery: Delivery,
     /// The number of data records (`None` until the job is processed).
@@ -479,47 +444,6 @@ impl FromStr for SplitDuration {
 }
 
 impl<'de> Deserialize<'de> for SplitDuration {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let str = String::deserialize(deserializer)?;
-        FromStr::from_str(&str).map_err(de::Error::custom)
-    }
-}
-
-impl Packaging {
-    /// Converts the enum to its `str` representation.
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            Packaging::Zip => "zip",
-            Packaging::Tar => "tar",
-        }
-    }
-}
-
-impl fmt::Display for Packaging {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl FromStr for Packaging {
-    type Err = crate::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "zip" => Ok(Packaging::Zip),
-            "tar" => Ok(Packaging::Tar),
-            _ => Err(crate::Error::bad_arg(
-                "s",
-                format!(
-                    "{s} does not correspond with any {} variant",
-                    std::any::type_name::<Self>()
-                ),
-            )),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for Packaging {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let str = String::deserialize(deserializer)?;
         FromStr::from_str(&str).map_err(de::Error::custom)
@@ -689,7 +613,6 @@ mod tests {
                     "split_symbols": false,
                     "split_duration": "day",
                     "split_size": null,
-                    "packaging": null,
                     "delivery": "download",
                     "state": "queued",
                      "ts_received": "2023-07-19T23:00:04.095538123Z",
@@ -710,14 +633,14 @@ mod tests {
             .batch()
             .submit_job(
                 &SubmitJobParams::builder()
-                    .dataset(dbn::datasets::XNAS_ITCH)
+                    .dataset(dbn::Dataset::XnasItch)
                     .schema(SCHEMA)
                     .symbols("TSLA")
                     .date_time_range((START, END))
                     .build(),
             )
             .await?;
-        assert_eq!(job_desc.dataset, dbn::datasets::XNAS_ITCH);
+        assert_eq!(job_desc.dataset, dbn::Dataset::XnasItch.as_str());
         Ok(())
     }
 
@@ -754,7 +677,6 @@ mod tests {
                     "split_symbols": false,
                     "split_duration": "day",
                     "split_size": null,
-                    "packaging": null,
                     "delivery": "download",
                     "state": "processing",
                      "ts_received": "2023-07-19 23:00:04.095538+00:00",

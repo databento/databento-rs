@@ -210,7 +210,7 @@ mod tests {
             .symbology()
             .resolve(
                 &ResolveParams::builder()
-                    .dataset(dbn::datasets::GLBX_MDP3)
+                    .dataset(dbn::Dataset::GlbxMdp3)
                     .symbols(vec!["ES.c.0", "ES.d.0"])
                     .stype_in(SType::Continuous)
                     .date_range((date!(2023 - 06 - 14), date!(2023 - 06 - 17)))

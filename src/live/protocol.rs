@@ -186,7 +186,7 @@ impl<'a> Challenge<'a> {
     }
 }
 
-impl<'a> Display for Challenge<'a> {
+impl Display for Challenge<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
