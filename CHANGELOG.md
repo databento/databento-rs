@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.18.0 - 2025-01-08
+
+### Enhancements
+- Upgraded DBN version to 0.26.0:
+  - Added `v3` namespace in preparation for future DBN version 3 release. DBN version 2
+    remains the current and default version
+  - Added `v3::InstrumentDefMsg` record with new fields to support normalizing multi-leg
+    strategy definitions
+    - Removal of statistics-schema related fields `trading_reference_price`,
+      `trading_reference_date`, and `settl_price_type`
+    - Removal of the status-schema related field `md_security_trading_status`
+  - Added initial support for merging DBN:
+    - Decoding streams: `MergeDecoder` and `MergeRecordDecoder` structs
+    - Metadata: `MergeDecoder` struct and `Metadata::merge()` method
+    - In the CLI: specify more than one input file to initiate a merge
+  - Eliminated `unsafe` in `From` implementations for record structs from different versions
+
 ## 0.17.0 - 2024-12-17
 
 ### Enhancements
