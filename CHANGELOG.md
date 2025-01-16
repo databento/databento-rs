@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.18.1 - TBD
+
+### Bug fixes
+- Changed historical metadata methods with `symbols` parameter to use a `POST` request
+  to allow for requesting supported maximum of 2000 symbols
+
 ## 0.18.0 - 2025-01-08
 
 ### Enhancements

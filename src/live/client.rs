@@ -244,7 +244,6 @@ impl fmt::Debug for Client {
 }
 
 #[cfg(test)]
-#[allow(deprecated)]
 mod tests {
     use std::{ffi::c_char, fmt};
 
