@@ -136,11 +136,9 @@ impl MetadataClient<'_> {
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
     pub async fn get_record_count(&mut self, params: &GetRecordCountParams) -> crate::Result<u64> {
-        let resp = self
-            .get("get_record_count")?
-            .add_to_query(params)
-            .send()
-            .await?;
+        let mut form = Vec::new();
+        params.add_to_form(&mut form);
+        let resp = self.post("get_record_count")?.form(&form).send().await?;
         handle_response(resp).await
     }
 
@@ -154,11 +152,9 @@ impl MetadataClient<'_> {
         &mut self,
         params: &GetBillableSizeParams,
     ) -> crate::Result<u64> {
-        let resp = self
-            .get("get_billable_size")?
-            .add_to_query(params)
-            .send()
-            .await?;
+        let mut form = Vec::new();
+        params.add_to_form(&mut form);
+        let resp = self.post("get_billable_size")?.form(&form).send().await?;
         handle_response(resp).await
     }
 
@@ -169,12 +165,18 @@ impl MetadataClient<'_> {
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
     pub async fn get_cost(&mut self, params: &GetCostParams) -> crate::Result<f64> {
-        let resp = self.get("get_cost")?.add_to_query(params).send().await?;
+        let mut form = Vec::new();
+        params.add_to_form(&mut form);
+        let resp = self.post("get_cost")?.form(&form).send().await?;
         handle_response(resp).await
     }
 
     fn get(&mut self, slug: &str) -> crate::Result<RequestBuilder> {
         self.inner.get(&format!("metadata.{slug}"))
+    }
+
+    fn post(&mut self, slug: &str) -> crate::Result<RequestBuilder> {
+        self.inner.post(&format!("metadata.{slug}"))
     }
 }
 
@@ -284,7 +286,6 @@ pub struct DatasetRange {
     pub end: time::OffsetDateTime,
 }
 
-#[allow(deprecated)]
 impl<'de> Deserialize<'de> for DatasetRange {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
@@ -430,20 +431,16 @@ fn deserialize_date<'de, D: serde::Deserializer<'de>>(
     let dt_str = String::deserialize(deserializer)?;
     time::Date::parse(&dt_str, super::DATE_FORMAT).map_err(serde::de::Error::custom)
 }
-impl AddToQuery<GetQueryParams> for reqwest::RequestBuilder {
-    fn add_to_query(mut self, params: &GetQueryParams) -> Self {
-        self = self
-            .query(&[
-                ("dataset", params.dataset.as_str()),
-                ("schema", params.schema.as_str()),
-                ("stype_in", params.stype_in.as_str()),
-            ])
-            .add_to_query(&params.symbols)
-            .add_to_query(&params.date_time_range);
-        if let Some(limit) = params.limit {
-            self = self.query(&[("limit", &limit.to_string())]);
+impl GetQueryParams {
+    fn add_to_form(&self, form: &mut Vec<(&'static str, String)>) {
+        form.push(("dataset", self.dataset.to_string()));
+        form.push(("schema", self.schema.to_string()));
+        form.push(("stype_in", self.stype_in.to_string()));
+        form.push(("symbols", self.symbols.to_api_string()));
+        self.date_time_range.add_to_form(form);
+        if let Some(limit) = self.limit {
+            form.push(("limit", limit.get().to_string()))
         }
-        self
     }
 }
 
@@ -650,7 +647,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[allow(deprecated)]
     async fn test_get_dataset_range() {
         const DATASET: &str = "XNAS.ITCH";
         let mock_server = MockServer::start().await;
@@ -679,7 +675,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[allow(deprecated)]
     async fn test_get_dataset_range_no_dates() {
         const DATASET: &str = "XNAS.ITCH";
         let mock_server = MockServer::start().await;

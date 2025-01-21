@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.19.0 - 2025-01-21
+
+### Enhancements
+- Upgraded DBN version to 0.27.0:
+  - Updated enumerations for unreleased US equities datasets and publishers
+  - Added new venue `EQUS` for consolidated US equities
+  - Added new dataset `EQUS.MINI` and new publishers `EQUS.MINI.EQUS` and
+    `XNYS.TRADES.EQUS`
+
+### Bug fixes
+- Changed historical metadata methods with `symbols` parameter to use a `POST` request
+  to allow for requesting supported maximum of 2000 symbols
+
 ## 0.18.0 - 2025-01-08
 
 ### Enhancements
@@ -15,7 +28,8 @@
     - Decoding streams: `MergeDecoder` and `MergeRecordDecoder` structs
     - Metadata: `MergeDecoder` struct and `Metadata::merge()` method
     - In the CLI: specify more than one input file to initiate a merge
-  - Eliminated `unsafe` in `From` implementations for record structs from different versions
+  - Eliminated `unsafe` in `From` implementations for record structs from different
+    versions
 
 ## 0.17.0 - 2024-12-17
 
@@ -47,8 +61,8 @@
 
 #### Deprecations
 - Deprecated `Packaging` enum and `packaging` field on `SubmitJobParams` and `BatchJob`.
-  These will be removed in a future version. All files from a batch job can be downloaded
-  with the `batch().download()` method on the historical client
+  These will be removed in a future version. All files from a batch job can be
+  downloaded with the `batch().download()` method on the historical client
 
 ## 0.15.0 - 2024-10-22
 
@@ -174,11 +188,13 @@
 ## 0.9.0 - 2024-05-14
 
 #### Enhancements
-- Added `start` and `end` fields to the `DatasetRange` struct which provide time resolution and an exclusive end date
+- Added `start` and `end` fields to the `DatasetRange` struct which provide time
+  resolution and an exclusive end date
 - Upgraded DBN version to 0.17.1
 
 #### Deprecations
-- The `start_date` and `end_date` fields of the `DatasetRange` struct are deprecated and will be removed in a future release
+- The `start_date` and `end_date` fields of the `DatasetRange` struct are deprecated and
+  will be removed in a future release
 
 ## 0.8.0 - 2024-04-01
 
