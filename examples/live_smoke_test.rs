@@ -82,7 +82,7 @@ async fn run(args: Args, mut client: LiveClient) -> anyhow::Result<()> {
         builder.build()
     };
 
-    client.subscribe(&subscription).await?;
+    client.subscribe(subscription).await?;
 
     //For start != 0 we stop at SymbolMappingMsg so that the tests can be run outside trading hours
     let expected_rtype: RType = if start
@@ -117,7 +117,7 @@ async fn run(args: Args, mut client: LiveClient) -> anyhow::Result<()> {
 async fn run_with_snapshot(args: Args, mut client: LiveClient) -> anyhow::Result<()> {
     client
         .subscribe(
-            &Subscription::builder()
+            Subscription::builder()
                 .schema(args.schema)
                 .symbols(args.symbols)
                 .stype_in(args.stype)

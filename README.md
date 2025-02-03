@@ -42,7 +42,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .await?;
     client
         .subscribe(
-            &Subscription::builder()
+            Subscription::builder()
                 .symbols("ES.FUT")
                 .schema(Schema::Trades)
                 .stype_in(SType::Parent)
