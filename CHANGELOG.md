@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.20.0 - TBD
+## 0.20.0 - 2025-02-12
 
 ### Enhancements
 - Added `LiveClient::reconnect()` and `LiveClient::resubscribe()` methods to make it easier
@@ -17,6 +17,9 @@
   that clients can be reused through the `reconnect()` method
 - Changed `LiveClient::subscribe()` to take a `Subscription` parameter rather than a
   `&Subscription` because it will now store the `Subscription` struct internally
+- Upgraded DBN version to 0.28.0:
+  - Added `CommoditySpot` `InstrumentClass` variant and made `InstrumentClass`
+    non-exhaustive to allow future additions without breaking changes
 
 ## 0.19.0 - 2025-01-21
 
