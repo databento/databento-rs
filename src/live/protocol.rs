@@ -156,6 +156,14 @@ where
         Ok(self.sender.write_all(StartRequest.as_bytes()).await?)
     }
 
+    /// Shuts down the inner writer.
+    ///
+    /// # Errors
+    /// This function returns an error if the shut down did not complete successfully.
+    pub async fn shutdown(&mut self) -> crate::Result<()> {
+        Ok(self.sender.shutdown().await?)
+    }
+
     /// Consumes the protocol instance and returns the inner sender.
     pub fn into_inner(self) -> W {
         self.sender

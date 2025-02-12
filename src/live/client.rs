@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, net::SocketAddr};
 
 use dbn::{
     decode::dbn::{AsyncMetadataDecoder, AsyncRecordDecoder},
@@ -6,10 +6,10 @@ use dbn::{
 };
 use time::Duration;
 use tokio::{
-    io::{AsyncWriteExt, BufReader, ReadHalf, WriteHalf},
+    io::{BufReader, ReadHalf, WriteHalf},
     net::{TcpStream, ToSocketAddrs},
 };
-use tracing::{info, info_span, instrument, Span};
+use tracing::{info, info_span, instrument, warn, Span};
 
 use crate::ApiKey;
 
@@ -29,6 +29,8 @@ pub struct Client {
     upgrade_policy: VersionUpgradePolicy,
     heartbeat_interval: Option<Duration>,
     protocol: Protocol<WriteHalf<TcpStream>>,
+    peer_addr: SocketAddr,
+    subscriptions: Vec<Subscription>,
     decoder: AsyncRecordDecoder<BufReader<ReadHalf<TcpStream>>>,
     session_id: String,
     span: Span,
@@ -75,7 +77,8 @@ impl Client {
         heartbeat_interval: Option<Duration>,
     ) -> crate::Result<Self> {
         let key = ApiKey::new(key)?;
-        let stream = TcpStream::connect(addr).await?;
+        let stream = TcpStream::connect(&addr).await?;
+        let peer_addr = stream.peer_addr()?;
         let (recver, sender) = tokio::io::split(stream);
         let mut recver = BufReader::new(recver);
         let mut protocol = Protocol::new(sender);
@@ -96,17 +99,11 @@ impl Client {
             upgrade_policy,
             heartbeat_interval,
             protocol,
-            // Pass a placeholder DBN version and should never fail because DBN_VERSION
-            // is a valid DBN version. Correct version set in `start()`.
-            decoder: AsyncRecordDecoder::with_version(
-                recver,
-                dbn::DBN_VERSION,
-                upgrade_policy,
-                send_ts_out,
-            )
-            .unwrap(),
+            peer_addr,
+            decoder: Self::create_decoder(recver, upgrade_policy, send_ts_out),
             session_id,
             span,
+            subscriptions: Vec::new(),
         })
     }
 
@@ -115,9 +112,7 @@ impl Client {
     pub fn builder() -> ClientBuilder<Unset, Unset> {
         ClientBuilder::default()
     }
-}
 
-impl Client {
     /// Returns the API key used by the instance of the client.
     pub fn key(&self) -> &str {
         &self.key.0
@@ -149,20 +144,23 @@ impl Client {
         self.heartbeat_interval
     }
 
-    /// Closes the connection with the gateway, ending the session and all subscriptions. Consumes
-    /// the client.
+    /// Returns an immutable reference to all subscriptions made with this instance.
+    pub fn subscriptions(&self) -> &Vec<Subscription> {
+        &self.subscriptions
+    }
+
+    /// Returns a mutable reference to all subscriptions made with this instance.
+    pub fn subscriptions_mut(&mut self) -> &mut Vec<Subscription> {
+        &mut self.subscriptions
+    }
+
+    /// Closes the connection with the gateway, ending the session and all subscriptions.
     ///
     /// # Errors
     /// This function returns an error if the shutdown of the TCP stream is unsuccessful, this usually
     /// means the stream is no longer usable.
-    pub async fn close(self) -> crate::Result<()> {
-        Ok(self
-            .decoder
-            .into_inner()
-            .into_inner()
-            .unsplit(self.protocol.into_inner())
-            .shutdown()
-            .await?)
+    pub async fn close(&mut self) -> crate::Result<()> {
+        self.protocol.shutdown().await
     }
 
     /// Attempts to add a new subscription to the session. Note that
@@ -178,8 +176,10 @@ impl Client {
     /// may have been partially sent, resulting in the gateway rejecting the
     /// subscription, sending an error, and closing the connection.
     #[instrument(parent = &self.span, skip_all)]
-    pub async fn subscribe(&mut self, sub: &Subscription) -> crate::Result<()> {
-        self.protocol.subscribe(sub).await
+    pub async fn subscribe(&mut self, sub: Subscription) -> crate::Result<()> {
+        self.protocol.subscribe(&sub).await?;
+        self.subscriptions.push(sub);
+        Ok(())
     }
 
     /// Instructs the gateway to start sending data, starting the session. This method
@@ -224,9 +224,72 @@ impl Client {
     /// # Cancel safety
     /// This method is cancel safe. It can be used within a [`tokio::select!`] statement
     /// without the potential for corrupting the input stream.
-    #[instrument(parent = &self.span, skip_all)]
+    #[instrument(parent = &self.span, level = "debug", skip_all)]
     pub async fn next_record(&mut self) -> crate::Result<Option<RecordRef>> {
         Ok(self.decoder.decode_ref().await?)
+    }
+
+    /// Closes the current connection, then reopens the connection and authenticates
+    /// with the live gateway.
+    ///
+    /// # Errors
+    /// This function returns an error if it's unable to connect to the gateway or
+    /// authentication fails.
+    ///
+    /// # Cancel safety
+    /// This method is not cancellation safe. If this method is used in a
+    /// [`tokio::select!`] statement and another branch completes first, the reconnect
+    /// may be in an invalid intermediate state and the reconnect should be reattempted.
+    pub async fn reconnect(&mut self) -> crate::Result<()> {
+        info!("Reconnecting");
+        if let Err(err) = self.close().await {
+            warn!(
+                ?err,
+                "Failed to close connection before reconnect. Proceeding"
+            );
+        }
+        let stream = TcpStream::connect(self.peer_addr).await?;
+        let (recver, sender) = tokio::io::split(stream);
+        let mut recver = BufReader::new(recver);
+        self.protocol = Protocol::new(sender);
+        self.session_id = self
+            .protocol
+            .authenticate(
+                &mut recver,
+                &self.key,
+                &self.dataset,
+                self.send_ts_out,
+                self.heartbeat_interval.map(|i| i.whole_seconds()),
+            )
+            .await?;
+        self.decoder = Self::create_decoder(recver, self.upgrade_policy, self.send_ts_out);
+        self.span = info_span!("LiveClient", dataset = %self.dataset, session_id = self.session_id);
+        Ok(())
+    }
+
+    /// Resubscribes to all subscriptions, removing the original `start` time, if any.
+    /// Usually performed after a [`reconnect()`](Self::reconnect).
+    ///
+    /// # Errors
+    /// This function returns an error if it fails to send any of the subscriptions to
+    /// the gateway.
+    pub async fn resubscribe(&mut self) -> crate::Result<()> {
+        for sub in self.subscriptions.iter_mut() {
+            sub.start = None;
+            self.protocol.subscribe(sub).await?;
+        }
+        Ok(())
+    }
+
+    fn create_decoder(
+        recver: BufReader<ReadHalf<TcpStream>>,
+        upgrade_policy: VersionUpgradePolicy,
+        send_ts_out: bool,
+    ) -> AsyncRecordDecoder<BufReader<ReadHalf<TcpStream>>> {
+        // Pass a placeholder DBN version and should never fail because DBN_VERSION
+        // is a valid DBN version. Correct version set in `start()`.
+        AsyncRecordDecoder::with_version(recver, dbn::DBN_VERSION, upgrade_policy, send_ts_out)
+            .unwrap()
     }
 }
 
@@ -238,6 +301,7 @@ impl fmt::Debug for Client {
             .field("send_ts_out", &self.send_ts_out)
             .field("upgrade_policy", &self.upgrade_policy)
             .field("heartbeat_interval", &self.heartbeat_interval)
+            .field("peer_addr", &self.peer_addr)
             .field("session_id", &self.session_id)
             .finish_non_exhaustive()
     }
@@ -254,9 +318,9 @@ mod tests {
         record::{HasRType, OhlcvMsg, RecordHeader, TradeMsg, WithTsOut},
         FlagSet, Mbp10Msg, MetadataBuilder, Record, SType, Schema,
     };
-    use time::Duration;
+    use time::{Duration, OffsetDateTime};
     use tokio::{
-        io::{AsyncBufReadExt, BufReader},
+        io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
         join,
         net::{TcpListener, TcpStream},
         select,
@@ -380,6 +444,13 @@ mod tests {
         fn stream(&mut self) -> &mut BufReader<TcpStream> {
             self.stream.as_mut().unwrap()
         }
+
+        async fn close(&mut self) {
+            if let Some(stream) = self.stream.as_mut() {
+                stream.shutdown().await.unwrap();
+            }
+            self.stream = None;
+        }
     }
 
     struct Fixture {
@@ -389,25 +460,27 @@ mod tests {
     }
 
     enum Event {
-        Stop,
+        Exit,
         Accept,
         Authenticate(Option<Duration>),
         Send(String),
         Subscribe(Subscription),
         Start,
         SendRecord(Box<dyn AsRef<[u8]> + Send>),
+        Disconnect,
     }
 
     impl fmt::Debug for Event {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match self {
-                Event::Stop => write!(f, "Stop"),
+                Event::Exit => write!(f, "Exit"),
                 Event::Accept => write!(f, "Accept"),
                 Event::Authenticate(hb_int) => write!(f, "Authenticate({hb_int:?})"),
                 Event::Send(msg) => write!(f, "Send({msg:?})"),
                 Event::Subscribe(sub) => write!(f, "Subscribe({sub:?})"),
                 Event::Start => write!(f, "Start"),
                 Event::SendRecord(_) => write!(f, "SendRecord"),
+                Event::Disconnect => write!(f, "Disconnect"),
             }
         }
     }
@@ -426,7 +499,8 @@ mod tests {
                         Some(Event::Subscribe(sub)) => mock.subscribe(sub).await,
                         Some(Event::Start) => mock.start().await,
                         Some(Event::SendRecord(rec)) => mock.send_record(rec).await,
-                        Some(Event::Stop) | None => break,
+                        Some(Event::Disconnect) => mock.close().await,
+                        Some(Event::Exit) | None => break,
                     }
                 }
             });
@@ -466,8 +540,12 @@ mod tests {
                 .unwrap();
         }
 
+        pub fn disconnect(&mut self) {
+            self.send.send(Event::Disconnect).unwrap()
+        }
+
         pub async fn stop(self) {
-            self.send.send(Event::Stop).unwrap();
+            self.send.send(Event::Exit).unwrap();
             self.task.await.unwrap()
         }
     }
@@ -511,7 +589,7 @@ mod tests {
             .stype_in(SType::RawSymbol)
             .build();
         fixture.expect_subscribe(subscription.clone());
-        client.subscribe(&subscription).await.unwrap();
+        client.subscribe(subscription).await.unwrap();
         fixture.stop().await;
     }
 
@@ -526,7 +604,7 @@ mod tests {
             .use_snapshot()
             .build();
         fixture.expect_subscribe(subscription.clone());
-        client.subscribe(&subscription).await.unwrap();
+        client.subscribe(subscription).await.unwrap();
         fixture.stop().await;
     }
 
@@ -537,7 +615,7 @@ mod tests {
 
         let err = client
             .subscribe(
-                &Subscription::builder()
+                Subscription::builder()
                     .symbols(vec!["MSFT", "TSLA", "QQQ"])
                     .schema(Schema::Ohlcv1M)
                     .stype_in(SType::RawSymbol)
@@ -563,7 +641,7 @@ mod tests {
             .schema(Schema::Ohlcv1M)
             .stype_in(SType::RawSymbol);
         let subscription = sub_base.clone().symbols(vec![SYMBOL; SYMBOL_COUNT]).build();
-        client.subscribe(&subscription).await.unwrap();
+        client.subscribe(subscription).await.unwrap();
         let mut i = 0;
         while i < SYMBOL_COUNT {
             let chunk_size = 128.min(SYMBOL_COUNT - i);
@@ -709,6 +787,71 @@ mod tests {
                 }
             }
         }
+        fixture.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_reconnect() {
+        let (mut fixture, mut client) = setup(Dataset::EqusMini, true, None).await;
+        let sub = Subscription::builder()
+            .symbols(["SPY", "QQQ"])
+            .schema(Schema::Trades)
+            .start(OffsetDateTime::UNIX_EPOCH)
+            .build();
+        fixture.expect_subscribe(sub.clone());
+        client.subscribe(sub.clone()).await.unwrap();
+        fixture.start();
+        let metadata = client.start().await.unwrap();
+        assert_eq!(metadata.version, dbn::DBN_VERSION);
+        assert!(metadata.schema.is_none());
+        assert_eq!(metadata.dataset, Dataset::EqusMini.as_str());
+
+        let trade = TradeMsg {
+            hd: RecordHeader::default::<TradeMsg>(rtype::MBP_0),
+            price: 1,
+            size: 2,
+            action: 'T' as c_char,
+            side: 'B' as c_char,
+            flags: FlagSet::default(),
+            depth: 0,
+            ts_recv: 3,
+            ts_in_delta: 4,
+            sequence: 5,
+        };
+        fixture.send_record(trade.clone());
+        assert_eq!(
+            *client
+                .next_record()
+                .await
+                .unwrap()
+                .unwrap()
+                .get::<TradeMsg>()
+                .unwrap(),
+            trade
+        );
+
+        fixture.disconnect();
+        // Receives None when gateway closes connection
+        assert!(client.next_record().await.unwrap().is_none());
+        fixture.authenticate(None);
+        client.reconnect().await.unwrap();
+
+        let mut resub = sub.clone();
+        resub.start = None;
+        fixture.expect_subscribe(resub);
+        client.resubscribe().await.unwrap();
+        fixture.send_record(trade.clone());
+        assert_eq!(
+            *client
+                .next_record()
+                .await
+                .unwrap()
+                .unwrap()
+                .get::<TradeMsg>()
+                .unwrap(),
+            trade
+        );
+
         fixture.stop().await;
     }
 }

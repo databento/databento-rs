@@ -156,6 +156,18 @@ impl From<Vec<String>> for Symbols {
     }
 }
 
+impl<const N: usize> From<[&str; N]> for Symbols {
+    fn from(value: [&str; N]) -> Self {
+        Symbols::Symbols(value.iter().map(ToString::to_string).collect())
+    }
+}
+
+impl From<&[&str]> for Symbols {
+    fn from(value: &[&str]) -> Self {
+        Symbols::Symbols(value.iter().map(ToString::to_string).collect())
+    }
+}
+
 impl From<Vec<&str>> for Symbols {
     fn from(value: Vec<&str>) -> Self {
         Symbols::Symbols(value.into_iter().map(ToOwned::to_owned).collect())

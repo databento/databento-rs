@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.20.0 - 2025-02-12
+
+### Enhancements
+- Added `LiveClient::reconnect()` and `LiveClient::resubscribe()` methods to make it easier
+  to resume a live session after losing the connection to the live gateway
+- Added `subscriptions()` and `subscriptions_mut()` getters to `LiveClient` for getting all
+  active subscriptions
+- Added `shutdown()` method to `live::Protocol` to clean up the active session
+- Downgraded to tracing span level on `LiveClient::next_record()` to "debug" to reduce
+  performance impact
+- Added `From<&[&str]>` and `From<[str; N]>` implementations for `Symbols`
+
+### Breaking changes
+- Changed `LiveClient::close()` to take `&mut self` rather than an owned value to `self` now
+  that clients can be reused through the `reconnect()` method
+- Changed `LiveClient::subscribe()` to take a `Subscription` parameter rather than a
+  `&Subscription` because it will now store the `Subscription` struct internally
+- Upgraded DBN version to 0.28.0:
+  - Added `CommoditySpot` `InstrumentClass` variant and made `InstrumentClass`
+    non-exhaustive to allow future additions without breaking changes
+
 ## 0.19.0 - 2025-01-21
 
 ### Enhancements
