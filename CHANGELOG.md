@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.21.0 - 2025-03-18
+
+### Enhancements
+- Improved error when calling `LiveClient::next_record()` on an instance that hasn't
+  been started
+- Improved error when calling `LiveClient::start()` on an instance that has already
+  been started
+- Upgraded DBN version to 0.29.0:
+
 ## 0.20.0 - 2025-02-12
 
 ### Enhancements
