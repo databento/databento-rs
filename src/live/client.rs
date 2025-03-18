@@ -31,9 +31,15 @@ pub struct Client {
     protocol: Protocol<WriteHalf<TcpStream>>,
     peer_addr: SocketAddr,
     subscriptions: Vec<Subscription>,
-    decoder: AsyncRecordDecoder<BufReader<ReadHalf<TcpStream>>>,
+    decoder: Decoder,
     session_id: String,
     span: Span,
+}
+
+enum Decoder {
+    Metadata(AsyncMetadataDecoder<BufReader<ReadHalf<TcpStream>>>),
+    Record(AsyncRecordDecoder<BufReader<ReadHalf<TcpStream>>>),
+    Empty,
 }
 
 impl Client {
@@ -100,7 +106,7 @@ impl Client {
             heartbeat_interval,
             protocol,
             peer_addr,
-            decoder: Self::create_decoder(recver, upgrade_policy, send_ts_out),
+            decoder: Decoder::Metadata(AsyncMetadataDecoder::new(recver)),
             session_id,
             span,
             subscriptions: Vec::new(),
@@ -182,15 +188,17 @@ impl Client {
         Ok(())
     }
 
-    /// Instructs the gateway to start sending data, starting the session. This method
-    /// should only be called once on a given instance.
+    /// Instructs the gateway to start sending data, starting the session. Except
+    /// in cases of a reconnect, this method should only be called once on a given
+    /// instance.
     ///
     /// Returns the DBN metadata associated with this session. This is primarily useful
     /// when saving the data to a file to replay it later.
     ///
     /// # Errors
-    /// This function returns an error if it's unable to communicate with
-    /// the gateway or there was an error decoding the DBN metadata.
+    /// This function returns an error if it's unable to communicate with the gateway or
+    /// there was an error decoding the DBN metadata. It will also return an error if
+    /// the session has already been started.
     ///
     /// # Cancel safety
     /// This method is not cancellation safe. If this method is used in a
@@ -199,14 +207,25 @@ impl Client {
     /// closing the connection.
     #[instrument(parent = &self.span, skip_all)]
     pub async fn start(&mut self) -> crate::Result<Metadata> {
+        let decoder @ Decoder::Metadata(_) = &mut self.decoder else {
+            return Err(crate::Error::BadArgument {
+                param_name: "self".to_owned(),
+                desc: "ignored request to start session that has already been started".to_owned(),
+            });
+        };
+        let Decoder::Metadata(mut decoder) = std::mem::replace(decoder, Decoder::Empty) else {
+            unreachable!("previously checked decoder type");
+        };
         info!("Starting session");
         self.protocol.start_session().await?;
-        let mut metadata = AsyncMetadataDecoder::new(self.decoder.get_mut())
-            .decode()
-            .await?;
-        self.decoder.set_version(metadata.version)?;
+        let mut metadata = decoder.decode().await?;
+        self.decoder = Decoder::Record(AsyncRecordDecoder::with_version(
+            decoder.into_inner(),
+            metadata.version,
+            self.upgrade_policy,
+            metadata.ts_out,
+        )?);
         // Should match `send_ts_out` but set again here for safety
-        self.decoder.set_ts_out(metadata.ts_out);
         metadata.upgrade(self.upgrade_policy);
         Ok(metadata)
     }
@@ -219,14 +238,21 @@ impl Client {
     ///
     /// # Errors
     /// This function returns an error when it's unable to decode the next record
-    /// or it's unable to read from the TCP stream.
+    /// or it's unable to read from the TCP stream. It will also return an error if the
+    /// session hasn't been started.
     ///
     /// # Cancel safety
     /// This method is cancel safe. It can be used within a [`tokio::select!`] statement
     /// without the potential for corrupting the input stream.
     #[instrument(parent = &self.span, level = "debug", skip_all)]
     pub async fn next_record(&mut self) -> crate::Result<Option<RecordRef>> {
-        Ok(self.decoder.decode_ref().await?)
+        let Decoder::Record(decoder) = &mut self.decoder else {
+            return Err(crate::Error::BadArgument {
+                param_name: "self".to_owned(),
+                desc: "Can't call LiveClient::next_record before starting session".to_owned(),
+            });
+        };
+        Ok(decoder.decode_ref().await?)
     }
 
     /// Closes the current connection, then reopens the connection and authenticates
@@ -262,7 +288,7 @@ impl Client {
                 self.heartbeat_interval.map(|i| i.whole_seconds()),
             )
             .await?;
-        self.decoder = Self::create_decoder(recver, self.upgrade_policy, self.send_ts_out);
+        self.decoder = Decoder::Metadata(AsyncMetadataDecoder::new(recver));
         self.span = info_span!("LiveClient", dataset = %self.dataset, session_id = self.session_id);
         Ok(())
     }
@@ -279,17 +305,6 @@ impl Client {
             self.protocol.subscribe(sub).await?;
         }
         Ok(())
-    }
-
-    fn create_decoder(
-        recver: BufReader<ReadHalf<TcpStream>>,
-        upgrade_policy: VersionUpgradePolicy,
-        send_ts_out: bool,
-    ) -> AsyncRecordDecoder<BufReader<ReadHalf<TcpStream>>> {
-        // Pass a placeholder DBN version and should never fail because DBN_VERSION
-        // is a valid DBN version. Correct version set in `start()`.
-        AsyncRecordDecoder::with_version(recver, dbn::DBN_VERSION, upgrade_policy, send_ts_out)
-            .unwrap()
     }
 }
 
@@ -840,6 +855,8 @@ mod tests {
         resub.start = None;
         fixture.expect_subscribe(resub);
         client.resubscribe().await.unwrap();
+        fixture.start();
+        client.start().await.unwrap();
         fixture.send_record(trade.clone());
         assert_eq!(
             *client

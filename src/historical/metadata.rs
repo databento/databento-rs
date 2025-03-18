@@ -114,7 +114,7 @@ impl MetadataClient<'_> {
         handle_response(resp).await
     }
 
-    /// Gets the available range for the dataset from Databento.
+    /// Gets the available range for the dataset given the user's entitlements.
     ///
     /// Use this method to discover data availability.
     ///
