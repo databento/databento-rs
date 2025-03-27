@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.22.0 - TBD
+- Added an implementation `From<Date>` for `DateRange` and `DateTimeRange` to make it
+  simpler to request a single full day's worth of data
+- Added conversions between `DateRange` and `DateTimeRange`
+- Added conversions from `timeseries::GetRangeParams`, `timeseries::GetRangeToFileParams`,
+  and `dbn::Metadata` to `symbology::ResolveParams`
+- Upgraded DBN version to 0.30.0:
+  - Added support for mapping symbols from instrument definitions to `PitSymbolMap`
+    with a new `on_instrument_def()` method
+  - Added instrument definition compatibility trait `InstrumentDefRec` for generalizing
+    across different versions of the instrument definition record
+
 ## 0.21.0 - 2025-03-18
 
 ### Enhancements
@@ -8,6 +20,14 @@
 - Improved error when calling `LiveClient::start()` on an instance that has already
   been started
 - Upgraded DBN version to 0.29.0:
+  - Added new venues, datasets, and publishers for ICE Futures US, ICE Futures Europe
+    (Financial products), Eurex, and European Energy Exchange (EEX)
+  - Added new `SkipBytes` and `AsyncSkipBytes` traits which are a subset of the `Seek`
+    and `AsyncSeek` traits respectively, only supporting seeking forward from the current
+    position
+  - Deprecated `AsyncRecordDecoder::get_mut()` and `AsyncDecoder::get_mut()` as modifying
+    the inner reader after decoding any records could lead to a corrupted stream and
+    decoding errors
 
 ## 0.20.0 - 2025-02-12
 
