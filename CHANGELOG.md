@@ -1,16 +1,23 @@
 # Changelog
 
-## 0.22.0 - TBD
+## 0.22.0 - 2025-04-01
 - Added an implementation `From<Date>` for `DateRange` and `DateTimeRange` to make it
   simpler to request a single full day's worth of data
 - Added conversions between `DateRange` and `DateTimeRange`
 - Added conversions from `timeseries::GetRangeParams`, `timeseries::GetRangeToFileParams`,
   and `dbn::Metadata` to `symbology::ResolveParams`
-- Upgraded DBN version to 0.30.0:
+- Upgraded DBN version to 0.31.0:
   - Added support for mapping symbols from instrument definitions to `PitSymbolMap`
     with a new `on_instrument_def()` method
   - Added instrument definition compatibility trait `InstrumentDefRec` for generalizing
     across different versions of the instrument definition record
+  - Added `Ord` and `PartialOrd` implementations for all enums and `FlagSet` to allow
+    for use in ordered containers like `BTreeMap`
+  - Added `decode_records()` method to `AsyncDbnDecoder` and `AsyncDbnRecordDecoder`
+    which is similar to the sync decoder methods of the same name
+  - Removed deprecated `dataset` module. The top-level `Dataset` enum and its `const` `as_str()`
+    method provide the same functionality for all datasets
+  - Removed deprecated `SymbolIndex::get_for_rec_ref()` method
 
 ## 0.21.0 - 2025-03-18
 
