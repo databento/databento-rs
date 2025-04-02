@@ -2,14 +2,14 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use dbn::{MappingInterval, SType, TsSymbolMap};
+use dbn::{MappingInterval, Metadata, SType, TsSymbolMap};
 use reqwest::RequestBuilder;
 use serde::Deserialize;
 use typed_builder::TypedBuilder;
 
 use crate::Symbols;
 
-use super::{handle_response, DateRange};
+use super::{handle_response, timeseries, DateRange, DateTimeRange};
 
 /// A client for the symbology group of Historical API endpoints.
 #[derive(Debug)]
@@ -74,6 +74,47 @@ pub struct ResolveParams {
     /// The date range of the resolution.
     #[builder(setter(into))]
     pub date_range: DateRange,
+}
+
+/// Primarily intended for requesting mappings for historical ALL_SYMBOLS requests,
+/// which currently don't return mappings on their own.
+impl TryFrom<Metadata> for ResolveParams {
+    type Error = crate::Error;
+
+    fn try_from(metadata: Metadata) -> Result<Self, Self::Error> {
+        let stype_in = metadata
+            .stype_in
+            .ok_or_else(|| crate::Error::bad_arg("metadata", "stype_in must be Some value"))?;
+        let end = metadata
+            .end()
+            .ok_or_else(|| crate::Error::bad_arg("metadata", "end must be Some value"))?;
+        let dt_range = DateTimeRange::from((metadata.start(), end));
+        Ok(Self {
+            dataset: metadata.dataset,
+            symbols: Symbols::Symbols(metadata.symbols),
+            stype_in,
+            stype_out: metadata.stype_out,
+            date_range: DateRange::from(dt_range),
+        })
+    }
+}
+
+impl From<timeseries::GetRangeParams> for ResolveParams {
+    fn from(get_range_params: timeseries::GetRangeParams) -> Self {
+        Self {
+            dataset: get_range_params.dataset,
+            symbols: get_range_params.symbols,
+            stype_in: get_range_params.stype_in,
+            stype_out: get_range_params.stype_out,
+            date_range: DateRange::from(get_range_params.date_time_range),
+        }
+    }
+}
+
+impl From<timeseries::GetRangeToFileParams> for ResolveParams {
+    fn from(get_range_to_file_params: timeseries::GetRangeToFileParams) -> Self {
+        Self::from(timeseries::GetRangeParams::from(get_range_to_file_params))
+    }
 }
 
 /// A symbology resolution from one symbology type to another.

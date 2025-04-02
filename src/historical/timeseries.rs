@@ -31,6 +31,10 @@ impl TimeseriesClient<'_> {
     /// This method returns a stream decoder. For larger requests, consider using
     /// [`BatchClient::submit_job()`](super::batch::BatchClient::submit_job()).
     ///
+    /// <div class="warning">
+    /// Calling this method will incur a cost.
+    /// </div>
+    ///
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
@@ -58,6 +62,10 @@ impl TimeseriesClient<'_> {
     ///
     /// This method returns a stream decoder. For larger requests, consider using
     /// [`BatchClient::submit_job()`](super::batch::BatchClient::submit_job()).
+    ///
+    /// <div class="warning">
+    /// Calling this method will incur a cost.
+    /// </div>
     ///
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API

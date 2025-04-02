@@ -34,6 +34,10 @@ pub struct BatchClient<'a> {
 impl BatchClient<'_> {
     /// Submits a new batch job and returns a description and identifiers for the job.
     ///
+    /// <div class="warning">
+    /// Calling this method will incur a cost.
+    /// </div>
+    ///
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
