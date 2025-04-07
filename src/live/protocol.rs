@@ -134,7 +134,14 @@ where
         let start_nanos = sub.start.as_ref().map(|start| start.unix_timestamp_nanos());
 
         for sym_str in sub.symbols.to_chunked_api_string() {
-            let sub_req = SubRequest::new(*schema, *stype_in, start_nanos, *use_snapshot, &sym_str);
+            let sub_req = SubRequest::new(
+                *schema,
+                *stype_in,
+                start_nanos,
+                *use_snapshot,
+                sub.id,
+                &sym_str,
+            );
             debug!(?sub_req, "Sending subscription request");
             self.sender.write_all(sub_req.as_bytes()).await?;
         }
@@ -299,19 +306,22 @@ impl SubRequest {
         stype_in: SType,
         start_nanos: Option<i128>,
         use_snapshot: bool,
+        id: Option<u32>,
         symbols: &str,
     ) -> Self {
         let use_snapshot = use_snapshot as u8;
-        let args = format!(
+        let mut args = format!(
             "schema={schema}|stype_in={stype_in}|symbols={symbols}|snapshot={use_snapshot}"
         );
 
-        let sub_str = if let Some(start) = start_nanos {
-            format!("{args}|start={start}\n")
-        } else {
-            format!("{args}\n")
-        };
-        Self(sub_str)
+        if let Some(start) = start_nanos {
+            args = format!("{args}|start={start}");
+        }
+        if let Some(id) = id {
+            args = format!("{args}|id={id}");
+        }
+        args.push('\n');
+        Self(args)
     }
 
     /// Returns the string slice of the request.

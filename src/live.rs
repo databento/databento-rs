@@ -37,6 +37,9 @@ pub struct Subscription {
     /// Request subscription with snapshot. Defaults to `false`. Conflicts with the `start` parameter.
     #[builder(setter(strip_bool))]
     pub use_snapshot: bool,
+    /// The optional numerical identifier associated with this subscription.
+    #[builder(default, setter(strip_option))]
+    pub id: Option<u32>,
 }
 
 #[doc(hidden)]

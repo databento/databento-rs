@@ -1,6 +1,18 @@
 # Changelog
 
+## 0.23.0 - TBD
+
+### Enhancements
+- Added `subscriptions` to `LiveClient` `Debug` implementation
+
+### Breaking changes
+- Added new `id` field to live `Subscription`, which will be used for improved error
+  messages
+- Added new `id` parameter to `live::protocol::SubRequest::new()` method
+
 ## 0.22.0 - 2025-04-01
+
+### Enhancements
 - Added an implementation `From<Date>` for `DateRange` and `DateTimeRange` to make it
   simpler to request a single full day's worth of data
 - Added conversions between `DateRange` and `DateTimeRange`
