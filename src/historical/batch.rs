@@ -244,7 +244,8 @@ pub struct SubmitJobParams {
     pub symbols: Symbols,
     /// The data record schema.
     pub schema: Schema,
-    /// The request time range.
+    /// The date time request range.
+    /// Filters on `ts_recv` if it exists in the schema, otherwise `ts_event`.
     #[builder(setter(into))]
     pub date_time_range: DateTimeRange,
     /// The data encoding. Defaults to [`Dbn`](Encoding::Dbn).
