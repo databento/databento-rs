@@ -1,14 +1,34 @@
 # Changelog
 
-## 0.23.0 - TBD
+## 0.23.0 - 2025-04-15
 
 ### Enhancements
 - Added `subscriptions` to `LiveClient` `Debug` implementation
+- Upgraded DBN version to 0.32.0:
+  - Added `SystemCode` and `ErrorCode` enums to indicate types of system and error
+    messages
+  - Added `code()` methods to `SystemMsg` and `ErrorMsg` to retrieve the enum value if
+    one exists and equivalent properties in Python
+  - Converting a `v1::SystemMsg` to a `v2::SystemMsg` now sets to `code` to the heartbeat
+    value
+  - Added `Ord` and `PartialOrd` implementations for all enums and `FlagSet` to allow
+    for use in ordered containers like `BTreeMap`
+  - Added `decode_records()` method to `AsyncDbnDecoder` and `AsyncDbnRecordDecoder`
+    which is similar to the sync decoder methods of the same name
+  - Upgraded `pyo3` version to 0.24.1
+  - Upgraded `time` version to 0.3.41
 
 ### Breaking changes
 - Added new `id` field to live `Subscription`, which will be used for improved error
   messages
 - Added new `id` parameter to `live::protocol::SubRequest::new()` method
+- Breaking changes from DBN:
+  - Added `code` parameter to `SystemCode::new()` and `ErrorMsg::new()`
+  - Updated the `rtype_dispatch` and `schema_dispatch` macro invocations to look more like
+    function invocation
+  - Removed deprecated `dataset` module. The top-level `Dataset` enum and its `const` `as_str()`
+    method provide the same functionality for all datasets
+  - Removed deprecated `SymbolIndex::get_for_rec_ref()` method
 
 ## 0.22.0 - 2025-04-01
 
