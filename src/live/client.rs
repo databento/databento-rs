@@ -30,6 +30,7 @@ pub struct Client {
     heartbeat_interval: Option<Duration>,
     protocol: Protocol<WriteHalf<TcpStream>>,
     peer_addr: SocketAddr,
+    sub_counter: u32,
     subscriptions: Vec<Subscription>,
     decoder: Decoder,
     session_id: String,
@@ -109,6 +110,7 @@ impl Client {
             decoder: Decoder::Metadata(AsyncMetadataDecoder::new(recver)),
             session_id,
             span,
+            sub_counter: 0,
             subscriptions: Vec::new(),
         })
     }
@@ -182,7 +184,15 @@ impl Client {
     /// may have been partially sent, resulting in the gateway rejecting the
     /// subscription, sending an error, and closing the connection.
     #[instrument(parent = &self.span, skip_all)]
-    pub async fn subscribe(&mut self, sub: Subscription) -> crate::Result<()> {
+    pub async fn subscribe(&mut self, mut sub: Subscription) -> crate::Result<()> {
+        if sub.id.is_none() {
+            if self.sub_counter == u32::MAX {
+                warn!("Exhausted all subscription IDs");
+            } else {
+                self.sub_counter += 1;
+            }
+            sub.id = Some(self.sub_counter);
+        }
         self.protocol.subscribe(&sub).await?;
         self.subscriptions.push(sub);
         Ok(())
@@ -278,6 +288,7 @@ impl Client {
         let (recver, sender) = tokio::io::split(stream);
         let mut recver = BufReader::new(recver);
         self.protocol = Protocol::new(sender);
+        self.sub_counter = 0;
         self.session_id = self
             .protocol
             .authenticate(
@@ -302,6 +313,7 @@ impl Client {
     pub async fn resubscribe(&mut self) -> crate::Result<()> {
         for sub in self.subscriptions.iter_mut() {
             sub.start = None;
+            self.sub_counter = self.sub_counter.max(sub.id.unwrap_or(0));
             self.protocol.subscribe(sub).await?;
         }
         Ok(())
@@ -317,6 +329,8 @@ impl fmt::Debug for Client {
             .field("upgrade_policy", &self.upgrade_policy)
             .field("heartbeat_interval", &self.heartbeat_interval)
             .field("peer_addr", &self.peer_addr)
+            .field("sub_counter", &self.sub_counter)
+            .field("subscriptions", &self.subscriptions)
             .field("session_id", &self.session_id)
             .finish_non_exhaustive()
     }
@@ -404,6 +418,7 @@ mod tests {
             assert!(sub_line.contains(&format!("symbols={}", subscription.symbols.to_api_string())));
             assert!(sub_line.contains(&format!("schema={}", subscription.schema)));
             assert!(sub_line.contains(&format!("stype_in={}", subscription.stype_in)));
+            assert!(sub_line.contains("id="));
             if let Some(start) = subscription.start {
                 assert!(sub_line.contains(&format!("start={}", start.unix_timestamp_nanos())))
             }
