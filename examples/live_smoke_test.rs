@@ -39,6 +39,9 @@ pub struct Args {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::FmtSubscriber::builder()
+        .with_test_writer()
+        .init();
     let args = Args::parse();
 
     let client = LiveClient::builder()

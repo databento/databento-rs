@@ -17,6 +17,9 @@ use tokio::fs::File;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::FmtSubscriber::builder()
+        .with_test_writer()
+        .init();
     if std::env::args().len() != 3 {
         anyhow::bail!(
             "Invalid number of arguments, expected: split_symbols FILE_PATH OUTPUT_PATTERN"

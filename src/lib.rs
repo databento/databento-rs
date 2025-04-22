@@ -6,11 +6,15 @@
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::missing_errors_doc)]
 
+#[cfg(feature = "historical")]
+mod deserialize;
 pub mod error;
 #[cfg(feature = "historical")]
 pub mod historical;
 #[cfg(feature = "live")]
 pub mod live;
+#[cfg(feature = "historical")]
+pub mod reference;
 
 pub use error::{Error, Result};
 #[cfg(feature = "historical")]
@@ -19,6 +23,9 @@ pub use historical::Client as HistoricalClient;
 #[cfg(feature = "live")]
 #[doc(inline)]
 pub use live::Client as LiveClient;
+#[cfg(feature = "historical")]
+#[doc(inline)]
+pub use reference::Client as ReferenceClient;
 // Re-export to keep versions synchronized
 pub use dbn;
 

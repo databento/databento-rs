@@ -21,17 +21,37 @@ use tokio::io::BufWriter;
 use tracing::{debug, error, info, info_span, warn, Instrument};
 use typed_builder::TypedBuilder;
 
-use crate::{historical::check_http_error, Error, Symbols};
-
-use super::{
+use crate::{
     deserialize::{deserialize_date_time, deserialize_opt_date_time},
-    handle_response, DateTimeRange,
+    historical::{check_http_error, AddToForm, Limit, ReqwestForm},
+    Error, Symbols,
 };
+
+use super::{handle_response, DateTimeRange};
 
 /// A client for the batch group of Historical API endpoints.
 #[derive(Debug)]
 pub struct BatchClient<'a> {
     pub(crate) inner: &'a mut super::Client,
+}
+
+struct SplitSize(Option<NonZeroU64>);
+impl AddToForm<SplitSize> for ReqwestForm {
+    fn add_to_form(mut self, SplitSize(split_size): &SplitSize) -> Self {
+        if let Some(split_size) = split_size {
+            self.push(("split_size", split_size.to_string()));
+        }
+        self
+    }
+}
+
+impl AddToForm<Option<SplitDuration>> for ReqwestForm {
+    fn add_to_form(mut self, split_duration: &Option<SplitDuration>) -> Self {
+        if let Some(split_duration) = split_duration {
+            self.push(("split_duration", split_duration.to_string()));
+        }
+        self
+    }
 }
 
 impl BatchClient<'_> {
@@ -45,7 +65,7 @@ impl BatchClient<'_> {
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
     pub async fn submit_job(&mut self, params: &SubmitJobParams) -> crate::Result<BatchJob> {
-        let mut form = vec![
+        let form = vec![
             ("dataset", params.dataset.to_string()),
             ("schema", params.schema.to_string()),
             ("encoding", params.encoding.to_string()),
@@ -58,17 +78,11 @@ impl BatchClient<'_> {
             ("stype_in", params.stype_in.to_string()),
             ("stype_out", params.stype_out.to_string()),
             ("symbols", params.symbols.to_api_string()),
-        ];
-        params.date_time_range.add_to_form(&mut form);
-        if let Some(split_size) = params.split_size {
-            form.push(("split_size", split_size.to_string()));
-        }
-        if let Some(limit) = params.limit {
-            form.push(("limit", limit.to_string()));
-        }
-        if let Some(split_duration) = params.split_duration {
-            form.push(("split_duration", split_duration.to_string()));
-        }
+        ]
+        .add_to_form(&params.date_time_range)
+        .add_to_form(&Limit(params.limit))
+        .add_to_form(&SplitSize(params.split_size))
+        .add_to_form(&params.split_duration);
         let builder = self.post("submit_job")?.form(&form);
         let resp = builder.send().await?;
         handle_response(resp).await
@@ -667,18 +681,11 @@ mod tests {
     };
 
     use super::*;
-    use crate::{body_contains, historical::API_VERSION, HistoricalClient};
-
-    const API_KEY: &str = "test-API________________________";
-
-    fn client(mock_server: &MockServer) -> HistoricalClient {
-        HistoricalClient::builder()
-            .base_url(mock_server.uri().parse().unwrap())
-            .key(API_KEY)
-            .unwrap()
-            .build()
-            .unwrap()
-    }
+    use crate::{
+        body_contains,
+        historical::test_infra::{client, API_KEY},
+        historical::API_VERSION,
+    };
 
     #[tokio::test]
     async fn test_submit_job() -> crate::Result<()> {

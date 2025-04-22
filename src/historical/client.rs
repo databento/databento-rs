@@ -1,7 +1,12 @@
+use std::io;
+
+use async_compression::tokio::bufread::ZstdDecoder;
 use dbn::VersionUpgradePolicy;
+use futures::TryStreamExt;
 use reqwest::{header::ACCEPT, IntoUrl, RequestBuilder, Url};
 use serde::Deserialize;
-use tracing::warn;
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tracing::{error, warn};
 
 use crate::{error::ApiError, ApiKey, Error, USER_AGENT};
 
@@ -16,7 +21,7 @@ use super::{
 /// Use [`HistoricalClient::builder()`](Client::builder) to get a type-safe builder for
 /// initializing the required parameters for the client.
 ///
-/// individual API methods are accessed through its four subclients:
+/// Individual API methods are accessed through its four subclients:
 /// - [`metadata()`](Self::metadata)
 /// - [`timeseries()`](Self::timeseries)
 /// - [`symbology()`](Self::symbology)
@@ -43,8 +48,8 @@ pub(crate) struct BusinessErrorDetails {
     docs: String,
 }
 
-const WARNING_HEADER: &str = "X-Warning";
-const REQUEST_ID_HEADER: &str = "request-id";
+pub(crate) const WARNING_HEADER: &str = "X-Warning";
+pub(crate) const REQUEST_ID_HEADER: &str = "request-id";
 
 impl Client {
     /// Returns a type-safe builder for setting the required parameters
@@ -189,10 +194,34 @@ pub(crate) async fn handle_response<R: serde::de::DeserializeOwned>(
 ) -> crate::Result<R> {
     check_warnings(&response);
     let response = check_http_error(response).await?;
-    Ok(response.json::<R>().await?)
+    let bytes = response.bytes().await?;
+
+    deserialize_json(std::str::from_utf8(&bytes)?)
 }
 
-fn check_warnings(response: &reqwest::Response) {
+pub(crate) async fn handle_zstd_jsonl_response<R: serde::de::DeserializeOwned>(
+    response: reqwest::Response,
+) -> crate::Result<Vec<R>> {
+    check_warnings(&response);
+    let response = check_http_error(response).await?;
+    let stream = response.bytes_stream().map_err(io::Error::other);
+    let stream_reader = tokio_util::io::StreamReader::new(stream);
+    let mut lines_decoder = BufReader::new(ZstdDecoder::new(stream_reader)).lines();
+    let mut res = Vec::new();
+    while let Some(line) = lines_decoder.next_line().await? {
+        res.push(deserialize_json(&line)?);
+    }
+    Ok(res)
+}
+
+fn deserialize_json<R: serde::de::DeserializeOwned>(str: &str) -> crate::Result<R> {
+    serde_json::from_str(str).map_err(|err| {
+        error!(?err, ?str, "Failed to decode JSON");
+        crate::Error::from(err)
+    })
+}
+
+pub(crate) fn check_warnings(response: &reqwest::Response) {
     if let Some(header) = response.headers().get(WARNING_HEADER) {
         match serde_json::from_slice::<Vec<String>>(header.as_bytes()) {
             Ok(warnings) => {
@@ -303,11 +332,10 @@ impl ClientBuilder<ApiKey> {
         let base_url = if let Some(url) = self.base_url {
             url
         } else {
-            match self.gateway {
-                HistoricalGateway::Bo1 => "https://hist.databento.com",
-            }
-            .parse()
-            .map_err(|e| Error::bad_arg("gateway", format!("{e:?}")))?
+            self.gateway
+                .as_url()
+                .parse()
+                .map_err(|e| Error::bad_arg("gateway", format!("{e:?}")))?
         };
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(ACCEPT, "application/json".parse().unwrap());

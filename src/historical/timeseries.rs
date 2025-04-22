@@ -17,7 +17,10 @@ use tokio::{
 use tokio_util::{bytes::Bytes, io::StreamReader};
 use typed_builder::TypedBuilder;
 
-use crate::Symbols;
+use crate::{
+    historical::{check_warnings, AddToForm, Limit},
+    Symbols,
+};
 
 use super::{check_http_error, DateTimeRange};
 
@@ -120,7 +123,7 @@ impl TimeseriesClient<'_> {
         date_time_range: &DateTimeRange,
         limit: Option<NonZeroU64>,
     ) -> crate::Result<StreamReader<impl Stream<Item = std::io::Result<Bytes>>, Bytes>> {
-        let mut form = vec![
+        let form = vec![
             ("dataset", dataset.to_owned()),
             ("schema", schema.to_string()),
             ("encoding", Encoding::Dbn.to_string()),
@@ -128,11 +131,9 @@ impl TimeseriesClient<'_> {
             ("stype_in", stype_in.to_string()),
             ("stype_out", stype_out.to_string()),
             ("symbols", symbols.to_api_string()),
-        ];
-        date_time_range.add_to_form(&mut form);
-        if let Some(limit) = limit {
-            form.push(("limit", limit.to_string()));
-        }
+        ]
+        .add_to_form(date_time_range)
+        .add_to_form(&Limit(limit));
         let resp = self
             .post("get_range")?
             // unlike almost every other request, it's not JSON
@@ -140,6 +141,7 @@ impl TimeseriesClient<'_> {
             .form(&form)
             .send()
             .await?;
+        check_warnings(&resp);
         let stream = check_http_error(resp)
             .await?
             .error_for_status()?
@@ -287,9 +289,10 @@ mod tests {
     };
 
     use super::*;
-    use crate::{body_contains, historical::API_VERSION, zst_test_data_path, HistoricalClient};
-
-    const API_KEY: &str = "test-API________________________";
+    use crate::{
+        body_contains, historical::test_infra::API_KEY, historical::API_VERSION,
+        zst_test_data_path, HistoricalClient,
+    };
 
     fn client(mock_server: &MockServer, upgrade_policy: VersionUpgradePolicy) -> HistoricalClient {
         HistoricalClient::builder()

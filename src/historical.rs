@@ -2,10 +2,11 @@
 
 pub mod batch;
 mod client;
-mod deserialize;
 pub mod metadata;
 pub mod symbology;
 pub mod timeseries;
+
+use std::num::NonZeroU64;
 
 pub use client::*;
 use serde::Deserialize;
@@ -13,8 +14,7 @@ use time::{
     format_description::BorrowedFormatItem, macros::format_description, Duration, Time, UtcOffset,
 };
 
-use self::deserialize::deserialize_date_time;
-use crate::{Error, Symbols};
+use crate::{deserialize::deserialize_date_time, Error, Symbols};
 
 /// The current Databento historical API version.
 pub const API_VERSION: u32 = 0;
@@ -25,6 +25,15 @@ pub enum HistoricalGateway {
     /// The default gateway in Boston.
     #[default]
     Bo1,
+}
+
+impl HistoricalGateway {
+    /// Returns the URL string associated with the gateway.
+    pub fn as_url(&self) -> &str {
+        match self {
+            HistoricalGateway::Bo1 => "https://hist.databento.com",
+        }
+    }
 }
 
 /// A **half**-closed date interval with an inclusive UTC start date and an exclusive UTC end
@@ -63,6 +72,18 @@ impl From<(time::Date, time::Duration)> for DateRange {
             start: value.0,
             end: value.0 + value.1,
         }
+    }
+}
+
+impl From<(time::Date, time::Duration)> for DateTimeRange {
+    fn from(value: (time::Date, time::Duration)) -> Self {
+        Self::from(DateRange::from(value))
+    }
+}
+
+impl From<(time::Date, time::Date)> for DateTimeRange {
+    fn from(value: (time::Date, time::Date)) -> Self {
+        Self::from(DateRange::from(value))
     }
 }
 
@@ -146,6 +167,12 @@ trait AddToQuery<T> {
     fn add_to_query(self, param: &T) -> Self;
 }
 
+pub(crate) trait AddToForm<T> {
+    fn add_to_form(self, param: &T) -> Self;
+}
+
+pub(crate) type ReqwestForm = Vec<(&'static str, String)>;
+
 impl AddToQuery<DateRange> for reqwest::RequestBuilder {
     fn add_to_query(self, param: &DateRange) -> Self {
         self.query(&[
@@ -170,17 +197,47 @@ impl AddToQuery<Symbols> for reqwest::RequestBuilder {
     }
 }
 
-impl DateRange {
-    pub(crate) fn add_to_form(&self, form: &mut Vec<(&'static str, String)>) {
-        form.push(("start_date", self.start.format(DATE_FORMAT).unwrap()));
-        form.push(("end_date", self.end.format(DATE_FORMAT).unwrap()));
+impl AddToForm<DateRange> for ReqwestForm {
+    fn add_to_form(mut self, param: &DateRange) -> Self {
+        self.push(("start_date", param.start.format(DATE_FORMAT).unwrap()));
+        self.push(("end_date", param.end.format(DATE_FORMAT).unwrap()));
+        self
     }
 }
 
-impl DateTimeRange {
-    pub(crate) fn add_to_form(&self, form: &mut Vec<(&'static str, String)>) {
-        form.push(("start", self.start.unix_timestamp_nanos().to_string()));
-        form.push(("end", self.end.unix_timestamp_nanos().to_string()));
+impl AddToForm<DateTimeRange> for ReqwestForm {
+    fn add_to_form(mut self, param: &DateTimeRange) -> Self {
+        self.push(("start", param.start.unix_timestamp_nanos().to_string()));
+        self.push(("end", param.end.unix_timestamp_nanos().to_string()));
+        self
+    }
+}
+
+struct Limit(Option<NonZeroU64>);
+impl AddToForm<Limit> for ReqwestForm {
+    fn add_to_form(mut self, Limit(limit): &Limit) -> Self {
+        if let Some(limit) = limit {
+            self.push(("limit", limit.to_string()));
+        }
+        self
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod test_infra {
+    use wiremock::MockServer;
+
+    use crate::HistoricalClient;
+
+    pub const API_KEY: &str = "test-API________________________";
+
+    pub fn client(mock_server: &MockServer) -> HistoricalClient {
+        HistoricalClient::builder()
+            .base_url(mock_server.uri().parse().unwrap())
+            .key(API_KEY)
+            .unwrap()
+            .build()
+            .unwrap()
     }
 }
 
