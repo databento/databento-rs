@@ -133,7 +133,8 @@ where
         }
         let start_nanos = sub.start.as_ref().map(|start| start.unix_timestamp_nanos());
 
-        for sym_str in sub.symbols.to_chunked_api_string() {
+        let symbol_chunks = sub.symbols.to_chunked_api_string();
+        for sym_str in symbol_chunks {
             let sub_req = SubRequest::new(
                 *schema,
                 *stype_in,

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.24.1 - TBD
+
+### Enhancements
+- Increased live subscription symbol chunking size
+
 ## 0.24.0 - 2025-04-22
 
 ### Enhancements
