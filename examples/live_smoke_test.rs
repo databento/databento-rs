@@ -84,7 +84,7 @@ async fn run(args: Args, mut client: LiveClient) -> anyhow::Result<()> {
 
     client.subscribe(subscription).await?;
 
-    //For start != 0 we stop at SymbolMappingMsg so that the tests can be run outside trading hours
+    // For start != 0 we stop at SymbolMappingMsg so that the tests can be run outside trading hours
     let expected_rtype: RType = if start
         .is_some_and(|s| s == OffsetDateTime::UNIX_EPOCH || args.stype == SType::InstrumentId)
     {
