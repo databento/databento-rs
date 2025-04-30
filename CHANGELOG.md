@@ -1,11 +1,12 @@
 # Changelog
 
-## 0.25.1 - TBD
+## 0.26.0 - TBD
 
 ### Enhancements
-- Added `From<DatasetRange>` conversion for `DateTimeRange`
 
-## 0.25.0 - TBD
+- Added `is_last` field to live subscription requests which will be used to improve the
+  handling of split subscription requests
+- Added `From<DatasetRange>` conversion for `DateTimeRange`
 
 ### Enhancements
 - Increased live subscription symbol chunking size

@@ -134,7 +134,8 @@ where
         let start_nanos = sub.start.as_ref().map(|start| start.unix_timestamp_nanos());
 
         let symbol_chunks = sub.symbols.to_chunked_api_string();
-        for sym_str in symbol_chunks {
+        let last_chunk_idx = symbol_chunks.len() - 1;
+        for (i, sym_str) in symbol_chunks.into_iter().enumerate() {
             let sub_req = SubRequest::new(
                 *schema,
                 *stype_in,
@@ -142,6 +143,7 @@ where
                 *use_snapshot,
                 sub.id,
                 &sym_str,
+                i == last_chunk_idx,
             );
             debug!(?sub_req, "Sending subscription request");
             self.sender.write_all(sub_req.as_bytes()).await?;
@@ -309,10 +311,12 @@ impl SubRequest {
         use_snapshot: bool,
         id: Option<u32>,
         symbols: &str,
+        is_last: bool,
     ) -> Self {
         let use_snapshot = use_snapshot as u8;
+        let is_last = is_last as u8;
         let mut args = format!(
-            "schema={schema}|stype_in={stype_in}|symbols={symbols}|snapshot={use_snapshot}"
+            "schema={schema}|stype_in={stype_in}|symbols={symbols}|snapshot={use_snapshot}|is_last={is_last}"
         );
 
         if let Some(start) = start_nanos {

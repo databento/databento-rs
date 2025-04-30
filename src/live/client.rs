@@ -414,7 +414,7 @@ mod tests {
             self.send("success=1|session_id=5\n").await;
         }
 
-        async fn subscribe(&mut self, subscription: Subscription) {
+        async fn subscribe(&mut self, subscription: Subscription, is_last: bool) {
             let sub_line = self.read_line().await;
             assert!(sub_line.contains(&format!("symbols={}", subscription.symbols.to_api_string())));
             assert!(sub_line.contains(&format!("schema={}", subscription.schema)));
@@ -424,6 +424,7 @@ mod tests {
                 assert!(sub_line.contains(&format!("start={}", start.unix_timestamp_nanos())))
             }
             assert!(sub_line.contains(&format!("snapshot={}", subscription.use_snapshot as u8)));
+            assert!(sub_line.contains(&format!("is_last={}", is_last as u8)));
         }
 
         async fn start(&mut self) {
@@ -490,7 +491,7 @@ mod tests {
         Accept,
         Authenticate(Option<Duration>),
         Send(String),
-        Subscribe(Subscription),
+        Subscribe(Subscription, bool),
         Start,
         SendRecord(Box<dyn AsRef<[u8]> + Send>),
         Disconnect,
@@ -503,7 +504,7 @@ mod tests {
                 Event::Accept => write!(f, "Accept"),
                 Event::Authenticate(hb_int) => write!(f, "Authenticate({hb_int:?})"),
                 Event::Send(msg) => write!(f, "Send({msg:?})"),
-                Event::Subscribe(sub) => write!(f, "Subscribe({sub:?})"),
+                Event::Subscribe(sub, is_last) => write!(f, "Subscribe({sub:?}, {is_last:?})"),
                 Event::Start => write!(f, "Start"),
                 Event::SendRecord(_) => write!(f, "SendRecord"),
                 Event::Disconnect => write!(f, "Disconnect"),
@@ -522,7 +523,7 @@ mod tests {
                         Some(Event::Authenticate(hb_int)) => mock.authenticate(hb_int).await,
                         Some(Event::Accept) => mock.accept().await,
                         Some(Event::Send(msg)) => mock.send(&msg).await,
-                        Some(Event::Subscribe(sub)) => mock.subscribe(sub).await,
+                        Some(Event::Subscribe(sub, is_last)) => mock.subscribe(sub, is_last).await,
                         Some(Event::Start) => mock.start().await,
                         Some(Event::SendRecord(rec)) => mock.send_record(rec).await,
                         Some(Event::Disconnect) => mock.close().await,
@@ -545,8 +546,10 @@ mod tests {
                 .unwrap();
         }
 
-        pub fn expect_subscribe(&mut self, subscription: Subscription) {
-            self.send.send(Event::Subscribe(subscription)).unwrap();
+        pub fn expect_subscribe(&mut self, subscription: Subscription, is_last: bool) {
+            self.send
+                .send(Event::Subscribe(subscription, is_last))
+                .unwrap();
         }
 
         pub fn start(&mut self) {
@@ -614,7 +617,7 @@ mod tests {
             .schema(Schema::Ohlcv1M)
             .stype_in(SType::RawSymbol)
             .build();
-        fixture.expect_subscribe(subscription.clone());
+        fixture.expect_subscribe(subscription.clone(), true);
         client.subscribe(subscription).await.unwrap();
         fixture.stop().await;
     }
@@ -629,7 +632,7 @@ mod tests {
             .stype_in(SType::RawSymbol)
             .use_snapshot()
             .build();
-        fixture.expect_subscribe(subscription.clone());
+        fixture.expect_subscribe(subscription.clone(), true);
         client.subscribe(subscription).await.unwrap();
         fixture.stop().await;
     }
@@ -671,7 +674,10 @@ mod tests {
         let mut i = 0;
         while i < SYMBOL_COUNT {
             let chunk_size = 500.min(SYMBOL_COUNT - i);
-            fixture.expect_subscribe(sub_base.clone().symbols(vec![SYMBOL; chunk_size]).build());
+            fixture.expect_subscribe(
+                sub_base.clone().symbols(vec![SYMBOL; chunk_size]).build(),
+                i + chunk_size == SYMBOL_COUNT,
+            );
             i += chunk_size;
         }
         fixture.stop().await;
@@ -824,7 +830,7 @@ mod tests {
             .schema(Schema::Trades)
             .start(OffsetDateTime::UNIX_EPOCH)
             .build();
-        fixture.expect_subscribe(sub.clone());
+        fixture.expect_subscribe(sub.clone(), true);
         client.subscribe(sub.clone()).await.unwrap();
         fixture.start();
         let metadata = client.start().await.unwrap();
@@ -864,7 +870,7 @@ mod tests {
 
         let mut resub = sub.clone();
         resub.start = None;
-        fixture.expect_subscribe(resub);
+        fixture.expect_subscribe(resub, true);
         client.resubscribe().await.unwrap();
         fixture.start();
         client.start().await.unwrap();
