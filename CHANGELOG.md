@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.25.0 - TBD
+
+### Enhancements
+- Increased live subscription symbol chunking size
+- Upgraded DBN version to 0.34.0:
+  - Added a `v3::StatMsg` record with an expanded 64-bit `quantity` field
+  - Added `with_compression_level` methods to `DynWriter`, `AsyncDynWriter`, and
+    `AsyncDynBufWriter`
+  - Added `DBN_VERSION` constants to each version module: `v1`, `v2`, and `v3`
+  - Added `UNDEF_STAT_QUANTITY` constants to each version module
+  - Added statistics compatibility trait `StatRec` for generalizing across different
+    versions of the statistics record
+  - Added `AsRef<[u8]>` implementations for `RecordEnum` and `RecordRefEnum`
+  - Added new off-market publishers for Eurex, and European Energy Exchange (EEX)
+
+### Breaking changes
+- From DBN:
+  - Made `Record` a subtrait of `AsRef<[u8]>` as all records should be convertible to
+    bytes
+
 ## 0.24.0 - 2025-04-22
 
 ### Enhancements

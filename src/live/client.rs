@@ -422,12 +422,7 @@ mod tests {
             if let Some(start) = subscription.start {
                 assert!(sub_line.contains(&format!("start={}", start.unix_timestamp_nanos())))
             }
-
-            if subscription.use_snapshot {
-                assert!(sub_line.contains("snapshot=1"));
-            } else {
-                assert!(sub_line.contains("snapshot=0"));
-            }
+            assert!(sub_line.contains(&format!("snapshot={}", subscription.use_snapshot as u8)));
         }
 
         async fn start(&mut self) {
@@ -665,7 +660,7 @@ mod tests {
     #[tokio::test]
     async fn test_subscription_chunking() {
         const SYMBOL: &str = "TEST";
-        const SYMBOL_COUNT: usize = 1000;
+        const SYMBOL_COUNT: usize = 1001;
         let (mut fixture, mut client) = setup(Dataset::XnasItch, false, None).await;
         let sub_base = Subscription::builder()
             .schema(Schema::Ohlcv1M)
@@ -674,7 +669,7 @@ mod tests {
         client.subscribe(subscription).await.unwrap();
         let mut i = 0;
         while i < SYMBOL_COUNT {
-            let chunk_size = 128.min(SYMBOL_COUNT - i);
+            let chunk_size = 500.min(SYMBOL_COUNT - i);
             fixture.expect_subscribe(sub_base.clone().symbols(vec![SYMBOL; chunk_size]).build());
             i += chunk_size;
         }

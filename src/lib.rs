@@ -74,7 +74,7 @@ impl Symbols {
     /// Splits the symbol into chunks to stay within the message length requirements of
     /// the live gateway.
     pub fn to_chunked_api_string(&self) -> Vec<String> {
-        const CHUNK_SIZE: usize = 128;
+        const CHUNK_SIZE: usize = 500;
         match self {
             Symbols::All => vec![ALL_SYMBOLS.to_owned()],
             Symbols::Ids(ids) => ids
