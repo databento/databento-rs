@@ -159,7 +159,7 @@ impl MetadataClient<'_> {
     }
 
     /// Gets the cost in US dollars for a historical streaming or batch download
-    /// request.
+    /// request. This cost respects any discounts provided by flat rate plans.
     ///
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
