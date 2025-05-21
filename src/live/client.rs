@@ -37,6 +37,7 @@ pub struct Client {
     span: Span,
 }
 
+#[allow(clippy::large_enum_variant)]
 enum Decoder {
     Metadata(AsyncMetadataDecoder<BufReader<ReadHalf<TcpStream>>>),
     Record(AsyncRecordDecoder<BufReader<ReadHalf<TcpStream>>>),

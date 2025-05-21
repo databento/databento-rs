@@ -132,7 +132,7 @@ impl TimeseriesClient<'_> {
             .await?
             .error_for_status()?
             .bytes_stream()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
+            .map_err(std::io::Error::other);
         Ok(tokio_util::io::StreamReader::new(stream))
     }
 
