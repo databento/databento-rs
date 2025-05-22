@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.25.1 - TBD
+
+### Enhancements
+- Added `From<DatasetRange>` conversion for `DateTimeRange`
+
 ## 0.25.0 - TBD
 
 ### Enhancements

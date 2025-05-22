@@ -286,6 +286,12 @@ pub struct DatasetRange {
     pub end: time::OffsetDateTime,
 }
 
+impl From<DatasetRange> for DateTimeRange {
+    fn from(DatasetRange { start, end }: DatasetRange) -> Self {
+        Self { start, end }
+    }
+}
+
 impl<'de> Deserialize<'de> for DatasetRange {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
