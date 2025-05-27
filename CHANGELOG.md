@@ -1,12 +1,39 @@
 # Changelog
 
-## 0.26.0 - TBD
 
-### Enhancements
+## 0.26.0 - 2025-05-28
 
+This version marks the release of DBN version 3 (DBNv3), which is the new default.
+API methods and decoders support decoding all versions of DBN, but now default to
+upgrading data to version 3.
+
+### Enhancements - Added `From<DatasetRange>` conversion for `DateTimeRange`
 - Added `is_last` field to live subscription requests which will be used to improve the
   handling of split subscription requests
-- Added `From<DatasetRange>` conversion for `DateTimeRange`
+- Upgraded DBN version to 0.35.0:
+  - Version 1 and 2 structs can be converted to version 3 structs with the `From` trait
+  - Implemented conversion from `RecordRef` to `IoSlice` for use with
+    `Write::write_vectored`
+
+### Breaking changes
+- Breaking changes from DBN:
+  - Definition schema:
+    - Updated `InstrumentDefMsg` with new `leg_` fields to support multi-leg strategy
+      definitions.
+    - Expanded `asset` to 11 bytes and `ASSET_CSTR_LEN` to match
+    - Expanded `raw_instrument_id` to 64 bits to support more venues. Like other 64-bit
+      integer fields, its value will now be quoted in JSON
+    - Removed `trading_reference_date`, `trading_reference_price`, and
+      `settl_price_type` fields which will be normalized in the statistics schema
+    - Removed `md_security_trading_status` better served by the status schema
+  - Statistics schema:
+    - Updated `StatMsg` has an expanded 64-bit `quantity` field. Like other 64-bit
+      integer fields, its value will now be quoted in JSON
+    - The previous `StatMsg` has been moved to `v2::StatMsg` or `StatMsgV2`
+  - Changed the default `VersionUpgradePolicy` to `UpgradeToV3`
+  - Updated the minimum supported `tokio` version to 1.38, which was released one year ago
+
+## 0.25.0 - 2025-05-13
 
 ### Enhancements
 - Increased live subscription symbol chunking size

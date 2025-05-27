@@ -37,10 +37,9 @@ pub struct Client {
     span: Span,
 }
 
-#[allow(clippy::large_enum_variant)]
 enum Decoder {
-    Metadata(AsyncMetadataDecoder<BufReader<ReadHalf<TcpStream>>>),
-    Record(AsyncRecordDecoder<BufReader<ReadHalf<TcpStream>>>),
+    Metadata(AsyncMetadataDecoder<ReadHalf<TcpStream>>),
+    Record(AsyncRecordDecoder<ReadHalf<TcpStream>>),
     Empty,
 }
 
@@ -108,7 +107,7 @@ impl Client {
             heartbeat_interval,
             protocol,
             peer_addr,
-            decoder: Decoder::Metadata(AsyncMetadataDecoder::new(recver)),
+            decoder: Decoder::Metadata(AsyncMetadataDecoder::new(recver.into_inner())),
             session_id,
             span,
             sub_counter: 0,
@@ -230,12 +229,7 @@ impl Client {
         info!("Starting session");
         self.protocol.start_session().await?;
         let mut metadata = decoder.decode().await?;
-        self.decoder = Decoder::Record(AsyncRecordDecoder::with_version(
-            decoder.into_inner(),
-            metadata.version,
-            self.upgrade_policy,
-            metadata.ts_out,
-        )?);
+        self.decoder = Decoder::Record(AsyncRecordDecoder::from(decoder));
         // Should match `send_ts_out` but set again here for safety
         metadata.upgrade(self.upgrade_policy);
         Ok(metadata)
@@ -300,7 +294,7 @@ impl Client {
                 self.heartbeat_interval.map(|i| i.whole_seconds()),
             )
             .await?;
-        self.decoder = Decoder::Metadata(AsyncMetadataDecoder::new(recver));
+        self.decoder = Decoder::Metadata(AsyncMetadataDecoder::new(recver.into_inner()));
         self.span = info_span!("LiveClient", dataset = %self.dataset, session_id = self.session_id);
         Ok(())
     }
