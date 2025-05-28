@@ -54,7 +54,7 @@ impl TimeseriesClient<'_> {
             )
             .await?;
         let mut decoder: AsyncDbnDecoder<_> = AsyncDbnDecoder::with_zstd_buffer(reader).await?;
-        decoder.set_upgrade_policy(params.upgrade_policy);
+        decoder.set_upgrade_policy(params.upgrade_policy)?;
         Ok(decoder)
     }
 
@@ -87,7 +87,7 @@ impl TimeseriesClient<'_> {
             )
             .await?;
         let mut http_decoder = AsyncDbnDecoder::with_zstd_buffer(reader).await?;
-        http_decoder.set_upgrade_policy(params.upgrade_policy);
+        http_decoder.set_upgrade_policy(params.upgrade_policy)?;
         let file = BufWriter::new(File::create(&params.path).await?);
         let mut encoder = AsyncDbnEncoder::with_zstd(file, http_decoder.metadata()).await?;
         while let Some(rec_ref) = http_decoder.decode_record_ref().await? {
@@ -132,7 +132,7 @@ impl TimeseriesClient<'_> {
             .await?
             .error_for_status()?
             .bytes_stream()
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
+            .map_err(std::io::Error::other);
         Ok(tokio_util::io::StreamReader::new(stream))
     }
 
