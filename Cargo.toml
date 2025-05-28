@@ -1,7 +1,7 @@
 [package]
 name = "databento"
 authors = ["Databento <support@databento.com>"]
-version = "0.25.0"
+version = "0.26.0"
 edition = "2021"
 repository = "https://github.com/databento/databento-rs"
 description = "Official Databento client library"
@@ -44,8 +44,8 @@ typed-builder = "0.21"
 [dev-dependencies]
 anyhow = "1.0.98"
 async-compression = { version = "0.4.23", features = ["tokio", "zstd"] }
-clap = { version = "4.5.39", features = ["derive"] }
-tempfile = "3.20.0"
-tokio = { version = "1.45", features = ["full"] }
+clap = { version = "4.5.37", features = ["derive"] }
+tempfile = "3.19.1"
+tokio = { version = "1.44", features = ["full"] }
 tracing-subscriber = "0.3.19"
 wiremock = "0.6"
