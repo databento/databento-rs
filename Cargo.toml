@@ -19,11 +19,21 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = ["historical", "live"]
-historical = ["dep:futures", "dep:reqwest", "dep:serde", "dep:tokio-util", "dep:serde_json", "tokio/fs"]
+historical = [
+  "dep:async-compression",
+  "dep:futures",
+  "dep:reqwest",
+  "dep:serde",
+  "dep:tokio-util",
+  "dep:serde_json",
+  "tokio/fs"
+]
 live = ["dep:hex", "dep:sha2", "tokio/net"]
 
 [dependencies]
 dbn = { version = "0.35.1", features = ["async", "serde"] }
+
+async-compression = { version = "0.4", features = ["tokio", "zstd"], optional = true }
 # Async stream trait
 futures = { version = "0.3", optional = true }
 # Used for Live authentication
@@ -43,8 +53,9 @@ typed-builder = "0.21"
 
 [dev-dependencies]
 anyhow = "1.0.98"
-async-compression = { version = "0.4.23", features = ["tokio", "zstd"] }
+async-compression = { version = "0.4", features = ["tokio", "zstd"] }
 clap = { version = "4.5.37", features = ["derive"] }
+rstest = "0.25.0"
 tempfile = "3.19.1"
 tokio = { version = "1.44", features = ["full"] }
 tracing-subscriber = "0.3.19"
