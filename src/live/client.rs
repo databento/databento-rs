@@ -107,7 +107,10 @@ impl Client {
             heartbeat_interval,
             protocol,
             peer_addr,
-            decoder: Decoder::Metadata(AsyncMetadataDecoder::new(recver.into_inner())),
+            decoder: Decoder::Metadata(AsyncMetadataDecoder::with_upgrade_policy(
+                recver.into_inner(),
+                upgrade_policy,
+            )),
             session_id,
             span,
             sub_counter: 0,
@@ -228,10 +231,8 @@ impl Client {
         };
         info!("Starting session");
         self.protocol.start_session().await?;
-        let mut metadata = decoder.decode().await?;
+        let metadata = decoder.decode().await?;
         self.decoder = Decoder::Record(AsyncRecordDecoder::from(decoder));
-        // Should match `send_ts_out` but set again here for safety
-        metadata.upgrade(self.upgrade_policy);
         Ok(metadata)
     }
 
@@ -294,7 +295,10 @@ impl Client {
                 self.heartbeat_interval.map(|i| i.whole_seconds()),
             )
             .await?;
-        self.decoder = Decoder::Metadata(AsyncMetadataDecoder::new(recver.into_inner()));
+        self.decoder = Decoder::Metadata(AsyncMetadataDecoder::with_upgrade_policy(
+            recver.into_inner(),
+            self.upgrade_policy,
+        ));
         self.span = info_span!("LiveClient", dataset = %self.dataset, session_id = self.session_id);
         Ok(())
     }

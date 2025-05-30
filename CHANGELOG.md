@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.26.1 - 2025-05-30
+
+### Bug fixes
+- Fixed handling of `VersionUpgradePolicy` in live client
+- Fixed default upgrade policies to `UpgradeToV3` to match announcement for
+  version 0.26.0
 
 ## 0.26.0 - 2025-05-28
 
