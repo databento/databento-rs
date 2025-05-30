@@ -67,7 +67,7 @@ impl Default for ClientBuilder<Unset, Unset> {
             key: Unset,
             dataset: Unset,
             send_ts_out: false,
-            upgrade_policy: VersionUpgradePolicy::UpgradeToV2,
+            upgrade_policy: VersionUpgradePolicy::default(),
             heartbeat_interval: None,
         }
     }

@@ -169,7 +169,7 @@ pub struct GetRangeParams {
     #[builder(default)]
     pub limit: Option<NonZeroU64>,
     /// How to decode DBN from prior versions. Defaults to upgrade.
-    #[builder(default = VersionUpgradePolicy::UpgradeToV2)]
+    #[builder(default)]
     pub upgrade_policy: VersionUpgradePolicy,
 }
 
@@ -201,7 +201,7 @@ pub struct GetRangeToFileParams {
     #[builder(default)]
     pub limit: Option<NonZeroU64>,
     /// How to decode DBN from prior versions. Defaults to upgrade.
-    #[builder(default = VersionUpgradePolicy::UpgradeToV2)]
+    #[builder(default)]
     pub upgrade_policy: VersionUpgradePolicy,
     /// The file path to persist the stream data to.
     #[builder(default, setter(transform = |p: impl Into<PathBuf>| p.into()))]
