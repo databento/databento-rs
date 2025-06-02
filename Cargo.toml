@@ -23,7 +23,7 @@ historical = ["dep:futures", "dep:reqwest", "dep:serde", "dep:tokio-util", "dep:
 live = ["dep:hex", "dep:sha2", "tokio/net"]
 
 [dependencies]
-dbn = { version = "0.35.0", features = ["async", "serde"] }
+dbn = { version = "0.35.1", features = ["async", "serde"] }
 # Async stream trait
 futures = { version = "0.3", optional = true }
 # Used for Live authentication

@@ -1,7 +1,7 @@
 use std::{fmt, net::SocketAddr};
 
 use dbn::{
-    decode::dbn::{AsyncMetadataDecoder, AsyncRecordDecoder},
+    decode::dbn::{async_decode_metadata_with_fsm, async_decode_record_ref_with_fsm, fsm::DbnFsm},
     Metadata, RecordRef, VersionUpgradePolicy,
 };
 use time::Duration;
@@ -32,15 +32,10 @@ pub struct Client {
     peer_addr: SocketAddr,
     sub_counter: u32,
     subscriptions: Vec<Subscription>,
-    decoder: Decoder,
+    reader: ReadHalf<TcpStream>,
+    fsm: DbnFsm,
     session_id: String,
     span: Span,
-}
-
-enum Decoder {
-    Metadata(AsyncMetadataDecoder<ReadHalf<TcpStream>>),
-    Record(AsyncRecordDecoder<ReadHalf<TcpStream>>),
-    Empty,
 }
 
 impl Client {
@@ -107,10 +102,12 @@ impl Client {
             heartbeat_interval,
             protocol,
             peer_addr,
-            decoder: Decoder::Metadata(AsyncMetadataDecoder::with_upgrade_policy(
-                recver.into_inner(),
-                upgrade_policy,
-            )),
+            reader: recver.into_inner(),
+            fsm: DbnFsm::builder()
+                .upgrade_policy(upgrade_policy)
+                .build()
+                // Not setting input version so it's infallible
+                .unwrap(),
             session_id,
             span,
             sub_counter: 0,
@@ -220,20 +217,15 @@ impl Client {
     /// closing the connection.
     #[instrument(parent = &self.span, skip_all)]
     pub async fn start(&mut self) -> crate::Result<Metadata> {
-        let decoder @ Decoder::Metadata(_) = &mut self.decoder else {
+        if self.fsm.has_decoded_metadata() {
             return Err(crate::Error::BadArgument {
                 param_name: "self".to_owned(),
                 desc: "ignored request to start session that has already been started".to_owned(),
             });
         };
-        let Decoder::Metadata(mut decoder) = std::mem::replace(decoder, Decoder::Empty) else {
-            unreachable!("previously checked decoder type");
-        };
         info!("Starting session");
         self.protocol.start_session().await?;
-        let metadata = decoder.decode().await?;
-        self.decoder = Decoder::Record(AsyncRecordDecoder::from(decoder));
-        Ok(metadata)
+        Ok(async_decode_metadata_with_fsm(&mut self.reader, &mut self.fsm).await?)
     }
 
     /// Fetches the next record. This method should only be called after the session has
@@ -252,13 +244,13 @@ impl Client {
     /// without the potential for corrupting the input stream.
     #[instrument(parent = &self.span, level = "debug", skip_all)]
     pub async fn next_record(&mut self) -> crate::Result<Option<RecordRef>> {
-        let Decoder::Record(decoder) = &mut self.decoder else {
+        if !self.fsm.has_decoded_metadata() {
             return Err(crate::Error::BadArgument {
                 param_name: "self".to_owned(),
                 desc: "Can't call LiveClient::next_record before starting session".to_owned(),
             });
         };
-        Ok(decoder.decode_ref().await?)
+        Ok(async_decode_record_ref_with_fsm(&mut self.reader, &mut self.fsm).await?)
     }
 
     /// Closes the current connection, then reopens the connection and authenticates
@@ -295,10 +287,8 @@ impl Client {
                 self.heartbeat_interval.map(|i| i.whole_seconds()),
             )
             .await?;
-        self.decoder = Decoder::Metadata(AsyncMetadataDecoder::with_upgrade_policy(
-            recver.into_inner(),
-            self.upgrade_policy,
-        ));
+        self.reader = recver.into_inner();
+        self.fsm.reset();
         self.span = info_span!("LiveClient", dataset = %self.dataset, session_id = self.session_id);
         Ok(())
     }

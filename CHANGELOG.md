@@ -2,6 +2,9 @@
 
 ## 0.26.1 - 2025-05-30
 
+### Enhancements
+- Improved performance of live client by removing redundant state
+
 ### Bug fixes
 - Fixed handling of `VersionUpgradePolicy` in live client
 - Fixed default upgrade policies to `UpgradeToV3` to match announcement for
