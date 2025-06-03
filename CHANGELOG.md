@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.26.2 - TBD
+## 0.26.2 - 2025-06-03
 
 ### Enhancements
 - Improved performance of live client by removing redundant state
