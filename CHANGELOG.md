@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.26.2 - 2025-06-03
+
+### Enhancements
+- Improved performance of live client by removing redundant state
+- Upgraded DBN version to 0.35.1
+
+### Bug fixes
+- Fixed handling of `VersionUpgradePolicy` in `timeseries().get_range()` and
+  `get_range_to_file()`
+- Bug fixes from DBN:
+  - Fixed behavior where encoding metadata could lower the `version`
+  - Changed `DbnFsm::data()` to exclude all processed data
+  - Fixed `Metadata::upgrade()` behavior with `UpgradeToV2`
+
 ## 0.26.1 - 2025-05-30
 
 ### Bug fixes

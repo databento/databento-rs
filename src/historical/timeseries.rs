@@ -7,7 +7,7 @@ use futures::{Stream, TryStreamExt};
 use reqwest::{header::ACCEPT, RequestBuilder};
 use tokio::{
     fs::File,
-    io::{AsyncReadExt, AsyncWriteExt, BufWriter},
+    io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter},
 };
 use tokio_util::{bytes::Bytes, io::StreamReader};
 use typed_builder::TypedBuilder;
@@ -53,9 +53,10 @@ impl TimeseriesClient<'_> {
                 params.limit,
             )
             .await?;
-        let mut decoder: AsyncDbnDecoder<_> = AsyncDbnDecoder::with_zstd_buffer(reader).await?;
-        decoder.set_upgrade_policy(params.upgrade_policy)?;
-        Ok(decoder)
+        Ok(
+            AsyncDbnDecoder::with_upgrade_policy(zstd_decoder(reader), params.upgrade_policy)
+                .await?,
+        )
     }
 
     /// Makes a streaming request for timeseries data from Databento.
@@ -86,15 +87,21 @@ impl TimeseriesClient<'_> {
                 params.limit,
             )
             .await?;
-        let mut http_decoder = AsyncDbnDecoder::with_zstd_buffer(reader).await?;
-        http_decoder.set_upgrade_policy(params.upgrade_policy)?;
+        let mut http_decoder =
+            AsyncDbnDecoder::with_upgrade_policy(zstd_decoder(reader), params.upgrade_policy)
+                .await?;
         let file = BufWriter::new(File::create(&params.path).await?);
         let mut encoder = AsyncDbnEncoder::with_zstd(file, http_decoder.metadata()).await?;
         while let Some(rec_ref) = http_decoder.decode_record_ref().await? {
             encoder.encode_record_ref(rec_ref).await?;
         }
         encoder.get_mut().shutdown().await?;
-        Ok(AsyncDbnDecoder::from_zstd_file(&params.path).await?)
+        Ok(AsyncDbnDecoder::with_upgrade_policy(
+            zstd_decoder(BufReader::new(File::open(&params.path).await?)),
+            // Applied upgrade policy during initial decoding
+            VersionUpgradePolicy::AsIs,
+        )
+        .await?)
     }
 
     #[allow(clippy::too_many_arguments)] // private method
@@ -241,10 +248,21 @@ impl GetRangeParams {
     }
 }
 
+fn zstd_decoder<R>(reader: R) -> async_compression::tokio::bufread::ZstdDecoder<R>
+where
+    R: tokio::io::AsyncBufReadExt + Unpin,
+{
+    let mut zstd_decoder = async_compression::tokio::bufread::ZstdDecoder::new(reader);
+    // explicitly enable decoding multiple frames
+    zstd_decoder.multiple_members(true);
+    zstd_decoder
+}
+
 #[cfg(test)]
 mod tests {
     use dbn::{record::TradeMsg, Dataset};
     use reqwest::StatusCode;
+    use rstest::*;
     use time::macros::datetime;
     use wiremock::{
         matchers::{basic_auth, method, path},
@@ -260,8 +278,12 @@ mod tests {
 
     const API_KEY: &str = "test-API";
 
+    #[rstest]
+    #[case(VersionUpgradePolicy::AsIs, 1)]
+    #[case(VersionUpgradePolicy::UpgradeToV2, 2)]
+    #[case(VersionUpgradePolicy::UpgradeToV3, 3)]
     #[tokio::test]
-    async fn test_get_range() {
+    async fn test_get_range(#[case] upgrade_policy: VersionUpgradePolicy, #[case] exp_version: u8) {
         const START: time::OffsetDateTime = datetime!(2023 - 06 - 14 00:00 UTC);
         const END: time::OffsetDateTime = datetime!(2023 - 06 - 17 00:00 UTC);
         const SCHEMA: Schema = Schema::Trades;
@@ -299,19 +321,29 @@ mod tests {
                     .schema(SCHEMA)
                     .symbols(vec!["SPOT", "AAPL"])
                     .date_time_range((START, END))
+                    .upgrade_policy(upgrade_policy)
                     .build(),
             )
             .await
             .unwrap();
-        assert_eq!(decoder.metadata().schema.unwrap(), SCHEMA);
+        let metadata = decoder.metadata();
+        assert_eq!(metadata.schema.unwrap(), SCHEMA);
+        assert_eq!(metadata.version, exp_version);
         // Two records
         decoder.decode_record::<TradeMsg>().await.unwrap().unwrap();
         decoder.decode_record::<TradeMsg>().await.unwrap().unwrap();
         assert!(decoder.decode_record::<TradeMsg>().await.unwrap().is_none());
     }
 
+    #[rstest]
+    #[case(VersionUpgradePolicy::AsIs, 1)]
+    #[case(VersionUpgradePolicy::UpgradeToV2, 2)]
+    #[case(VersionUpgradePolicy::UpgradeToV3, 3)]
     #[tokio::test]
-    async fn test_get_range_to_file() {
+    async fn test_get_range_to_file(
+        #[case] upgrade_policy: VersionUpgradePolicy,
+        #[case] exp_version: u8,
+    ) {
         const START: time::OffsetDateTime = datetime!(2024 - 05 - 17 00:00 UTC);
         const END: time::OffsetDateTime = datetime!(2024 - 05 - 18 00:00 UTC);
         const SCHEMA: Schema = Schema::Trades;
@@ -354,11 +386,14 @@ mod tests {
                     .stype_in(SType::Parent)
                     .date_time_range((START, END))
                     .path(path.clone())
+                    .upgrade_policy(upgrade_policy)
                     .build(),
             )
             .await
             .unwrap();
-        assert_eq!(decoder.metadata().schema.unwrap(), SCHEMA);
+        let metadata = decoder.metadata();
+        assert_eq!(metadata.schema.unwrap(), SCHEMA);
+        assert_eq!(metadata.version, exp_version);
         // Two records
         decoder.decode_record::<TradeMsg>().await.unwrap().unwrap();
         decoder.decode_record::<TradeMsg>().await.unwrap().unwrap();
