@@ -3,12 +3,19 @@
 ## 0.27.0 - TBD
 
 ### Enhancements
+- Made the buffer size used by the live client when reading from the TCP socket
+  configurable through the `LiveBuilder::buffer_size()` method
 - Added support for using `rustls` without pulling in OpenSSL. `reqwest` with OpenSSL is
   still the default
 
 ### Breaking changes
 - Changed type of `split_duration` to `Option<SplitDuration>` to support setting no
   split duration
+
+### Deprecations
+- Deprecated `LiveClient::connect` and `LiveClient::connect_with_addr` methods in favor
+  of using the builder so additional optional parameters can be added without a breaking
+  change
 
 ### Bug fixes
 - Fixed bug with deserializing `null` `split_duration` in historical

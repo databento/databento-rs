@@ -58,6 +58,7 @@ pub struct ClientBuilder<AK, D> {
     send_ts_out: bool,
     upgrade_policy: VersionUpgradePolicy,
     heartbeat_interval: Option<Duration>,
+    buf_size: Option<usize>,
 }
 
 impl Default for ClientBuilder<Unset, Unset> {
@@ -69,6 +70,7 @@ impl Default for ClientBuilder<Unset, Unset> {
             send_ts_out: false,
             upgrade_policy: VersionUpgradePolicy::default(),
             heartbeat_interval: None,
+            buf_size: None,
         }
     }
 }
@@ -103,6 +105,13 @@ impl<AK, D> ClientBuilder<AK, D> {
             )
         }
         self.heartbeat_interval = Some(heartbeat_interval);
+        self
+    }
+
+    /// Sets the initial size of the internal buffer used for reading data from the
+    /// TCP socket.
+    pub fn buffer_size(mut self, size: usize) -> Self {
+        self.buf_size = Some(size);
         self
     }
 
@@ -142,6 +151,7 @@ impl<D> ClientBuilder<Unset, D> {
             send_ts_out: self.send_ts_out,
             upgrade_policy: self.upgrade_policy,
             heartbeat_interval: self.heartbeat_interval,
+            buf_size: self.buf_size,
         })
     }
 
@@ -167,6 +177,7 @@ impl<AK> ClientBuilder<AK, Unset> {
             send_ts_out: self.send_ts_out,
             upgrade_policy: self.upgrade_policy,
             heartbeat_interval: self.heartbeat_interval,
+            buf_size: self.buf_size,
         }
     }
 }
@@ -179,22 +190,24 @@ impl ClientBuilder<ApiKey, String> {
     /// to connect and authenticate with the Live gateway.
     pub async fn build(self) -> crate::Result<Client> {
         if let Some(addr) = self.addr {
-            Client::connect_with_addr(
+            Client::connect_with_addr_impl(
                 addr.as_slice(),
                 self.key.0,
                 self.dataset,
                 self.send_ts_out,
                 self.upgrade_policy,
                 self.heartbeat_interval,
+                self.buf_size,
             )
             .await
         } else {
-            Client::connect(
+            Client::connect_impl(
                 self.key.0,
                 self.dataset,
                 self.send_ts_out,
                 self.upgrade_policy,
                 self.heartbeat_interval,
+                self.buf_size,
             )
             .await
         }
