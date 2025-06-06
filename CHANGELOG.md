@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.26.3 - TBD
+
+### Bug fixes
+- Fixed bug with deserializing `null` `split_duration` in historical
+  `batch().list_jobs()`
+
+### Bug fixes
+- Fixed bug with deserializing `null` `split_duration` in historical
+  `batch().list_jobs()`
+
 ## 0.26.2 - 2025-06-03
 
 ### Enhancements
