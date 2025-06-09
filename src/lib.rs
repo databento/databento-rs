@@ -1,18 +1,5 @@
-//! The official [Databento](https://databento.com) client library.
-//! It provides clients for fast, safe streaming of both real-time and historical market data through
-//! similar interfaces.
-//! The library is built on top of the tokio asynchronous runtime and
-//! [Databento's efficient binary encoding](https://databento.com/docs/standards-and-conventions/databento-binary-encoding).
-//!
-//! You can find getting started tutorials, full API method documentation, examples
-//! with output on the [Databento docs site](https://databento.com/docs/?historical=rust&live=rust).
-//!
-//! # Feature flags
-//! By default both features are enabled.
-//! - `historical`: enables the [historical client](HistoricalClient) for data older than 24 hours
-//! - `live`: enables the [live client](LiveClient) for real-time and intraday
-//!   historical data
-
+// Use README as crate-level documentation
+#![doc = include_str!("../README.md")]
 // Experimental feature to allow docs.rs to display features
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![deny(missing_docs)]

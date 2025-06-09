@@ -1,10 +1,14 @@
 # Changelog
 
-## 0.26.3 - TBD
+## 0.27.0 - TBD
 
-### Bug fixes
-- Fixed bug with deserializing `null` `split_duration` in historical
-  `batch().list_jobs()`
+### Enhancements
+- Added support for using `rustls` without pulling in OpenSSL. `reqwest` with OpenSSL is
+  still the default
+
+### Breaking changes
+- Changed type of `split_duration` to `Option<SplitDuration>` to support setting no
+  split duration
 
 ### Bug fixes
 - Fixed bug with deserializing `null` `split_duration` in historical
