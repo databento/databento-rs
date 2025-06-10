@@ -82,12 +82,15 @@ impl TryFrom<Metadata> for ResolveParams {
     type Error = crate::Error;
 
     fn try_from(metadata: Metadata) -> Result<Self, Self::Error> {
-        let stype_in = metadata
-            .stype_in
-            .ok_or_else(|| crate::Error::bad_arg("metadata", "stype_in must be Some value"))?;
-        let end = metadata
-            .end()
-            .ok_or_else(|| crate::Error::bad_arg("metadata", "end must be Some value"))?;
+        let stype_in = metadata.stype_in.ok_or_else(|| {
+            crate::Error::bad_arg(
+                "metadata",
+                "stype_in must be Some value for resolution request",
+            )
+        })?;
+        let end = metadata.end().ok_or_else(|| {
+            crate::Error::bad_arg("metadata", "end must be Some value for resolution request")
+        })?;
         let dt_range = DateTimeRange::from((metadata.start(), end));
         Ok(Self {
             dataset: metadata.dataset,

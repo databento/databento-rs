@@ -46,6 +46,7 @@ impl Client {
     /// and authenticate with the Live gateway.
     /// This function returns an error when `key` or `heartbeat_interval` are invalid,
     /// or it's unable to connect and authenticate with the Live gateway.
+    #[deprecated(since = "0.27.0", note = "Use the builder instead")]
     pub async fn connect(
         key: String,
         dataset: String,
@@ -53,13 +54,33 @@ impl Client {
         upgrade_policy: VersionUpgradePolicy,
         heartbeat_interval: Option<Duration>,
     ) -> crate::Result<Self> {
-        Self::connect_with_addr(
+        Self::connect_impl(
+            key,
+            dataset,
+            send_ts_out,
+            upgrade_policy,
+            heartbeat_interval,
+            None,
+        )
+        .await
+    }
+
+    pub(crate) async fn connect_impl(
+        key: String,
+        dataset: String,
+        send_ts_out: bool,
+        upgrade_policy: VersionUpgradePolicy,
+        heartbeat_interval: Option<Duration>,
+        buf_size: Option<usize>,
+    ) -> crate::Result<Self> {
+        Self::connect_with_addr_impl(
             protocol::determine_gateway(&dataset),
             key,
             dataset,
             send_ts_out,
             upgrade_policy,
             heartbeat_interval,
+            buf_size,
         )
         .await
     }
@@ -70,6 +91,7 @@ impl Client {
     /// # Errors
     /// This function returns an error when `key` or `heartbeat_interval` are invalid,
     /// or it's unable to connect and authenticate with the Live gateway.
+    #[deprecated(since = "0.27.0", note = "Use the builder instead")]
     pub async fn connect_with_addr(
         addr: impl ToSocketAddrs,
         key: String,
@@ -77,6 +99,27 @@ impl Client {
         send_ts_out: bool,
         upgrade_policy: VersionUpgradePolicy,
         heartbeat_interval: Option<Duration>,
+    ) -> crate::Result<Self> {
+        Self::connect_with_addr_impl(
+            addr,
+            key,
+            dataset,
+            send_ts_out,
+            upgrade_policy,
+            heartbeat_interval,
+            None,
+        )
+        .await
+    }
+
+    pub(crate) async fn connect_with_addr_impl(
+        addr: impl ToSocketAddrs,
+        key: String,
+        dataset: String,
+        send_ts_out: bool,
+        upgrade_policy: VersionUpgradePolicy,
+        heartbeat_interval: Option<Duration>,
+        buf_size: Option<usize>,
     ) -> crate::Result<Self> {
         let key = ApiKey::new(key)?;
         let stream = TcpStream::connect(&addr).await?;
@@ -105,6 +148,7 @@ impl Client {
             reader: recver.into_inner(),
             fsm: DbnFsm::builder()
                 .upgrade_policy(upgrade_policy)
+                .buffer_size(buf_size.unwrap_or(DbnFsm::DEFAULT_BUF_SIZE))
                 .build()
                 // Not setting input version so it's infallible
                 .unwrap(),

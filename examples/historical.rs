@@ -2,9 +2,9 @@
 use std::error::Error;
 
 use databento::{
-    dbn::{Schema, TradeMsg},
+    dbn::{decode::DbnMetadata, Dataset, SType, Schema, TradeMsg},
     historical::timeseries::GetRangeParams,
-    HistoricalClient, Symbols,
+    HistoricalClient,
 };
 use time::macros::{date, datetime};
 
@@ -15,12 +15,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .timeseries()
         .get_range(
             &GetRangeParams::builder()
-                .dataset("GLBX.MDP3")
+                .dataset(Dataset::GlbxMdp3)
                 .date_time_range((
                     datetime!(2022-06-10 14:30 UTC),
                     datetime!(2022-06-10 14:40 UTC),
                 ))
-                .symbols(Symbols::All)
+                .symbols("ES.FUT")
+                .stype_in(SType::Parent)
                 .schema(Schema::Trades)
                 .build(),
         )

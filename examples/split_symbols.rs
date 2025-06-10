@@ -6,8 +6,9 @@ use anyhow::Context;
 use async_compression::tokio::write::ZstdEncoder;
 use databento::{
     dbn::{
-        decode::AsyncDbnDecoder, encode::AsyncDbnEncoder, InstrumentDefMsg, Metadata, Schema,
-        SymbolIndex,
+        decode::{AsyncDbnDecoder, DbnMetadata},
+        encode::{AsyncDbnEncoder, AsyncEncodeRecord, AsyncEncodeRecordRef},
+        InstrumentDefMsg, Metadata, Schema, SymbolIndex,
     },
     historical::timeseries::GetRangeParams,
     HistoricalClient,
@@ -55,7 +56,7 @@ async fn main() -> anyhow::Result<()> {
             encoders.insert(parent.clone(), encoder);
         };
     }
-    for (parent, encoder) in encoders {
+    for (parent, mut encoder) in encoders {
         if let Err(e) = encoder.shutdown().await {
             eprintln!("Failed to shutdown encoder for {parent}: {e:?}");
         }

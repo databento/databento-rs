@@ -51,7 +51,6 @@ impl BatchClient<'_> {
             ("pretty_ts", params.pretty_ts.to_string()),
             ("map_symbols", params.map_symbols.to_string()),
             ("split_symbols", params.split_symbols.to_string()),
-            ("split_duration", params.split_duration.to_string()),
             ("delivery", params.delivery.to_string()),
             ("stype_in", params.stype_in.to_string()),
             ("stype_out", params.stype_out.to_string()),
@@ -63,6 +62,9 @@ impl BatchClient<'_> {
         }
         if let Some(limit) = params.limit {
             form.push(("limit", limit.to_string()));
+        }
+        if let Some(split_duration) = params.split_duration {
+            form.push(("split_duration", split_duration.to_string()));
         }
         let builder = self.post("submit_job")?.form(&form);
         let resp = builder.send().await?;
@@ -270,10 +272,11 @@ pub struct SubmitJobParams {
     /// If `true`, files will be split by raw symbol. Cannot be requested with [`Symbols::All`].
     #[builder(default)]
     pub split_symbols: bool,
-    /// The maximum time duration before batched data is split into multiple files.
-    /// Defaults to [`Day`](SplitDuration::Day).
-    #[builder(default)]
-    pub split_duration: SplitDuration,
+    /// The maximum time duration before batched data is split into multiple
+    /// files. If `None` the data will not be split by time. Defaults to
+    /// [`Day`](SplitDuration::Day).
+    #[builder(default = Some(SplitDuration::default()))]
+    pub split_duration: Option<SplitDuration>,
     /// The optional maximum size (in bytes) of each batched data file before being split.
     /// Must be an integer between 1e9 and 10e9 inclusive (1GB - 10GB). Defaults to `None`.
     #[builder(default, setter(strip_option))]
@@ -339,7 +342,7 @@ pub struct BatchJob {
     pub split_symbols: bool,
     /// The maximum time interval for an individual file before splitting into multiple
     /// files.
-    pub split_duration: SplitDuration,
+    pub split_duration: Option<SplitDuration>,
     /// The maximum size for an individual file before splitting into multiple files.
     pub split_size: Option<NonZeroU64>,
     /// The delivery mechanism of the batch data.
@@ -689,6 +692,41 @@ mod tests {
                      "ts_process_start": "2023-07-19 23:01:04.000000+00:00",
                      "ts_process_done": null,
                      "ts_expiration": null
+                },
+                {
+                    "id": "XNAS-20250602-5KM3HL5BUW",
+                    "user_id": "AA89XSlBV",
+                    "bill_id": null,
+                    "cost_usd": 0.0,
+                    "dataset": "XNAS.ITCH",
+                    "symbols": "MSFT",
+                    "stype_in": "raw_symbol",
+                    "stype_out": "instrument_id",
+                    "schema": "trades",
+                    "start": "2022-06-10T12:30:00.000000000Z",
+                    "end": "2022-06-10T14:00:00.000000000Z",
+                    "limit": 1000,
+                    "encoding": "csv",
+                    "compression": null,
+                    "pretty_px": false,
+                    "pretty_ts": false,
+                    "map_symbols": true,
+                    "split_symbols": false,
+                    "split_duration": null,
+                    "split_size": null,
+                    "packaging": null,
+                    "delivery": "download",
+                    "record_count": 1000,
+                    "billed_size": 48000,
+                    "actual_size": 94000,
+                    "package_size": 97690,
+                    "state": "done",
+                    "ts_received": "2025-06-02T15:51:19.251582000Z",
+                    "ts_queued": "2025-06-02T15:51:20.997673000Z",
+                    "ts_process_start": "2025-06-02T15:51:45.312317000Z",
+                    "ts_process_done": "2025-06-02T15:51:46.324860000Z",
+                    "ts_expiration": "2025-07-02T16:00:00.000000000Z",
+                    "progress": 100
                 }])),
             )
             .mount(&mock_server)
@@ -699,8 +737,8 @@ mod tests {
             HistoricalGateway::Bo1,
         )?;
         let job_descs = target.batch().list_jobs(&ListJobsParams::default()).await?;
-        assert_eq!(job_descs.len(), 1);
-        let job_desc = &job_descs[0];
+        assert_eq!(job_descs.len(), 2);
+        let mut job_desc = &job_descs[0];
         assert_eq!(
             job_desc.ts_queued.unwrap(),
             datetime!(2023-07-19 23:00:08.095538123 UTC)
@@ -713,6 +751,26 @@ mod tests {
         assert!(job_desc.pretty_px);
         assert!(!job_desc.pretty_ts);
         assert!(job_desc.map_symbols);
+        assert_eq!(job_desc.split_duration, Some(SplitDuration::Day));
+
+        job_desc = &job_descs[1];
+        assert_eq!(
+            job_desc.ts_queued.unwrap(),
+            datetime!(2025-06-02 15:51:20.997673000 UTC)
+        );
+        assert_eq!(
+            job_desc.ts_process_start.unwrap(),
+            datetime!(2025-06-02 15:51:45.312317000 UTC)
+        );
+        assert_eq!(job_desc.start, datetime!(2022-06-10 12:30:00.000000000 UTC));
+        assert_eq!(job_desc.end, datetime!(2022-06-10 14:00:00.000000000 UTC));
+        assert_eq!(job_desc.encoding, Encoding::Csv);
+        assert!(!job_desc.pretty_px);
+        assert!(!job_desc.pretty_ts);
+        assert!(job_desc.map_symbols);
+        assert!(!job_desc.split_symbols);
+        assert_eq!(job_desc.split_duration, None);
+
         Ok(())
     }
 

@@ -9,6 +9,11 @@
 The official Rust client library for [Databento](https://databento.com).
 The clients support fast and safe streaming of both real-time and historical market data
 through similar interfaces.
+The library is built on top of the tokio asynchronous runtime and
+[Databento's efficient binary encoding](https://databento.com/docs/standards-and-conventions/databento-binary-encoding).
+
+You can find getting started tutorials, full API method documentation, examples with output on the
+[Databento docs site](https://databento.com/docs/?historical=rust&live=rust).
 
 ## Installation
 
@@ -17,14 +22,70 @@ To add the crate to an existing project, run the following command:
 cargo add databento
 ```
 
+### Feature flags
+
+- `historical`: enables the historical client for data older than 24 hours
+- `live`: enables the live client for real-time and intraday historical data
+
+By default both features are enabled and the historical client uses OpenSSL for TLS.
+To use `rustls`, disable default features for both the databento crate and [reqwest](https://github.com/seanmonstar/reqwest).
+```toml
+databento = { features = ["historical"], default-features = false }
+reqwest = { features = ["rustls-tls"], default-features = false }
+```
+
 ## Usage
+
+### Historical
+
+Here is a simple program that fetches 10 minutes worth of historical trades for E-mini S&P 500 futures from CME Globex:
+```rust no_run
+use std::error::Error;
+
+use databento::{
+    dbn::{decode::DbnMetadata, Dataset, SType, Schema, TradeMsg},
+    historical::timeseries::GetRangeParams,
+    HistoricalClient,
+};
+use time::macros::{date, datetime};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    let mut client = HistoricalClient::builder().key_from_env()?.build()?;
+    let mut decoder = client
+        .timeseries()
+        .get_range(
+            &GetRangeParams::builder()
+                .dataset(Dataset::GlbxMdp3)
+                .date_time_range((
+                    datetime!(2022-06-10 14:30 UTC),
+                    datetime!(2022-06-10 14:40 UTC),
+                ))
+                .symbols("ES.FUT")
+                .stype_in(SType::Parent)
+                .schema(Schema::Trades)
+                .build(),
+        )
+        .await?;
+    let symbol_map = decoder
+        .metadata()
+        .symbol_map_for_date(date!(2022 - 06 - 10))?;
+    while let Some(trade) = decoder.decode_record::<TradeMsg>().await? {
+        let symbol = &symbol_map[trade];
+        println!("Received trade for {symbol}: {trade:?}");
+    }
+    Ok(())
+}
+```
+
+To run this program, set the `DATABENTO_API_KEY` environment variable with an API key and run `cargo bin --example historical`.
 
 ### Live
 
 Real-time and intraday replay is provided through the Live clients.
-Here is a simple program that fetches the next ES mini futures trade:
+Here is a simple program that fetches the next E-mini S&P 500 futures trade:
 
-```rust
+```rust no_run
 use std::error::Error;
 
 use databento::{
@@ -65,54 +126,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 ```
-To run this program, set the `DATABENTO_API_KEY` environment variable with an API key and run `cargo run --example historical`
 
-### Historical
-
-Here is a simple program that fetches 10 minutes worth of historical trades for the entire CME Globex market:
-```rust
-use std::error::Error;
-
-use databento::{
-    dbn::{Schema, TradeMsg},
-    historical::timeseries::GetRangeParams,
-    HistoricalClient, Symbols,
-};
-use time::macros::{date, datetime};
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    let mut client = HistoricalClient::builder().key_from_env()?.build()?;
-    let mut decoder = client
-        .timeseries()
-        .get_range(
-            &GetRangeParams::builder()
-                .dataset("GLBX.MDP3")
-                .date_time_range((
-                    datetime!(2022-06-10 14:30 UTC),
-                    datetime!(2022-06-10 14:40 UTC),
-                ))
-                .symbols(Symbols::All)
-                .schema(Schema::Trades)
-                .build(),
-        )
-        .await?;
-    let symbol_map = decoder
-        .metadata()
-        .symbol_map_for_date(date!(2022 - 06 - 10))?;
-    while let Some(trade) = decoder.decode_record::<TradeMsg>().await? {
-        let symbol = &symbol_map[trade];
-        println!("Received trade for {symbol}: {trade:?}");
-    }
-    Ok(())
-}
-```
-
-To run this program, set the `DATABENTO_API_KEY` environment variable with an API key and run `cargo bin --example live`.
-
-## Documentation
-
-You can find more detailed examples and the full API documentation on the [Databento docs site](https://databento.com/docs/quickstart?historical=rust&live=rust).
+To run this program, set the `DATABENTO_API_KEY` environment variable with an API key and run `cargo run --example live`
 
 ## License
 
