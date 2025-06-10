@@ -2,7 +2,11 @@
 
 use std::{num::NonZeroU64, path::PathBuf};
 
-use dbn::{encode::AsyncDbnEncoder, Compression, Encoding, SType, Schema, VersionUpgradePolicy};
+use dbn::{
+    decode::DbnMetadata,
+    encode::{AsyncDbnEncoder, AsyncEncodeRecordRef},
+    Compression, Encoding, SType, Schema, VersionUpgradePolicy,
+};
 use futures::{Stream, TryStreamExt};
 use reqwest::{header::ACCEPT, RequestBuilder};
 use tokio::{

@@ -43,7 +43,7 @@ Here is a simple program that fetches 10 minutes worth of historical trades for 
 use std::error::Error;
 
 use databento::{
-    dbn::{Dataset, SType, Schema, TradeMsg},
+    dbn::{decode::DbnMetadata, Dataset, SType, Schema, TradeMsg},
     historical::timeseries::GetRangeParams,
     HistoricalClient,
 };

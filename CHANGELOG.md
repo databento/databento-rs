@@ -1,16 +1,27 @@
 # Changelog
 
-## 0.27.0 - TBD
+## 0.27.0 - 2025-06-10
 
 ### Enhancements
 - Made the buffer size used by the live client when reading from the TCP socket
   configurable through the `LiveBuilder::buffer_size()` method
 - Added support for using `rustls` without pulling in OpenSSL. `reqwest` with OpenSSL is
   still the default
+- Upgraded DBN version to 0.36.0:
+  - Added support for width, fill, and padding when formatting `pretty::Ts`
+  - Added support for sign, precision, width, fill, and padding when formatting
+    `pretty::Px`
+  - Optimized pretty formatting of prices and timestamps
 
 ### Breaking changes
 - Changed type of `split_duration` to `Option<SplitDuration>` to support setting no
   split duration
+- Breaking changes from DBN:
+  - Moved core async decoding and encoding functionality to new traits to
+    match the sync interface and present a standardized interface
+    - Decoding: `AsyncDecodeRecordRef` and `AsyncDecodeRecord`
+    - Encoding: `AsyncEncodeRecord`, `AsyncEncodeRecordRef`, and
+      `AsyncEncodeRecordTextExt`
 
 ### Deprecations
 - Deprecated `LiveClient::connect` and `LiveClient::connect_with_addr` methods in favor
