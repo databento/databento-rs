@@ -165,7 +165,7 @@ pub struct GetRangeParams {
     pub symbols: Symbols,
     /// The data record schema.
     pub schema: Schema,
-    /// The date time request range.
+    /// The request range with an inclusive start and an exclusive end.
     /// Filters on `ts_recv` if it exists in the schema, otherwise `ts_event`.
     #[builder(setter(into))]
     pub date_time_range: DateTimeRange,
@@ -202,7 +202,7 @@ pub struct GetRangeToFileParams {
     pub symbols: Symbols,
     /// The data record schema.
     pub schema: Schema,
-    /// The date time request range.
+    /// The request range with an inclusive start and an exclusive end.
     /// Filters on `ts_recv` if it exists in the schema, otherwise `ts_event`.
     #[builder(setter(into))]
     pub date_time_range: DateTimeRange,

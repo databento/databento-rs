@@ -71,7 +71,7 @@ pub struct ResolveParams {
     /// [`InstrumentId`](dbn::enums::SType::InstrumentId).
     #[builder(default = SType::InstrumentId)]
     pub stype_out: SType,
-    /// The date range of the resolution.
+    /// The UTC date range with an inclusive start and an exclusive end.
     #[builder(setter(into))]
     pub date_range: DateRange,
 }

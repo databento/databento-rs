@@ -27,24 +27,23 @@ pub enum HistoricalGateway {
     Bo1,
 }
 
-/// A **half**-closed date interval with an inclusive start date and an exclusive end
+/// A **half**-closed date interval with an inclusive UTC start date and an exclusive UTC end
 /// date.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DateRange {
-    /// The start date (inclusive).
+    /// The inclusive UTC start date.
     start: time::Date,
-    /// The end date (exclusive).
+    /// The exclusive UTC end date.
     end: time::Date,
 }
 
-/// A **half**-closed datetime interval with an inclusive start time and an exclusive
-/// end time.
+/// A **half**-closed datetime interval with an inclusive start and an exclusive end.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct DateTimeRange {
-    /// The start date time (inclusive).
+    /// The inclusive start.
     #[serde(deserialize_with = "deserialize_date_time")]
     start: time::OffsetDateTime,
-    /// The end date time (exclusive).
+    /// The exclusive end.
     #[serde(deserialize_with = "deserialize_date_time")]
     end: time::OffsetDateTime,
 }
