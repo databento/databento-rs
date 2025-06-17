@@ -278,38 +278,22 @@ pub struct DatasetConditionDetail {
 }
 
 /// The available range for a dataset.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct DatasetRange {
     /// The start of the available range.
+    #[serde(deserialize_with = "deserialize_date_time")]
     pub start: time::OffsetDateTime,
     /// The end of the available range (exclusive).
+    #[serde(deserialize_with = "deserialize_date_time")]
     pub end: time::OffsetDateTime,
+    /// The available ranges for each available schema in the dataset.
+    #[serde(rename = "schema")]
+    pub range_by_schema: HashMap<Schema, DateTimeRange>,
 }
 
 impl From<DatasetRange> for DateTimeRange {
-    fn from(DatasetRange { start, end }: DatasetRange) -> Self {
+    fn from(DatasetRange { start, end, .. }: DatasetRange) -> Self {
         Self { start, end }
-    }
-}
-
-impl<'de> Deserialize<'de> for DatasetRange {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        struct Helper {
-            #[serde(deserialize_with = "deserialize_date_time")]
-            start: time::OffsetDateTime,
-            #[serde(deserialize_with = "deserialize_date_time")]
-            end: time::OffsetDateTime,
-        }
-        let partial = Helper::deserialize(deserializer)?;
-
-        Ok(DatasetRange {
-            start: partial.start,
-            end: partial.end,
-        })
     }
 }
 
@@ -663,35 +647,21 @@ mod tests {
             .respond_with(
                 ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!({
                     "start": "2019-07-07T00:00:00.000000000Z",
-                    // test both time formats
                     "end": "2023-07-20T00:00:00.000000000Z",
-                })),
-            )
-            .mount(&mock_server)
-            .await;
-        let mut target = HistoricalClient::with_url(
-            mock_server.uri(),
-            API_KEY.to_owned(),
-            HistoricalGateway::Bo1,
-        )
-        .unwrap();
-        let range = target.metadata().get_dataset_range(DATASET).await.unwrap();
-        assert_eq!(range.start, datetime!(2019 - 07 - 07 00:00:00+00:00));
-        assert_eq!(range.end, datetime!(2023 - 07 - 20 00:00:00.000000+00:00));
-    }
-
-    #[tokio::test]
-    async fn test_get_dataset_range_no_dates() {
-        const DATASET: &str = "XNAS.ITCH";
-        let mock_server = MockServer::start().await;
-        Mock::given(method("GET"))
-            .and(basic_auth(API_KEY, ""))
-            .and(path(format!("/v{API_VERSION}/metadata.get_dataset_range")))
-            .and(query_param("dataset", DATASET))
-            .respond_with(
-                ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!({
-                    "start": "2019-07-07T00:00:00.000000000Z",
-                    "end": "2023-07-20T00:00:00.000000000Z",
+                    "schema": {
+                       "bbo-1m": {
+                            "start": "2020-08-02T00:00:00.000000000Z",
+                            "end": "2023-03-23T00:00:00.000000000Z"
+                        },
+                        "ohlcv-1s": {
+                            "start": "2020-08-02T00:00:00.000000000Z",
+                            "end": "2023-03-23T00:00:00.000000000Z"
+                        },
+                        "ohlcv-1m": {
+                            "start": "2020-08-02T00:00:00.000000000Z",
+                            "end": "2023-03-23T00:00:00.000000000Z"
+                        },
+                    }
                 })),
             )
             .mount(&mock_server)
