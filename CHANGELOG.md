@@ -5,6 +5,9 @@
 ### Enhancements
 - Added `range_by_schema` field to `DatasetRange` struct
 
+### Bug fixes
+- Changed type of `last_modified_date` in `DatasetConditionDetail` to `Option<time::Date>` to support missing dates
+
 ## 0.27.0 - 2025-06-10
 
 ### Enhancements

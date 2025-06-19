@@ -271,10 +271,10 @@ pub struct DatasetConditionDetail {
     /// The condition code describing the quality and availability of the data on the
     /// given day.
     pub condition: DatasetCondition,
-    /// The date when any schemna in the dataset on the given day was last generated or
-    /// modified.
-    #[serde(deserialize_with = "deserialize_date")]
-    pub last_modified_date: time::Date,
+    /// The date when any schema in the dataset on the given day was last generated or
+    /// modified. Will be None when `condition` is `Missing`.
+    #[serde(deserialize_with = "deserialize_opt_date")]
+    pub last_modified_date: Option<time::Date>,
 }
 
 /// The available range for a dataset.
@@ -402,7 +402,7 @@ impl FromStr for DatasetCondition {
             "missing" => Ok(DatasetCondition::Missing),
             "intraday" => Ok(DatasetCondition::Intraday),
             _ => Err(crate::Error::internal(format_args!(
-                "Unabled to convert {s} to DatasetCondition"
+                "Unable to convert {s} to DatasetCondition"
             ))),
         }
     }
@@ -418,9 +418,24 @@ impl<'de> Deserialize<'de> for DatasetCondition {
 fn deserialize_date<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<time::Date, D::Error> {
-    let dt_str = String::deserialize(deserializer)?;
-    time::Date::parse(&dt_str, super::DATE_FORMAT).map_err(serde::de::Error::custom)
+    let date_str = String::deserialize(deserializer)?;
+    time::Date::parse(&date_str, super::DATE_FORMAT).map_err(serde::de::Error::custom)
 }
+
+fn deserialize_opt_date<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<time::Date>, D::Error> {
+    let opt_date_str: Option<String> = Option::deserialize(deserializer)?;
+    match opt_date_str {
+        Some(date_str) => {
+            let date = time::Date::parse(&date_str, super::DATE_FORMAT)
+                .map_err(serde::de::Error::custom)?;
+            Ok(Some(date))
+        }
+        None => Ok(None),
+    }
+}
+
 impl GetQueryParams {
     fn add_to_form(&self, form: &mut Vec<(&'static str, String)>) {
         form.push(("dataset", self.dataset.to_string()));
@@ -584,7 +599,7 @@ mod tests {
             )))
             .and(query_param("dataset", DATASET))
             .and(query_param("start_date", "2022-05-17"))
-            .and(query_param("end_date", "2022-05-18"))
+            .and(query_param("end_date", "2022-05-19"))
             .respond_with(
                 ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!([
                     {
@@ -596,7 +611,12 @@ mod tests {
                         "date": "2022-05-18",
                         "condition": "degraded",
                         "last_modified_date": "2022-05-19",
-                    }
+                    },
+                    {
+                        "date": "2022-05-19",
+                        "condition": "missing",
+                        "last_modified_date": null,
+                    },
                 ])),
             )
             .mount(&mock_server)
@@ -612,18 +632,18 @@ mod tests {
             .get_dataset_condition(
                 &GetDatasetConditionParams::builder()
                     .dataset(DATASET.to_owned())
-                    .date_range((date!(2022 - 05 - 17), time::Duration::DAY))
+                    .date_range((date!(2022 - 05 - 17), time::Duration::days(2)))
                     .build(),
             )
             .await
             .unwrap();
-        assert_eq!(condition.len(), 2);
+        assert_eq!(condition.len(), 3);
         assert_eq!(
             condition[0],
             DatasetConditionDetail {
                 date: date!(2022 - 05 - 17),
                 condition: DatasetCondition::Available,
-                last_modified_date: date!(2023 - 07 - 11)
+                last_modified_date: Some(date!(2023 - 07 - 11))
             }
         );
         assert_eq!(
@@ -631,7 +651,15 @@ mod tests {
             DatasetConditionDetail {
                 date: date!(2022 - 05 - 18),
                 condition: DatasetCondition::Degraded,
-                last_modified_date: date!(2022 - 05 - 19)
+                last_modified_date: Some(date!(2022 - 05 - 19))
+            }
+        );
+        assert_eq!(
+            condition[2],
+            DatasetConditionDetail {
+                date: date!(2022 - 05 - 19),
+                condition: DatasetCondition::Missing,
+                last_modified_date: None
             }
         );
     }
