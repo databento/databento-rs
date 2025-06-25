@@ -8,10 +8,12 @@ pub mod symbology;
 pub mod timeseries;
 
 pub use client::*;
+use serde::Deserialize;
 use time::{
     format_description::BorrowedFormatItem, macros::format_description, Duration, Time, UtcOffset,
 };
 
+use self::deserialize::deserialize_date_time;
 use crate::{Error, Symbols};
 
 /// The current Databento historical API version.
@@ -37,11 +39,13 @@ pub struct DateRange {
 
 /// A **half**-closed datetime interval with an inclusive start time and an exclusive
 /// end time.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct DateTimeRange {
     /// The start date time (inclusive).
+    #[serde(deserialize_with = "deserialize_date_time")]
     start: time::OffsetDateTime,
     /// The end date time (exclusive).
+    #[serde(deserialize_with = "deserialize_date_time")]
     end: time::OffsetDateTime,
 }
 

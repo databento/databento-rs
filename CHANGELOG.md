@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.27.1 - 2025-06-25
+
+### Enhancements
+- Added `range_by_schema` field to `DatasetRange` struct
+
+### Bug fixes
+- Changed type of `last_modified_date` in `DatasetConditionDetail` to
+  `Option<time::Date>` to support missing dates
+
 ## 0.27.0 - 2025-06-10
 
 ### Enhancements
@@ -187,8 +196,8 @@ upgrading data to version 3.
 - Improved error when calling `LiveClient::start()` on an instance that has already
   been started
 - Upgraded DBN version to 0.29.0:
-  - Added new venues, datasets, and publishers for ICE Futures US, ICE Futures Europe
-    (Financial products), Eurex, and European Energy Exchange (EEX)
+  - Added new venues, datasets, and publishers for ICE Futures US, ICE Europe Financials
+    products, Eurex, and European Energy Exchange (EEX)
   - Added new `SkipBytes` and `AsyncSkipBytes` traits which are a subset of the `Seek`
     and `AsyncSeek` traits respectively, only supporting seeking forward from the current
     position
