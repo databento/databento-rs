@@ -20,7 +20,10 @@ pub use live::Client as LiveClient;
 // Re-export to keep versions synchronized
 pub use dbn;
 
-use std::fmt::{self, Display, Write};
+use std::{
+    fmt::{self, Display, Write},
+    sync::LazyLock,
+};
 
 #[cfg(feature = "historical")]
 use serde::{Deserialize, Deserializer};
@@ -273,6 +276,15 @@ pub(crate) fn body_contains(
 ) -> wiremock::matchers::BodyContainsMatcher {
     wiremock::matchers::body_string_contains(format!("{key}={val}"))
 }
+
+static USER_AGENT: LazyLock<String> = LazyLock::new(|| {
+    format!(
+        "Databento/{} Rust {}-{}",
+        env!("CARGO_PKG_VERSION"),
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+    )
+});
 
 #[cfg(test)]
 mod tests {

@@ -59,6 +59,7 @@ pub struct ClientBuilder<AK, D> {
     upgrade_policy: VersionUpgradePolicy,
     heartbeat_interval: Option<Duration>,
     buf_size: Option<usize>,
+    user_agent_ext: Option<String>,
 }
 
 impl Default for ClientBuilder<Unset, Unset> {
@@ -71,6 +72,7 @@ impl Default for ClientBuilder<Unset, Unset> {
             upgrade_policy: VersionUpgradePolicy::default(),
             heartbeat_interval: None,
             buf_size: None,
+            user_agent_ext: None,
         }
     }
 }
@@ -129,6 +131,12 @@ impl<AK, D> ClientBuilder<AK, D> {
         self.addr = Some(Arc::new(addrs));
         Ok(self)
     }
+
+    /// Extends the user agent. Intended for library authors.
+    pub fn user_agent_extension(mut self, extension: String) -> Self {
+        self.user_agent_ext = Some(extension);
+        self
+    }
 }
 
 impl ClientBuilder<Unset, Unset> {
@@ -152,6 +160,7 @@ impl<D> ClientBuilder<Unset, D> {
             upgrade_policy: self.upgrade_policy,
             heartbeat_interval: self.heartbeat_interval,
             buf_size: self.buf_size,
+            user_agent_ext: self.user_agent_ext,
         })
     }
 
@@ -178,6 +187,7 @@ impl<AK> ClientBuilder<AK, Unset> {
             upgrade_policy: self.upgrade_policy,
             heartbeat_interval: self.heartbeat_interval,
             buf_size: self.buf_size,
+            user_agent_ext: self.user_agent_ext,
         }
     }
 }
@@ -189,27 +199,6 @@ impl ClientBuilder<ApiKey, String> {
     /// This function returns an error when its unable
     /// to connect and authenticate with the Live gateway.
     pub async fn build(self) -> crate::Result<Client> {
-        if let Some(addr) = self.addr {
-            Client::connect_with_addr_impl(
-                addr.as_slice(),
-                self.key.0,
-                self.dataset,
-                self.send_ts_out,
-                self.upgrade_policy,
-                self.heartbeat_interval,
-                self.buf_size,
-            )
-            .await
-        } else {
-            Client::connect_impl(
-                self.key.0,
-                self.dataset,
-                self.send_ts_out,
-                self.upgrade_policy,
-                self.heartbeat_interval,
-                self.buf_size,
-            )
-            .await
-        }
+        Client::new(self).await
     }
 }

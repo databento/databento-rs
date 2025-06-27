@@ -28,6 +28,7 @@ pub struct Client {
     send_ts_out: bool,
     upgrade_policy: VersionUpgradePolicy,
     heartbeat_interval: Option<Duration>,
+    user_agent_ext: Option<String>,
     protocol: Protocol<WriteHalf<TcpStream>>,
     peer_addr: SocketAddr,
     sub_counter: u32,
@@ -54,35 +55,16 @@ impl Client {
         upgrade_policy: VersionUpgradePolicy,
         heartbeat_interval: Option<Duration>,
     ) -> crate::Result<Self> {
-        Self::connect_impl(
-            key,
-            dataset,
-            send_ts_out,
-            upgrade_policy,
-            heartbeat_interval,
-            None,
-        )
-        .await
-    }
-
-    pub(crate) async fn connect_impl(
-        key: String,
-        dataset: String,
-        send_ts_out: bool,
-        upgrade_policy: VersionUpgradePolicy,
-        heartbeat_interval: Option<Duration>,
-        buf_size: Option<usize>,
-    ) -> crate::Result<Self> {
-        Self::connect_with_addr_impl(
-            protocol::determine_gateway(&dataset),
-            key,
-            dataset,
-            send_ts_out,
-            upgrade_policy,
-            heartbeat_interval,
-            buf_size,
-        )
-        .await
+        let builder = Self::builder()
+            .key(key)?
+            .dataset(dataset)
+            .send_ts_out(send_ts_out)
+            .upgrade_policy(upgrade_policy);
+        if let Some(heartbeat_interval) = heartbeat_interval {
+            builder.heartbeat_interval(heartbeat_interval).build().await
+        } else {
+            builder.build().await
+        }
     }
 
     /// Creates a new client connected to the Live gateway at `addr`. This is an advanced method and generally
@@ -100,29 +82,37 @@ impl Client {
         upgrade_policy: VersionUpgradePolicy,
         heartbeat_interval: Option<Duration>,
     ) -> crate::Result<Self> {
-        Self::connect_with_addr_impl(
+        let builder = Self::builder()
+            .addr(addr)
+            .await?
+            .key(key)?
+            .dataset(dataset)
+            .send_ts_out(send_ts_out)
+            .upgrade_policy(upgrade_policy);
+        if let Some(heartbeat_interval) = heartbeat_interval {
+            builder.heartbeat_interval(heartbeat_interval).build().await
+        } else {
+            builder.build().await
+        }
+    }
+
+    pub(crate) async fn new(
+        ClientBuilder {
             addr,
             key,
             dataset,
             send_ts_out,
             upgrade_policy,
             heartbeat_interval,
-            None,
-        )
-        .await
-    }
-
-    pub(crate) async fn connect_with_addr_impl(
-        addr: impl ToSocketAddrs,
-        key: String,
-        dataset: String,
-        send_ts_out: bool,
-        upgrade_policy: VersionUpgradePolicy,
-        heartbeat_interval: Option<Duration>,
-        buf_size: Option<usize>,
+            buf_size,
+            user_agent_ext,
+        }: ClientBuilder<ApiKey, String>,
     ) -> crate::Result<Self> {
-        let key = ApiKey::new(key)?;
-        let stream = TcpStream::connect(&addr).await?;
+        let stream = if let Some(addr) = addr {
+            TcpStream::connect(addr.as_slice()).await
+        } else {
+            TcpStream::connect(protocol::determine_gateway(&dataset)).await
+        }?;
         let peer_addr = stream.peer_addr()?;
         let (recver, sender) = tokio::io::split(stream);
         let mut recver = BufReader::new(recver);
@@ -134,6 +124,7 @@ impl Client {
                 &dataset,
                 send_ts_out,
                 heartbeat_interval.map(|i| i.whole_seconds()),
+                user_agent_ext.as_deref(),
             )
             .await?;
         let span = info_span!("LiveClient", %dataset, session_id);
@@ -143,6 +134,7 @@ impl Client {
             send_ts_out,
             upgrade_policy,
             heartbeat_interval,
+            user_agent_ext,
             protocol,
             peer_addr,
             reader: recver.into_inner(),
@@ -329,6 +321,7 @@ impl Client {
                 &self.dataset,
                 self.send_ts_out,
                 self.heartbeat_interval.map(|i| i.whole_seconds()),
+                self.user_agent_ext.as_deref(),
             )
             .await?;
         self.reader = recver.into_inner();
@@ -392,15 +385,16 @@ mod tests {
     use tracing::level_filters::LevelFilter;
 
     use super::*;
+    use crate::USER_AGENT;
 
-    struct MockLsgServer {
+    struct MockGateway {
         dataset: String,
         send_ts_out: bool,
         listener: TcpListener,
         stream: Option<BufReader<TcpStream>>,
     }
 
-    impl MockLsgServer {
+    impl MockGateway {
         async fn new(dataset: String, send_ts_out: bool) -> Self {
             let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
             Self {
@@ -434,7 +428,7 @@ mod tests {
             assert!(auth_line.contains(&format!("dataset={}", self.dataset)));
             assert!(auth_line.contains("encoding=dbn"));
             assert!(auth_line.contains(&format!("ts_out={}", if self.send_ts_out { 1 } else { 0 })));
-            assert!(auth_line.contains(&format!("client=Rust {}", env!("CARGO_PKG_VERSION"))));
+            assert!(auth_line.contains(&format!("client={}", *USER_AGENT)));
             if let Some(heartbeat_interval) = heartbeat_interval {
                 assert!(auth_line.contains(&format!(
                     "heartbeat_interval_s={}",
@@ -547,7 +541,7 @@ mod tests {
     impl Fixture {
         pub async fn new(dataset: String, send_ts_out: bool) -> Self {
             let (send, mut recv) = tokio::sync::mpsc::unbounded_channel();
-            let mut mock = MockLsgServer::new(dataset, send_ts_out).await;
+            let mut mock = MockGateway::new(dataset, send_ts_out).await;
             let port = mock.listener.local_addr().unwrap().port();
             let task = tokio::task::spawn(async move {
                 loop {

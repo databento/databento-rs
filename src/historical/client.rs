@@ -1,8 +1,9 @@
+use dbn::VersionUpgradePolicy;
 use reqwest::{header::ACCEPT, IntoUrl, RequestBuilder, Url};
 use serde::Deserialize;
 use tracing::warn;
 
-use crate::{error::ApiError, ApiKey, Error};
+use crate::{error::ApiError, ApiKey, Error, USER_AGENT};
 
 use super::{
     batch::BatchClient, metadata::MetadataClient, symbology::SymbologyClient,
@@ -25,6 +26,7 @@ pub struct Client {
     key: ApiKey,
     base_url: Url,
     gateway: HistoricalGateway,
+    uprade_policy: VersionUpgradePolicy,
     client: reqwest::Client,
 }
 
@@ -41,7 +43,6 @@ pub(crate) struct BusinessErrorDetails {
     docs: String,
 }
 
-const USER_AGENT: &str = concat!("Databento/", env!("CARGO_PKG_VERSION"), " Rust");
 const WARNING_HEADER: &str = "X-Warning";
 const REQUEST_ID_HEADER: &str = "request-id";
 
@@ -57,10 +58,7 @@ impl Client {
     /// # Errors
     /// This function returns an error when it fails to build the HTTP client.
     pub fn new(key: String, gateway: HistoricalGateway) -> crate::Result<Self> {
-        let url = match gateway {
-            HistoricalGateway::Bo1 => "https://hist.databento.com",
-        };
-        Self::with_url(url, key, gateway)
+        Self::builder().key(key)?.gateway(gateway).build()
     }
 
     /// Creates a new client with a specific API URL. This is an advanced method and
@@ -68,25 +66,17 @@ impl Client {
     ///
     /// # Errors
     /// This function returns an error when the `url` is invalid.
+    #[deprecated(since = "0.28.0", note = "Use the builder instead")]
     pub fn with_url(
         url: impl IntoUrl,
         key: String,
         gateway: HistoricalGateway,
     ) -> crate::Result<Self> {
-        let base_url = url
-            .into_url()
-            .map_err(|e| Error::bad_arg("url", format!("{e:?}")))?;
-        let mut headers = reqwest::header::HeaderMap::new();
-        headers.insert(ACCEPT, "application/json".parse().unwrap());
-        Ok(Self {
-            key: ApiKey(key),
-            base_url,
-            gateway,
-            client: reqwest::ClientBuilder::new()
-                .user_agent(USER_AGENT)
-                .default_headers(headers)
-                .build()?,
-        })
+        Self::builder()
+            .key(key)?
+            .gateway(gateway)
+            .base_url(url.into_url()?)
+            .build()
     }
 
     /// Returns the API key used by the instance of the client.
@@ -117,6 +107,10 @@ impl Client {
     /// Returns the timeseries subclient.
     pub fn timeseries(&mut self) -> TimeseriesClient {
         TimeseriesClient { inner: self }
+    }
+
+    pub(crate) fn upgrade_policy(&self) -> VersionUpgradePolicy {
+        self.uprade_policy
     }
 
     pub(crate) fn get(&mut self, slug: &str) -> crate::Result<RequestBuilder> {
@@ -224,6 +218,8 @@ pub struct ClientBuilder<AK> {
     key: AK,
     base_url: Option<Url>,
     gateway: HistoricalGateway,
+    upgrade_policy: VersionUpgradePolicy,
+    user_agent_ext: Option<String>,
 }
 
 impl Default for ClientBuilder<Unset> {
@@ -232,6 +228,8 @@ impl Default for ClientBuilder<Unset> {
             key: Unset,
             base_url: None,
             gateway: HistoricalGateway::default(),
+            upgrade_policy: VersionUpgradePolicy::default(),
+            user_agent_ext: None,
         }
     }
 }
@@ -247,6 +245,19 @@ impl<AK> ClientBuilder<AK> {
     /// Sets the historical gateway to use.
     pub fn gateway(mut self, gateway: HistoricalGateway) -> Self {
         self.gateway = gateway;
+        self
+    }
+
+    /// Sets the DBN version upgrade policy to be used in the
+    /// [`Client::timeseries()`] methods.
+    pub fn upgrade_policy(mut self, upgrade_policy: VersionUpgradePolicy) -> Self {
+        self.upgrade_policy = upgrade_policy;
+        self
+    }
+
+    /// Extends the user agent. Intended for library authors.
+    pub fn user_agent_extension(mut self, extension: String) -> Self {
+        self.user_agent_ext = Some(extension);
         self
     }
 }
@@ -266,6 +277,8 @@ impl ClientBuilder<Unset> {
             key: ApiKey::new(key.to_string())?,
             base_url: self.base_url,
             gateway: self.gateway,
+            upgrade_policy: self.upgrade_policy,
+            user_agent_ext: self.user_agent_ext,
         })
     }
 
@@ -287,11 +300,31 @@ impl ClientBuilder<ApiKey> {
     /// # Errors
     /// This function returns an error when it fails to build the HTTP client.
     pub fn build(self) -> crate::Result<Client> {
-        if let Some(url) = self.base_url {
-            Client::with_url(url, self.key.0, self.gateway)
+        let base_url = if let Some(url) = self.base_url {
+            url
         } else {
-            Client::new(self.key.0, self.gateway)
-        }
+            match self.gateway {
+                HistoricalGateway::Bo1 => "https://hist.databento.com",
+            }
+            .parse()
+            .map_err(|e| Error::bad_arg("gateway", format!("{e:?}")))?
+        };
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(ACCEPT, "application/json".parse().unwrap());
+        let user_agent = self
+            .user_agent_ext
+            .map(|ext| format!("{} {ext}", *USER_AGENT))
+            .unwrap_or_else(|| USER_AGENT.clone());
+        Ok(Client {
+            key: self.key,
+            base_url,
+            gateway: self.gateway,
+            uprade_policy: self.upgrade_policy,
+            client: reqwest::ClientBuilder::new()
+                .user_agent(user_agent)
+                .default_headers(headers)
+                .build()?,
+        })
     }
 }
 

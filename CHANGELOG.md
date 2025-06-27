@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.28.0 - TBD
+
+### Enhancements
+- Added operating system info to the user agent to aid troubleshooting
+- Standardized `client` info sent by live clients to match historical
+- Added methods to the client builders to extend the user agents with a custom string
+
+### Deprecations
+- Deprecated `Historical::with_url()`: use the builder to override the base URL
+- Deprecated the `upgrade_policy` parameters for `timseries().get_range()` and
+  `timeseries().get_range_to_file()`: use the `Historical` client parameter
+  instead
+
 ## 0.27.1 - 2025-06-25
 
 ### Enhancements

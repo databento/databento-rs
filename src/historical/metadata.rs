@@ -460,12 +460,18 @@ mod tests {
     };
 
     use super::*;
-    use crate::{
-        historical::{HistoricalGateway, API_VERSION},
-        HistoricalClient,
-    };
+    use crate::{historical::API_VERSION, HistoricalClient};
 
-    const API_KEY: &str = "test-metadata";
+    const API_KEY: &str = "test-API________________________";
+
+    fn client(mock_server: &MockServer) -> HistoricalClient {
+        HistoricalClient::builder()
+            .base_url(mock_server.uri().parse().unwrap())
+            .key(API_KEY)
+            .unwrap()
+            .build()
+            .unwrap()
+    }
 
     #[tokio::test]
     async fn test_list_fields() {
@@ -490,12 +496,7 @@ mod tests {
             )
             .mount(&mock_server)
             .await;
-        let mut target = HistoricalClient::with_url(
-            mock_server.uri(),
-            API_KEY.to_owned(),
-            HistoricalGateway::Bo1,
-        )
-        .unwrap();
+        let mut target = client(&mock_server);
         let fields = target
             .metadata()
             .list_fields(
@@ -566,12 +567,7 @@ mod tests {
             )
             .mount(&mock_server)
             .await;
-        let mut target = HistoricalClient::with_url(
-            mock_server.uri(),
-            API_KEY.to_owned(),
-            HistoricalGateway::Bo1,
-        )
-        .unwrap();
+        let mut target = client(&mock_server);
         let prices = target.metadata().list_unit_prices(DATASET).await.unwrap();
         assert_eq!(
             prices,
@@ -621,12 +617,7 @@ mod tests {
             )
             .mount(&mock_server)
             .await;
-        let mut target = HistoricalClient::with_url(
-            mock_server.uri(),
-            API_KEY.to_owned(),
-            HistoricalGateway::Bo1,
-        )
-        .unwrap();
+        let mut target = client(&mock_server);
         let condition = target
             .metadata()
             .get_dataset_condition(
@@ -694,12 +685,7 @@ mod tests {
             )
             .mount(&mock_server)
             .await;
-        let mut target = HistoricalClient::with_url(
-            mock_server.uri(),
-            API_KEY.to_owned(),
-            HistoricalGateway::Bo1,
-        )
-        .unwrap();
+        let mut target = client(&mock_server);
         let range = target.metadata().get_dataset_range(DATASET).await.unwrap();
         assert_eq!(range.start, datetime!(2019 - 07 - 07 00:00:00+00:00));
         assert_eq!(range.end, datetime!(2023 - 07 - 20 00:00:00.000000+00:00));

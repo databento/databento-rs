@@ -15,7 +15,7 @@ use sha2::{Digest, Sha256};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
 use tracing::{debug, error, instrument};
 
-use crate::{ApiKey, Error};
+use crate::{ApiKey, Error, USER_AGENT};
 
 use super::Subscription;
 
@@ -63,6 +63,7 @@ where
         dataset: &str,
         send_ts_out: bool,
         heartbeat_interval_s: Option<i64>,
+        user_agent_ext: Option<&str>,
     ) -> crate::Result<String>
     where
         R: AsyncBufReadExt + Unpin,
@@ -85,17 +86,27 @@ where
         debug!(%challenge, "Received CRAM challenge");
 
         // Send CRAM reply/auth request
-        let auth_req =
-            AuthRequest::new(key, dataset, send_ts_out, heartbeat_interval_s, &challenge);
+        let auth_req = AuthRequest::new(
+            key,
+            dataset,
+            send_ts_out,
+            heartbeat_interval_s,
+            user_agent_ext,
+            &challenge,
+        );
         debug!(?auth_req, "Sending CRAM reply");
         self.sender.write_all(auth_req.as_bytes()).await.unwrap();
 
         response.clear();
         recver.read_line(&mut response).await?;
-        debug!(
-            auth_resp = &response[..response.len() - 1],
-            "Received auth response"
-        );
+        if response.is_empty() {
+            error!("Received empty auth response");
+        } else {
+            debug!(
+                auth_resp = &response[..response.len() - 1],
+                "Received auth response"
+            );
+        }
         response.pop(); // remove newline
 
         let auth_resp = AuthResponse::parse(&response)?;
@@ -223,6 +234,7 @@ impl AuthRequest {
         dataset: &str,
         send_ts_out: bool,
         heartbeat_interval_s: Option<i64>,
+        user_agent_ext: Option<&str>,
         challenge: &Challenge,
     ) -> Self {
         let challenge_key = format!("{challenge}|{}", key.0);
@@ -232,8 +244,11 @@ impl AuthRequest {
         let bucket_id = key.bucket_id();
         let encoded_response = hashed.encode_hex::<String>();
         let send_ts_out = send_ts_out as u8;
+        let user_agent = user_agent_ext
+            .map(|ext| format!("{} {ext}", *USER_AGENT))
+            .unwrap_or_else(|| USER_AGENT.clone());
         let mut req =
-                format!("auth={encoded_response}-{bucket_id}|dataset={dataset}|encoding=dbn|ts_out={send_ts_out}|client=Rust {}", env!("CARGO_PKG_VERSION"));
+                format!("auth={encoded_response}-{bucket_id}|dataset={dataset}|encoding=dbn|ts_out={send_ts_out}|client={user_agent}");
         if let Some(heartbeat_interval_s) = heartbeat_interval_s {
             req = format!("{req}|heartbeat_interval_s={heartbeat_interval_s}");
         }
