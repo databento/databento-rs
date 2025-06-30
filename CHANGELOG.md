@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.28.0 - TBD
+## 0.28.0 - 2025-07-01
 
 ### Enhancements
 - Added operating system info to the user agent to aid troubleshooting
