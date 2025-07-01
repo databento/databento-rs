@@ -567,13 +567,18 @@ mod tests {
     };
 
     use super::*;
-    use crate::{
-        body_contains,
-        historical::{HistoricalGateway, API_VERSION},
-        HistoricalClient,
-    };
+    use crate::{body_contains, historical::API_VERSION, HistoricalClient};
 
-    const API_KEY: &str = "test-batch";
+    const API_KEY: &str = "test-API________________________";
+
+    fn client(mock_server: &MockServer) -> HistoricalClient {
+        HistoricalClient::builder()
+            .base_url(mock_server.uri().parse().unwrap())
+            .key(API_KEY)
+            .unwrap()
+            .build()
+            .unwrap()
+    }
 
     #[tokio::test]
     async fn test_submit_job() -> crate::Result<()> {
@@ -632,11 +637,7 @@ mod tests {
             )
             .mount(&mock_server)
             .await;
-        let mut target = HistoricalClient::with_url(
-            mock_server.uri(),
-            API_KEY.to_owned(),
-            HistoricalGateway::Bo1,
-        )?;
+        let mut target = client(&mock_server);
         let job_desc = target
             .batch()
             .submit_job(
@@ -731,11 +732,7 @@ mod tests {
             )
             .mount(&mock_server)
             .await;
-        let mut target = HistoricalClient::with_url(
-            mock_server.uri(),
-            API_KEY.to_owned(),
-            HistoricalGateway::Bo1,
-        )?;
+        let mut target = client(&mock_server);
         let job_descs = target.batch().list_jobs(&ListJobsParams::default()).await?;
         assert_eq!(job_descs.len(), 2);
         let mut job_desc = &job_descs[0];

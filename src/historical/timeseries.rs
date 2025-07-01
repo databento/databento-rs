@@ -57,10 +57,9 @@ impl TimeseriesClient<'_> {
                 params.limit,
             )
             .await?;
-        Ok(
-            AsyncDbnDecoder::with_upgrade_policy(zstd_decoder(reader), params.upgrade_policy)
-                .await?,
-        )
+        #[expect(deprecated)]
+        let upgrade_policy = params.upgrade_policy.unwrap_or(self.inner.upgrade_policy());
+        Ok(AsyncDbnDecoder::with_upgrade_policy(zstd_decoder(reader), upgrade_policy).await?)
     }
 
     /// Makes a streaming request for timeseries data from Databento.
@@ -91,9 +90,10 @@ impl TimeseriesClient<'_> {
                 params.limit,
             )
             .await?;
+        #[expect(deprecated)]
+        let upgrade_policy = params.upgrade_policy.unwrap_or(self.inner.upgrade_policy());
         let mut http_decoder =
-            AsyncDbnDecoder::with_upgrade_policy(zstd_decoder(reader), params.upgrade_policy)
-                .await?;
+            AsyncDbnDecoder::with_upgrade_policy(zstd_decoder(reader), upgrade_policy).await?;
         let file = BufWriter::new(File::create(&params.path).await?);
         let mut encoder = AsyncDbnEncoder::with_zstd(file, http_decoder.metadata()).await?;
         while let Some(rec_ref) = http_decoder.decode_record_ref().await? {
@@ -179,9 +179,14 @@ pub struct GetRangeParams {
     /// The optional maximum number of records to return. Defaults to no limit.
     #[builder(default)]
     pub limit: Option<NonZeroU64>,
-    /// How to decode DBN from prior versions. Defaults to upgrade.
-    #[builder(default)]
-    pub upgrade_policy: VersionUpgradePolicy,
+    /// How to decode DBN from prior versions. Defaults to upgrade to the latest
+    /// version.
+    #[builder(default, setter(strip_option))]
+    #[deprecated(
+        since = "0.28.0",
+        note = "Use the upgrade_policy configuration option on HistoricalClient"
+    )]
+    pub upgrade_policy: Option<VersionUpgradePolicy>,
 }
 
 /// The parameters for [`TimeseriesClient::get_range_to_file()`]. Use
@@ -211,9 +216,14 @@ pub struct GetRangeToFileParams {
     /// The optional maximum number of records to return. Defaults to no limit.
     #[builder(default)]
     pub limit: Option<NonZeroU64>,
-    /// How to decode DBN from prior versions. Defaults to upgrade.
-    #[builder(default)]
-    pub upgrade_policy: VersionUpgradePolicy,
+    /// How to decode DBN from prior versions. Defaults to upgrade to the latest
+    /// version.
+    #[builder(default, setter(strip_option))]
+    #[deprecated(
+        since = "0.28.0",
+        note = "Use the upgrade_policy configuration option on HistoricalClient"
+    )]
+    pub upgrade_policy: Option<VersionUpgradePolicy>,
     /// The file path to persist the stream data to.
     #[builder(default, setter(transform = |p: impl Into<PathBuf>| p.into()))]
     pub path: PathBuf,
@@ -229,6 +239,7 @@ impl From<GetRangeToFileParams> for GetRangeParams {
             stype_in: value.stype_in,
             stype_out: value.stype_out,
             limit: value.limit,
+            #[expect(deprecated)]
             upgrade_policy: value.upgrade_policy,
         }
     }
@@ -246,6 +257,7 @@ impl GetRangeParams {
             stype_in: self.stype_in,
             stype_out: self.stype_out,
             limit: self.limit,
+            #[expect(deprecated)]
             upgrade_policy: self.upgrade_policy,
             path: path.into(),
         }
@@ -274,13 +286,19 @@ mod tests {
     };
 
     use super::*;
-    use crate::{
-        body_contains,
-        historical::{HistoricalGateway, API_VERSION},
-        zst_test_data_path, HistoricalClient,
-    };
+    use crate::{body_contains, historical::API_VERSION, zst_test_data_path, HistoricalClient};
 
-    const API_KEY: &str = "test-API";
+    const API_KEY: &str = "test-API________________________";
+
+    fn client(mock_server: &MockServer, upgrade_policy: VersionUpgradePolicy) -> HistoricalClient {
+        HistoricalClient::builder()
+            .base_url(mock_server.uri().parse().unwrap())
+            .key(API_KEY)
+            .unwrap()
+            .upgrade_policy(upgrade_policy)
+            .build()
+            .unwrap()
+    }
 
     #[rstest]
     #[case(VersionUpgradePolicy::AsIs, 1)]
@@ -311,12 +329,7 @@ mod tests {
             .respond_with(ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_bytes(bytes))
             .mount(&mock_server)
             .await;
-        let mut target = HistoricalClient::with_url(
-            mock_server.uri(),
-            API_KEY.to_owned(),
-            HistoricalGateway::Bo1,
-        )
-        .unwrap();
+        let mut target = client(&mock_server, upgrade_policy);
         let mut decoder = target
             .timeseries()
             .get_range(
@@ -325,7 +338,6 @@ mod tests {
                     .schema(SCHEMA)
                     .symbols(vec!["SPOT", "AAPL"])
                     .date_time_range((START, END))
-                    .upgrade_policy(upgrade_policy)
                     .build(),
             )
             .await
@@ -373,12 +385,7 @@ mod tests {
             .respond_with(ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_bytes(bytes))
             .mount(&mock_server)
             .await;
-        let mut target = HistoricalClient::with_url(
-            mock_server.uri(),
-            API_KEY.to_owned(),
-            HistoricalGateway::Bo1,
-        )
-        .unwrap();
+        let mut target = client(&mock_server, upgrade_policy);
         let path = temp_dir.path().join("test.dbn.zst");
         let mut decoder = target
             .timeseries()
@@ -390,7 +397,6 @@ mod tests {
                     .stype_in(SType::Parent)
                     .date_time_range((START, END))
                     .path(path.clone())
-                    .upgrade_policy(upgrade_policy)
                     .build(),
             )
             .await
