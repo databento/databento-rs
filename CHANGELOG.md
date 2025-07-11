@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.28.1 - TBD
+
+### Bug fixes
+- Removed `Intraday` variant from `DatasetCondition` enum
+
 ## 0.28.0 - 2025-07-01
 
 ### Enhancements
