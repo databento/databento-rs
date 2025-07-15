@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.29.0 - 2025-07-15
+
+### Breaking changes
+- Upgraded DBN version to 0.37.0:
+  - Renamed the following Venue, Dataset, and Publishers:
+      - `XEER` to `XEEE`
+      - `XEER.EOBI` to `XEEE.EOBI`
+      - `XEER.EOBI.XEER` to `XEEE.EOBI.XEEE`
+      - `XEER.EOBI.XOFF` to `XEEE.EOBI.XOFF`
+  - Renamed `CMBP1` constant to `CMBP_1` for consistency with `MBP_1` and `MBP_10`
+
+### Bug fixes
+- Removed `Intraday` variant from `DatasetCondition` enum
+
 ## 0.28.0 - 2025-07-01
 
 ### Enhancements

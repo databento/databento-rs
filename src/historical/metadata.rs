@@ -203,8 +203,6 @@ pub enum DatasetCondition {
     Pending,
     /// The data is not available.
     Missing,
-    /// The data is available intraday, which may have different licensing.
-    Intraday,
 }
 
 /// The details about a publisher.
@@ -386,7 +384,6 @@ impl DatasetCondition {
             DatasetCondition::Degraded => "degraded",
             DatasetCondition::Pending => "pending",
             DatasetCondition::Missing => "missing",
-            DatasetCondition::Intraday => "intraday",
         }
     }
 }
@@ -400,7 +397,6 @@ impl FromStr for DatasetCondition {
             "degraded" => Ok(DatasetCondition::Degraded),
             "pending" => Ok(DatasetCondition::Pending),
             "missing" => Ok(DatasetCondition::Missing),
-            "intraday" => Ok(DatasetCondition::Intraday),
             _ => Err(crate::Error::internal(format_args!(
                 "Unable to convert {s} to DatasetCondition"
             ))),
