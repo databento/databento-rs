@@ -123,7 +123,7 @@ impl TimeseriesClient<'_> {
             ("dataset", dataset.to_owned()),
             ("schema", schema.to_string()),
             ("encoding", Encoding::Dbn.to_string()),
-            ("compression", Compression::ZStd.to_string()),
+            ("compression", Compression::Zstd.to_string()),
             ("stype_in", stype_in.to_string()),
             ("stype_out", stype_out.to_string()),
             ("symbols", symbols.to_api_string()),

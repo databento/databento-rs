@@ -253,8 +253,8 @@ pub struct SubmitJobParams {
     /// The data encoding. Defaults to [`Dbn`](Encoding::Dbn).
     #[builder(default = Encoding::Dbn)]
     pub encoding: Encoding,
-    /// The data compression mode. Defaults to [`ZStd`](Compression::ZStd).
-    #[builder(default = Compression::ZStd)]
+    /// The data compression mode. Defaults to [`Zstd`](Compression::Zstd).
+    #[builder(default = Compression::Zstd)]
     pub compression: Compression,
     /// If `true`, prices will be formatted to the correct scale (using the fixed-
     /// precision scalar 1e-9). Only valid for [`Encoding::Csv`] and [`Encoding::Json`].
@@ -784,7 +784,7 @@ mod tests {
         let res: Vec<Test> = serde_json::from_str(JSON).unwrap();
         assert_eq!(
             res.into_iter().map(|t| t.compression).collect::<Vec<_>>(),
-            vec![Compression::None, Compression::None, Compression::ZStd]
+            vec![Compression::None, Compression::None, Compression::Zstd]
         );
     }
 }
