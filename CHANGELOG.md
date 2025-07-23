@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.30.0 - 2025-07-22
+
+### Breaking changes
+- Upgraded DBN version to 0.38.0:
+  - Renamed `Compression::ZStd` to `Zstd` for consistency
+
 ## 0.29.0 - 2025-07-15
 
 ### Breaking changes
