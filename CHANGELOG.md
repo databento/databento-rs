@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.30.1 - TBD
+
+### Bug fixes
+- Removed unused `S3` and `Disk` variants from `Delivery` enum
+
 ## 0.30.0 - 2025-07-22
 
 ### Breaking changes

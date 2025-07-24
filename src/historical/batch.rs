@@ -213,10 +213,6 @@ pub enum Delivery {
     /// Via download from the Databento portal.
     #[default]
     Download,
-    /// Via Amazon S3.
-    S3,
-    /// Via disk.
-    Disk,
 }
 
 /// The state of a batch job.
@@ -281,8 +277,8 @@ pub struct SubmitJobParams {
     /// Must be an integer between 1e9 and 10e9 inclusive (1GB - 10GB). Defaults to `None`.
     #[builder(default, setter(strip_option))]
     pub split_size: Option<NonZeroU64>,
-    /// The delivery mechanism for the batched data files once processed. Defaults to
-    /// [`Download`](Delivery::Download).
+    /// The delivery mechanism for the batched data files once processed.
+    /// Only [`Download`](Delivery::Download) is supported at this time.
     #[builder(default)]
     pub delivery: Delivery,
     /// The symbology type of the input `symbols`. Defaults to
@@ -463,8 +459,6 @@ impl Delivery {
     pub const fn as_str(&self) -> &'static str {
         match self {
             Delivery::Download => "download",
-            Delivery::S3 => "s3",
-            Delivery::Disk => "disk",
         }
     }
 }
@@ -481,8 +475,6 @@ impl FromStr for Delivery {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "download" => Ok(Delivery::Download),
-            "s3" => Ok(Delivery::S3),
-            "disk" => Ok(Delivery::Disk),
             _ => Err(crate::Error::bad_arg(
                 "s",
                 format!(
