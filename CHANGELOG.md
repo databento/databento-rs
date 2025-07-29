@@ -2,6 +2,10 @@
 
 ## 0.30.1 - TBD
 
+### Enhancements
+- Changed `timeseries.get_range_to_file()` to return a concrete type instead of an impl
+  trait type
+
 ### Bug fixes
 - Removed unused `S3` and `Disk` variants from `Delivery` enum
 
