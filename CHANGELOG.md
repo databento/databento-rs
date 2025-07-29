@@ -1,10 +1,28 @@
 # Changelog
 
-## 0.30.1 - TBD
+## 0.31.0 - 2025-07-29
 
 ### Enhancements
 - Changed `timeseries.get_range_to_file()` to return a concrete type instead of an impl
   trait type
+- Upgraded DBN version to 0.39.0:
+  - Added `side()` and `unpaired_side()` methods to `ImbalanceMsg` that convert the fields
+    of the same name to the `Side` enum
+  - Added `pretty_auction_time` property in Python for `ImbalanceMsg`
+  - Added `Default` implementation for `StatUpdateAction`
+  - Added warnings to the floating-point getter methods' docstrings
+  - Added `action` and `ts_in_delta` getters to `BboMsg`
+  - Added `ts_recv` getter to `StatusMsg`
+  - Added missing floating-point price getters to `InstrumentDefMsg` record types from all
+    DBN versions
+  - Added more floating-point price getters to `ImbalanceMsg`
+  - Added floating-point price getter to `StatMsg` and `v1::StatMsg`
+
+### Breaking changes
+- Breaking changes from DBN:
+  - Changed `SystemMsg::code()` and `ErrorMsg::code()` methods to return a `Result`
+    instead of an `Option` to be consistent with other enum conversion methods
+  - Changed `auction_time` field in `ImbalanceMsg` to be formatted as a timestamp
 
 ### Bug fixes
 - Removed unused `S3` and `Disk` variants from `Delivery` enum
