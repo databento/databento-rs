@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.31.0 - 2025-07-29
+## 0.31.0 - 2025-07-30
 
 ### Enhancements
 - Changed `timeseries.get_range_to_file()` to return a concrete type instead of an impl
