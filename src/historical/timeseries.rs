@@ -2,6 +2,7 @@
 
 use std::{num::NonZeroU64, path::PathBuf};
 
+use async_compression::tokio::bufread::ZstdDecoder;
 use dbn::{
     decode::DbnMetadata,
     encode::{AsyncDbnEncoder, AsyncEncodeRecordRef},
@@ -78,7 +79,7 @@ impl TimeseriesClient<'_> {
     pub async fn get_range_to_file(
         &mut self,
         params: &GetRangeToFileParams,
-    ) -> crate::Result<AsyncDbnDecoder<impl AsyncReadExt>> {
+    ) -> crate::Result<AsyncDbnDecoder<ZstdDecoder<BufReader<File>>>> {
         let reader = self
             .get_range_impl(
                 &params.dataset,

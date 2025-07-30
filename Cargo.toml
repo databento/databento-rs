@@ -31,7 +31,7 @@ historical = [
 live = ["dep:hex", "dep:sha2", "tokio/net"]
 
 [dependencies]
-dbn = { version = "0.38.0", features = ["async", "serde"] }
+dbn = { version = "0.39.0", features = ["async", "serde"] }
 
 async-compression = { version = "0.4", features = ["tokio", "zstd"], optional = true }
 # Async stream trait
