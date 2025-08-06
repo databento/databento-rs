@@ -218,8 +218,6 @@ pub enum Delivery {
 /// The state of a batch job.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JobState {
-    /// The job has been received (the initial state).
-    Received,
     /// The job has been queued for processing.
     Queued,
     /// The job has begun processing.
@@ -374,7 +372,7 @@ pub struct BatchJob {
 /// get a builder type with all the preset defaults.
 #[derive(Debug, Clone, Default, TypedBuilder, PartialEq, Eq)]
 pub struct ListJobsParams {
-    /// The optional filter for job states.
+    /// The optional filter for job states. If `None`, defaults to all except `Expired`.
     #[builder(default, setter(strip_option))]
     pub states: Option<Vec<JobState>>,
     /// The optional filter for timestamp submitted (will not include jobs prior to
@@ -497,7 +495,6 @@ impl JobState {
     /// Converts the enum to its `str` representation.
     pub const fn as_str(&self) -> &'static str {
         match self {
-            JobState::Received => "received",
             JobState::Queued => "queued",
             JobState::Processing => "processing",
             JobState::Done => "done",
@@ -517,7 +514,6 @@ impl FromStr for JobState {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "received" => Ok(JobState::Received),
             "queued" => Ok(JobState::Queued),
             "processing" => Ok(JobState::Processing),
             "done" => Ok(JobState::Done),
