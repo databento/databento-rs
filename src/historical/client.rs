@@ -90,22 +90,22 @@ impl Client {
     }
 
     /// Returns the batch subclient.
-    pub fn batch(&mut self) -> BatchClient {
+    pub fn batch(&mut self) -> BatchClient<'_> {
         BatchClient { inner: self }
     }
 
     /// Returns the metadata subclient.
-    pub fn metadata(&mut self) -> MetadataClient {
+    pub fn metadata(&mut self) -> MetadataClient<'_> {
         MetadataClient { inner: self }
     }
 
     /// Returns the symbology subclient.
-    pub fn symbology(&mut self) -> SymbologyClient {
+    pub fn symbology(&mut self) -> SymbologyClient<'_> {
         SymbologyClient { inner: self }
     }
 
     /// Returns the timeseries subclient.
-    pub fn timeseries(&mut self) -> TimeseriesClient {
+    pub fn timeseries(&mut self) -> TimeseriesClient<'_> {
         TimeseriesClient { inner: self }
     }
 
