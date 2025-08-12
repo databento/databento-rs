@@ -1,7 +1,7 @@
 [package]
 name = "databento"
 authors = ["Databento <support@databento.com>"]
-version = "0.31.0"
+version = "0.32.0"
 edition = "2021"
 repository = "https://github.com/databento/databento-rs"
 description = "Official Databento client library"
@@ -31,7 +31,7 @@ historical = [
 live = ["dep:hex", "dep:sha2", "tokio/net"]
 
 [dependencies]
-dbn = { version = "0.39.0", features = ["async", "serde"] }
+dbn = { version = "0.39.1", features = ["async", "serde"] }
 
 async-compression = { version = "0.4", features = ["tokio", "zstd"], optional = true }
 # Async stream trait
@@ -52,11 +52,11 @@ tracing = "0.1"
 typed-builder = "0.21"
 
 [dev-dependencies]
-anyhow = "1.0.98"
+anyhow = "1.0.99"
 async-compression = { version = "0.4", features = ["tokio", "zstd"] }
-clap = { version = "4.5.40", features = ["derive"] }
+clap = { version = "4.5.44", features = ["derive"] }
 rstest = "0.26.1"
 tempfile = "3.20.0"
-tokio = { version = "1.45", features = ["full"] }
+tokio = { version = "1.47", features = ["full"] }
 tracing-subscriber = "0.3.19"
 wiremock = "0.6"
