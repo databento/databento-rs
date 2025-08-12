@@ -279,7 +279,7 @@ impl Client {
     /// This method is cancel safe. It can be used within a [`tokio::select!`] statement
     /// without the potential for corrupting the input stream.
     #[instrument(parent = &self.span, level = "debug", skip_all)]
-    pub async fn next_record(&mut self) -> crate::Result<Option<RecordRef>> {
+    pub async fn next_record(&mut self) -> crate::Result<Option<RecordRef<'_>>> {
         if !self.fsm.has_decoded_metadata() {
             return Err(crate::Error::BadArgument {
                 param_name: "self".to_owned(),

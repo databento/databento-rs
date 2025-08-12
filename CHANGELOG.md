@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.32.0 - 2025-08-12
+
+### Enhancements
+- Upgraded DBN version to 0.39.1:
+  - Added `PUBLISHER_SPECIFIC` flag
+  - Improved JSON encoding performance
+  - Added a `Default` implementation for `SecurityUpdateAction`
+
+### Breaking changes
+- Removed unused `Received` variant from `JobState` enum
+
 ## 0.31.0 - 2025-07-30
 
 ### Enhancements
