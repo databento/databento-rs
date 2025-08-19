@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.33.0 - 2025-08-19
+
+### Enhancements
+- Upgraded DBN version to 0.40.0:
+  - Added `DbnVersion` new type
+
+
+### Breaking changes
+- Removed `bill_id` field from `BatchJob` struct
+- Breaking changes from DBN:
+  - Marked `ErrorCode` and `SystemCode` non-exhaustive to allow adding future variants
+    without a breaking change
+  - Added `EndOfInterval` variant to `SystemCode` to notify when all OHLCV bars and
+    subsampled BBO records have been published for a time interval
+
 ## 0.32.0 - 2025-08-12
 
 ### Enhancements

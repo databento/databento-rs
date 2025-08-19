@@ -299,8 +299,6 @@ pub struct BatchJob {
     pub id: String,
     /// The user ID of the user who submitted the job.
     pub user_id: Option<String>,
-    /// The bill ID (for internal use).
-    pub bill_id: Option<String>,
     /// The cost of the job in US dollars. Will be `None` until the job is processed.
     pub cost_usd: Option<f64>,
     /// The dataset code.
@@ -596,7 +594,6 @@ mod tests {
                 ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!({
                     "id": "123",
                     "user_id": "test_user",
-                    "bill_id": "345",
                     "cost_usd": 10.50,
                     "dataset": "XNAS.ITCH",
                     "symbols": ["TSLA"],
@@ -655,7 +652,6 @@ mod tests {
                 ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!([{
                     "id": "123",
                     "user_id": "test_user",
-                    "bill_id": "345",
                     "cost_usd": 10.50,
                     "dataset": "XNAS.ITCH",
                     "symbols": "TSLA",
@@ -685,7 +681,6 @@ mod tests {
                 {
                     "id": "XNAS-20250602-5KM3HL5BUW",
                     "user_id": "AA89XSlBV",
-                    "bill_id": null,
                     "cost_usd": 0.0,
                     "dataset": "XNAS.ITCH",
                     "symbols": "MSFT",
