@@ -1,11 +1,19 @@
 # Changelog
 
+## 0.33.1 - TBD
+
+### Enhancements
+- Upgraded DBN version to 0.41.0:
+  - Added `interval` method to `RType` and `Schema` to get the duration for subsampled
+    schemas like `Ohlcv1H` and `Cbbo1S`
+  - Changed the default value for `channel_id` to be `u8::MAX` in `MboMsg` and `u16::MAX`
+    elsewhere since 0 is a valid channel ID
+
 ## 0.33.0 - 2025-08-19
 
 ### Enhancements
 - Upgraded DBN version to 0.40.0:
   - Added `DbnVersion` new type
-
 
 ### Breaking changes
 - Removed `bill_id` field from `BatchJob` struct

@@ -255,7 +255,8 @@ pub struct GetDatasetConditionParams {
     /// The dataset code.
     #[builder(setter(transform = |dataset: impl ToString| dataset.to_string()))]
     pub dataset: String,
-    /// The optional filter by UTC date range.
+    /// The UTC date request range with an inclusive start date and an inclusive end date.
+    /// If `None` then will return all available dates.
     #[builder(default, setter(transform = |dr: impl Into<DateRange>| Some(dr.into())))]
     pub date_range: Option<DateRange>,
 }
@@ -278,10 +279,10 @@ pub struct DatasetConditionDetail {
 /// The available range for a dataset.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct DatasetRange {
-    /// The start of the available range.
+    /// The inclusive UTC start timestamp of the available range.
     #[serde(deserialize_with = "deserialize_date_time")]
     pub start: time::OffsetDateTime,
-    /// The end of the available range (exclusive).
+    /// The exclusive UTC end timestamp of the available range.
     #[serde(deserialize_with = "deserialize_date_time")]
     pub end: time::OffsetDateTime,
     /// The available ranges for each available schema in the dataset.
@@ -306,7 +307,7 @@ pub struct GetQueryParams {
     pub symbols: Symbols,
     /// The data record schema.
     pub schema: Schema,
-    /// The request time range.
+    /// The request range with an inclusive start and an exclusive end.
     #[builder(setter(into))]
     pub date_time_range: DateTimeRange,
     /// The symbology type of the input `symbols`. Defaults to

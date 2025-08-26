@@ -240,7 +240,7 @@ pub struct SubmitJobParams {
     pub symbols: Symbols,
     /// The data record schema.
     pub schema: Schema,
-    /// The date time request range.
+    /// The request range with an inclusive start and an exclusive end.
     /// Filters on `ts_recv` if it exists in the schema, otherwise `ts_event`.
     #[builder(setter(into))]
     pub date_time_range: DateTimeRange,
@@ -311,10 +311,10 @@ pub struct BatchJob {
     pub stype_out: SType,
     /// The data record schema.
     pub schema: Schema,
-    /// The start of the request time range (inclusive).
+    /// The inclusive start of the request range.
     #[serde(deserialize_with = "deserialize_date_time")]
     pub start: OffsetDateTime,
-    /// The end of the request time range (exclusive).
+    /// The exclusive end of the request range.
     #[serde(deserialize_with = "deserialize_date_time")]
     pub end: OffsetDateTime,
     /// The maximum number of records to return.
