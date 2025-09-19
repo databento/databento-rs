@@ -1,12 +1,11 @@
 //! The historical batch download API.
 
-use core::fmt;
 use std::{
     cmp::Ordering,
     collections::HashMap,
+    fmt,
     fmt::Write,
     num::NonZeroU64,
-    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -253,7 +252,7 @@ impl BatchClient<'_> {
         let Ok(metadata) = tokio::fs::metadata(path).await else {
             return Ok(Header::Range(None));
         };
-        let actual_size = metadata.size();
+        let actual_size = metadata.len();
         match actual_size.cmp(&exp_size) {
             Ordering::Less => {
                 debug!(
@@ -275,7 +274,7 @@ impl BatchClient<'_> {
         }
         Ok(Header::Range(Some((
             "Range",
-            format!("bytes={}-", metadata.size()),
+            format!("bytes={}-", metadata.len()),
         ))))
     }
 
