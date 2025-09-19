@@ -35,7 +35,8 @@ pub struct Subscription {
     #[builder(default, setter(strip_option))]
     pub start: Option<OffsetDateTime>,
     #[doc(hidden)]
-    /// Request subscription with snapshot. Defaults to `false`. Conflicts with the `start` parameter.
+    /// Request subscription with snapshot. Only supported with `Mbo` schema.
+    /// Defaults to `false`. Conflicts with the `start` parameter.
     #[builder(setter(strip_bool))]
     pub use_snapshot: bool,
     /// The optional numerical identifier associated with this subscription.
