@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.34.0 - TBD
+## 0.34.0 - 2025-09-23
 
 ### Enhancements
 - Added batch download retry, resumption, and checksum verification
