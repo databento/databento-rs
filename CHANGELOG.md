@@ -1,6 +1,16 @@
 # Changelog
 
-## 0.33.1 - TBD
+## 0.34.0 - 2025-09-23
+
+### Enhancements
+- Added batch download retry, resumption, and checksum verification
+- Changed setter for `batch::DownloadParams` to accept any `impl ToString` for
+  `filename_to_download`
+
+### Breaking changes
+- Changed `sha2` and `hex` to required dependencies
+
+## 0.33.1 - 2025-08-26
 
 ### Enhancements
 - Upgraded DBN version to 0.41.0:

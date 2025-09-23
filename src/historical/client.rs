@@ -26,7 +26,7 @@ pub struct Client {
     key: ApiKey,
     base_url: Url,
     gateway: HistoricalGateway,
-    uprade_policy: VersionUpgradePolicy,
+    upgrade_policy: VersionUpgradePolicy,
     client: reqwest::Client,
 }
 
@@ -110,7 +110,7 @@ impl Client {
     }
 
     pub(crate) fn upgrade_policy(&self) -> VersionUpgradePolicy {
-        self.uprade_policy
+        self.upgrade_policy
     }
 
     pub(crate) fn get(&mut self, slug: &str) -> crate::Result<RequestBuilder> {
@@ -319,7 +319,7 @@ impl ClientBuilder<ApiKey> {
             key: self.key,
             base_url,
             gateway: self.gateway,
-            uprade_policy: self.upgrade_policy,
+            upgrade_policy: self.upgrade_policy,
             client: reqwest::ClientBuilder::new()
                 .user_agent(user_agent)
                 .default_headers(headers)

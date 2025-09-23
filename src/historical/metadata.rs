@@ -358,7 +358,7 @@ impl FromStr for FeedMode {
             "historical-streaming" => Ok(Self::HistoricalStreaming),
             "live" => Ok(Self::Live),
             _ => Err(crate::Error::internal(format_args!(
-                "Unabled to convert {s} to FeedMode"
+                "Unable to convert {s} to FeedMode"
             ))),
         }
     }

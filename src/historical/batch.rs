@@ -1,8 +1,9 @@
 //! The historical batch download API.
 
-use core::fmt;
 use std::{
+    cmp::Ordering,
     collections::HashMap,
+    fmt,
     fmt::Write,
     num::NonZeroU64,
     path::{Path, PathBuf},
@@ -11,11 +12,13 @@ use std::{
 
 use dbn::{Compression, Encoding, SType, Schema};
 use futures::StreamExt;
+use hex::ToHex;
 use reqwest::RequestBuilder;
 use serde::{de, Deserialize, Deserializer};
+use sha2::{Digest, Sha256};
 use time::OffsetDateTime;
 use tokio::io::BufWriter;
-use tracing::info;
+use tracing::{debug, error, info, info_span, warn, Instrument};
 use typed_builder::TypedBuilder;
 
 use crate::{historical::check_http_error, Error, Symbols};
@@ -144,10 +147,11 @@ impl BatchClient<'_> {
                 .urls
                 .get("https")
                 .ok_or_else(|| Error::internal("Missing https URL for batch file"))?;
-            self.download_file(https_url, &output_path).await?;
+            self.download_file(https_url, &output_path, &file_desc.hash, file_desc.size)
+                .await?;
             Ok(vec![output_path])
         } else {
-            let mut paths = Vec::new();
+            let mut paths = Vec::with_capacity(job_files.len());
             for file_desc in job_files.iter() {
                 let output_path = params
                     .output_dir
@@ -157,31 +161,136 @@ impl BatchClient<'_> {
                     .urls
                     .get("https")
                     .ok_or_else(|| Error::internal("Missing https URL for batch file"))?;
-                self.download_file(https_url, &output_path).await?;
+                self.download_file(https_url, &output_path, &file_desc.hash, file_desc.size)
+                    .await?;
                 paths.push(output_path);
             }
             Ok(paths)
         }
     }
 
-    async fn download_file(&mut self, url: &str, path: impl AsRef<Path>) -> crate::Result<()> {
+    async fn download_file(
+        &mut self,
+        url: &str,
+        path: &Path,
+        hash: &str,
+        exp_size: u64,
+    ) -> crate::Result<()> {
+        const MAX_RETRIES: usize = 5;
         let url = reqwest::Url::parse(url)
             .map_err(|e| Error::internal(format!("Unable to parse URL: {e:?}")))?;
-        let resp = self.inner.get_with_path(url.path())?.send().await?;
-        let mut stream = check_http_error(resp).await?.bytes_stream();
-        info!(%url, path=%path.as_ref().display(), "Downloading file");
-        let mut output = BufWriter::new(
-            tokio::fs::OpenOptions::new()
-                .create(true)
-                .truncate(true)
-                .write(true)
-                .open(path)
-                .await?,
-        );
-        while let Some(chunk) = stream.next().await {
-            tokio::io::copy(&mut chunk?.as_ref(), &mut output).await?;
+
+        let Some((hash_algo, exp_hash_hex)) = hash.split_once(':') else {
+            return Err(Error::internal("Unexpected hash string format {hash:?}"));
+        };
+        let mut hasher = if hash_algo == "sha256" {
+            Some(Sha256::new())
+        } else {
+            warn!(
+                hash_algo,
+                "Skipping checksum with unsupported hash algorithm"
+            );
+            None
+        };
+
+        let span = info_span!("BatchDownload", %url, path=%path.display());
+        async move {
+            let mut retries = 0;
+            'retry: loop {
+                let mut req = self.inner.get_with_path(url.path())?;
+                match Self::check_if_exists(path, exp_size).await? {
+                    Header::Skip => {
+                        return Ok(());
+                    }
+                    Header::Range(Some((key, val))) => {
+                        req = req.header(key, val);
+                    }
+                    Header::Range(None) => {}
+                }
+                let resp = req.send().await?;
+                let mut stream = check_http_error(resp).await?.bytes_stream();
+                info!("Downloading file");
+                let mut output = BufWriter::new(
+                    tokio::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .write(true)
+                        .open(path)
+                        .await?,
+                );
+                while let Some(chunk) = stream.next().await {
+                    let chunk = match chunk {
+                        Ok(chunk) => chunk,
+                        Err(err) if retries < MAX_RETRIES => {
+                            retries += 1;
+                            error!(?err, retries, "Retrying download");
+                            continue 'retry;
+                        }
+                        Err(err) => {
+                            return Err(crate::Error::from(err));
+                        }
+                    };
+                    if retries > 0 {
+                        retries = 0;
+                        info!("Resumed download");
+                    }
+                    if let Some(hasher) = hasher.as_mut() {
+                        hasher.update(&chunk)
+                    }
+                    tokio::io::copy(&mut chunk.as_ref(), &mut output).await?;
+                }
+                debug!("Completed download");
+                Self::verify_hash(hasher, exp_hash_hex).await;
+                return Ok(());
+            }
         }
-        Ok(())
+        .instrument(span)
+        .await
+    }
+
+    async fn check_if_exists(path: &Path, exp_size: u64) -> crate::Result<Header> {
+        let Ok(metadata) = tokio::fs::metadata(path).await else {
+            return Ok(Header::Range(None));
+        };
+        let actual_size = metadata.len();
+        match actual_size.cmp(&exp_size) {
+            Ordering::Less => {
+                debug!(
+                    prev_downloaded_bytes = actual_size,
+                    total_bytes = exp_size,
+                    "Found existing file, resuming download"
+                );
+            }
+            Ordering::Equal => {
+                debug!("Skipping download as file already exists and matches expected size");
+                return Ok(Header::Skip);
+            }
+            Ordering::Greater => {
+                return Err(crate::Error::Io(std::io::Error::other(format!(
+                                    "Batch file {} already exists with size {actual_size} which is larger than expected size {exp_size}",
+                                    path.file_name().unwrap().display(),
+                                ))));
+            }
+        }
+        Ok(Header::Range(Some((
+            "Range",
+            format!("bytes={}-", metadata.len()),
+        ))))
+    }
+
+    async fn verify_hash(hasher: Option<Sha256>, exp_hash_hex: &str) {
+        let Some(hasher) = hasher else {
+            return;
+        };
+        let hash_hex = hasher.finalize().encode_hex::<String>();
+        if hash_hex != exp_hash_hex {
+            warn!(
+                hash_hex,
+                exp_hash_hex, "Downloaded file failed checksum validation"
+            );
+        } else {
+            debug!("Successfully verified checksum");
+        }
     }
 
     const PATH_PREFIX: &'static str = "batch";
@@ -403,7 +512,7 @@ pub struct DownloadParams {
     #[builder(setter(transform = |dt: impl ToString| dt.to_string()))]
     pub job_id: String,
     /// `None` means all files associated with the job will be downloaded.
-    #[builder(default, setter(strip_option))]
+    #[builder(default, setter(transform = |filename: impl ToString| Some(filename.to_string())))]
     pub filename_to_download: Option<String>,
 }
 
@@ -540,6 +649,11 @@ fn deserialize_compression<'de, D: serde::Deserializer<'de>>(
 ) -> Result<Compression, D::Error> {
     let opt = Option::<Compression>::deserialize(deserializer)?;
     Ok(opt.unwrap_or(Compression::None))
+}
+
+enum Header {
+    Skip,
+    Range(Option<(&'static str, String)>),
 }
 
 #[cfg(test)]

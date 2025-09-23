@@ -26,15 +26,17 @@ pub struct Subscription {
     /// The symbology type of the symbols in [`symbols`](Self::symbols).
     #[builder(default = SType::RawSymbol)]
     pub stype_in: SType,
-    /// If specified, requests available data since that time (inclusive), based on
-    /// [`ts_event`](dbn::RecordHeader::ts_event). When `None`, only real-time data is sent.
+    /// The inclusive start of subscription replay.
+    /// Pass [`OffsetDateTime::UNIX_EPOCH`](time::OffsetDateTime::UNIX_EPOCH) to request all available data.
+    /// When `None`, only real-time data is sent.
     ///
-    /// Setting this field is not supported once the session has been started with
-    /// [`LiveClient::start`](crate::LiveClient::start).
+    /// Cannot be specified after the session is started with [`LiveClient::start`](crate::LiveClient::start).
+    /// See [`Intraday Replay`](https://databento.com/docs/api-reference-live/basics/intraday-replay).
     #[builder(default, setter(strip_option))]
     pub start: Option<OffsetDateTime>,
     #[doc(hidden)]
-    /// Request subscription with snapshot. Defaults to `false`. Conflicts with the `start` parameter.
+    /// Request subscription with snapshot. Only supported with `Mbo` schema.
+    /// Defaults to `false`. Conflicts with the `start` parameter.
     #[builder(setter(strip_bool))]
     pub use_snapshot: bool,
     /// The optional numerical identifier associated with this subscription.
