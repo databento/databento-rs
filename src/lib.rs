@@ -14,8 +14,10 @@ pub mod live;
 
 pub use error::{Error, Result};
 #[cfg(feature = "historical")]
+#[doc(inline)]
 pub use historical::Client as HistoricalClient;
 #[cfg(feature = "live")]
+#[doc(inline)]
 pub use live::Client as LiveClient;
 // Re-export to keep versions synchronized
 pub use dbn;
