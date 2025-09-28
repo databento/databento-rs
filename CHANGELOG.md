@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.34.1 - TBD
+
+### Bug fixes
+- Fixed visibility of fields in `DateRange` and `DateTimeRange`
+
 ## 0.34.0 - 2025-09-23
 
 ### Enhancements
