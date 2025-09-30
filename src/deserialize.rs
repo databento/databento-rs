@@ -17,20 +17,26 @@ pub(crate) fn deserialize_date_time<'de, D: serde::Deserializer<'de>>(
         .map_err(serde::de::Error::custom)
 }
 
-pub(crate) fn deserialize_date_time_hash_map<'de, D: serde::Deserializer<'de>>(
+pub(crate) fn deserialize_opt_date_time_hash_map<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
-) -> Result<HashMap<String, OffsetDateTime>, D::Error> {
-    let map: HashMap<String, String> = HashMap::deserialize(deserializer)?;
+) -> Result<HashMap<String, Option<OffsetDateTime>>, D::Error> {
+    let map: HashMap<String, Option<String>> = HashMap::deserialize(deserializer)?;
     map.into_iter()
         .map(|(k, v)| {
             Ok((
                 k,
-                time::PrimitiveDateTime::parse(&v, &Iso8601::DEFAULT)
-                    .map_err(serde::de::Error::custom)?
-                    .assume_utc(),
+                if let Some(v) = v {
+                    Some(
+                        time::PrimitiveDateTime::parse(&v, &Iso8601::DEFAULT)
+                            .map_err(serde::de::Error::custom)?
+                            .assume_utc(),
+                    )
+                } else {
+                    None
+                },
             ))
         })
-        .collect::<Result<HashMap<String, OffsetDateTime>, D::Error>>()
+        .collect::<Result<HashMap<String, Option<OffsetDateTime>>, D::Error>>()
 }
 
 pub(crate) fn deserialize_opt_date_time<'de, D: serde::Deserializer<'de>>(

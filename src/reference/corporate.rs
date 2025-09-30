@@ -8,7 +8,7 @@ use time::{Date, OffsetDateTime};
 use typed_builder::TypedBuilder;
 
 use crate::{
-    deserialize::{deserialize_date_time, deserialize_date_time_hash_map},
+    deserialize::{deserialize_date_time, deserialize_opt_date_time_hash_map},
     historical::{handle_zstd_jsonl_response, AddToForm, ReqwestForm},
     reference::{
         Action, Country, Currency, DateTimeLike, End, Event, EventSubType, Fraction, GlobalStatus,
@@ -73,9 +73,10 @@ impl<'a> AddToForm<Exchanges<'a>> for ReqwestForm {
 }
 
 /// Which field to use for filtering and sorting.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub enum Index {
     /// [`event_date`][CorporateAction::event_date].
+    #[default]
     EventDate,
     /// [`ex_date`][CorporateAction::ex_date].
     ExDate,
@@ -96,7 +97,7 @@ pub struct GetRangeParams {
     #[builder(default, setter(transform = |dt: impl DateTimeLike| Some(dt.to_date_time())))]
     pub end: Option<OffsetDateTime>,
     /// The timestamp to use for filtering.
-    #[builder(default = Index::EventDate)]
+    #[builder(default)]
     pub index: Index,
     /// The symbols to filter for.
     #[builder(setter(into))]
@@ -388,12 +389,12 @@ pub struct CorporateAction {
     /// Expiry time zone.
     pub expiry_tz: Option<String>,
     /// Event-specific date information.
-    #[serde(deserialize_with = "deserialize_date_time_hash_map")]
-    pub date_info: HashMap<String, OffsetDateTime>,
+    #[serde(deserialize_with = "deserialize_opt_date_time_hash_map")]
+    pub date_info: HashMap<String, Option<OffsetDateTime>>,
     /// Event-specific payment information.
     pub rate_info: HashMap<String, Option<f64>>,
     /// Additional event-specific information.
-    pub event_info: HashMap<String, String>,
+    pub event_info: HashMap<String, Option<String>>,
     /// The timestamp (UTC) the record was added by Databento.
     #[serde(deserialize_with = "deserialize_date_time")]
     pub ts_created: OffsetDateTime,

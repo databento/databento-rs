@@ -80,9 +80,10 @@ impl SecurityMasterClient<'_> {
 }
 
 /// Which field to use for filtering and sorting.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub enum Index {
     /// [`ts_effective`][SecurityMaster::ts_effective].
+    #[default]
     TsEffective,
     /// [`ts_record`][SecurityMaster::ts_record].
     TsRecord,
@@ -101,7 +102,7 @@ pub struct GetRangeParams {
     #[builder(default, setter(transform = |dt: impl DateTimeLike| Some(dt.to_date_time())))]
     pub end: Option<OffsetDateTime>,
     /// The timestamp to use for filtering.
-    #[builder(default = Index::TsEffective)]
+    #[builder(default)]
     pub index: Index,
     /// The symbols to filter for.
     #[builder(setter(into))]
