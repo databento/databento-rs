@@ -1,6 +1,9 @@
 # Changelog
 
-## 0.34.1 - TBD
+## 0.34.1 - 2025-09-30
+
+### Enhancements
+- Upgraded DBN version to 0.42.0
 
 ### Bug fixes
 - Fixed visibility of fields in `DateRange` and `DateTimeRange`
