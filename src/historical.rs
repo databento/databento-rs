@@ -32,9 +32,9 @@ pub enum HistoricalGateway {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DateRange {
     /// The inclusive UTC start date.
-    start: time::Date,
+    pub start: time::Date,
     /// The exclusive UTC end date.
-    end: time::Date,
+    pub end: time::Date,
 }
 
 /// A **half**-closed datetime interval with an inclusive start and an exclusive end.
@@ -42,10 +42,10 @@ pub struct DateRange {
 pub struct DateTimeRange {
     /// The inclusive start.
     #[serde(deserialize_with = "deserialize_date_time")]
-    start: time::OffsetDateTime,
+    pub start: time::OffsetDateTime,
     /// The exclusive end.
     #[serde(deserialize_with = "deserialize_date_time")]
-    end: time::OffsetDateTime,
+    pub end: time::OffsetDateTime,
 }
 
 impl From<(time::Date, time::Date)> for DateRange {
