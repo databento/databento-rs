@@ -9,7 +9,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     deserialize::{deserialize_date_time, deserialize_date_time_hash_map},
-    historical::{handle_zstd_jsonl_response, AddToForm},
+    historical::{handle_zstd_jsonl_response, AddToForm, ReqwestForm},
     reference::{
         Action, Country, Currency, DateTimeLike, End, Event, EventSubType, Fraction, GlobalStatus,
         ListingSource, ListingStatus, MandVolu, OutturnStyle, PaymentType, SecurityType, Start,
@@ -43,6 +43,7 @@ impl CorporateActionsClient<'_> {
         .add_to_form(&End(params.end))
         .add_to_form(&params.events)
         .add_to_form(&params.countries)
+        .add_to_form(&Exchanges(&params.exchanges))
         .add_to_form(&params.security_types);
         let resp = self
             .inner
@@ -57,6 +58,17 @@ impl CorporateActionsClient<'_> {
             Index::TsRecord => corporate_actions.sort_by_key(|a| a.ts_record),
         };
         Ok(corporate_actions)
+    }
+}
+
+struct Exchanges<'a>(&'a Vec<String>);
+
+impl<'a> AddToForm<Exchanges<'a>> for ReqwestForm {
+    fn add_to_form(mut self, Exchanges(exchanges): &Exchanges) -> Self {
+        if !exchanges.is_empty() {
+            self.push(("exchanges", exchanges.join(",")));
+        }
+        self
     }
 }
 
@@ -100,6 +112,10 @@ pub struct GetRangeParams {
     /// included.
     #[builder(default, setter(into))]
     pub countries: Vec<Country>,
+    /// An optional list of listing exchanges to filter for. By default all exchanges are
+    /// included.
+    #[builder(default, setter(into))]
+    pub exchanges: Vec<String>,
     /// An optional list of security types to filter for. By default all security types
     /// are included.
     #[builder(default, setter(into))]
