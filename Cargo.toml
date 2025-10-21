@@ -26,6 +26,7 @@ historical = [
   "dep:serde",
   "dep:tokio-util",
   "dep:serde_json",
+  "dep:zstd",
   "tokio/fs"
 ]
 live = ["tokio/net"]
@@ -44,12 +45,13 @@ serde_json = { version = "1.0", optional = true }
 # Used for Live authentication and historical checksums
 sha2 = "0.10"
 thiserror = "2.0"
-time = { version = ">=0.3.35", features = ["macros", "parsing", "serde"] }
+time = { version = ">=0.3.35", features = ["macros", "parsing", "serde-human-readable"] }
 tokio = { version = ">=1.38", features = ["io-util", "macros"] }
 # Stream utils
 tokio-util = { version = "0.7", features = ["io"], optional = true }
 tracing = "0.1"
 typed-builder = "0.22"
+zstd = { version = "0.13", optional = true }
 
 [dev-dependencies]
 anyhow = "1.0.100"

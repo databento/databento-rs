@@ -20,6 +20,14 @@ pub enum Error {
     #[cfg(feature = "historical")]
     #[error("HTTP error: {0:?}")]
     Http(#[from] reqwest::Error),
+    /// An error related to JSON decoding.
+    #[cfg(feature = "historical")]
+    #[error("JSON error: {0:?}")]
+    Json(#[from] serde_json::Error),
+    /// An error related to JSON decoding.
+    #[cfg(feature = "historical")]
+    #[error("invalid UTF-8: {0:?}")]
+    Utf8(#[from] std::str::Utf8Error),
     /// An error from the Databento API.
     #[cfg(feature = "historical")]
     #[error("API error: {0}")]
@@ -27,7 +35,7 @@ pub enum Error {
     /// An error internal to the client.
     #[error("internal error: {0}")]
     Internal(String),
-    /// An error related to DBN encoding.
+    /// An error related to DBN encoding or decoding.
     #[error("DBN error: {0}")]
     Dbn(#[source] dbn::Error),
     /// An when authentication failed.

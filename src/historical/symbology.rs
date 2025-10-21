@@ -7,7 +7,7 @@ use reqwest::RequestBuilder;
 use serde::Deserialize;
 use typed_builder::TypedBuilder;
 
-use crate::Symbols;
+use crate::{historical::AddToForm, Symbols};
 
 use super::{handle_response, timeseries, DateRange, DateTimeRange};
 
@@ -26,13 +26,13 @@ impl SymbologyClient<'_> {
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
     pub async fn resolve(&mut self, params: &ResolveParams) -> crate::Result<Resolution> {
-        let mut form = vec![
+        let form = vec![
             ("dataset", params.dataset.to_string()),
             ("stype_in", params.stype_in.to_string()),
             ("stype_out", params.stype_out.to_string()),
             ("symbols", params.symbols.to_api_string()),
-        ];
-        params.date_range.add_to_form(&mut form);
+        ]
+        .add_to_form(&params.date_range);
         let resp = self.post("resolve")?.form(&form).send().await?;
         let ResolutionResp {
             mappings,
@@ -201,18 +201,11 @@ mod tests {
     };
 
     use super::*;
-    use crate::{body_contains, historical::API_VERSION, HistoricalClient};
-
-    const API_KEY: &str = "test-API________________________";
-
-    fn client(mock_server: &MockServer) -> HistoricalClient {
-        HistoricalClient::builder()
-            .base_url(mock_server.uri().parse().unwrap())
-            .key(API_KEY)
-            .unwrap()
-            .build()
-            .unwrap()
-    }
+    use crate::{
+        body_contains,
+        historical::test_infra::{client, API_KEY},
+        historical::API_VERSION,
+    };
 
     #[tokio::test]
     async fn test_resolve() {

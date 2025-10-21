@@ -9,6 +9,9 @@ use databento::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    tracing_subscriber::FmtSubscriber::builder()
+        .with_test_writer()
+        .init();
     let mut client = LiveClient::builder()
         .key_from_env()?
         .dataset(Dataset::GlbxMdp3)

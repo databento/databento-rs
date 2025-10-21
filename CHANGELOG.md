@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.35.0 - TBD
+
+### Enhancements
+- Initial release with Reference API support
+
 ## 0.34.1 - 2025-09-30
 
 ### Enhancements

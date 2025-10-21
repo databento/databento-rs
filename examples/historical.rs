@@ -10,6 +10,9 @@ use time::macros::{date, datetime};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    tracing_subscriber::FmtSubscriber::builder()
+        .with_test_writer()
+        .init();
     let mut client = HistoricalClient::builder().key_from_env()?.build()?;
     let mut decoder = client
         .timeseries()
