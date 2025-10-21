@@ -1,9 +1,12 @@
 # Changelog
 
-## 0.35.0 - TBD
+## 0.35.0 - 2025-10-22
 
 ### Enhancements
 - Initial release with Reference API support
+- Upgraded DBN version to 0.43.0:
+  - Added explicit `Unset` variant for `SystemCode` and `ErrorCode`
+  - Added `Default` implementation for `SystemCode` and `ErrorCode`
 
 ## 0.34.1 - 2025-09-30
 
