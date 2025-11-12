@@ -8,6 +8,9 @@
   - Added explicit `Unset` variant for `SystemCode` and `ErrorCode`
   - Added `Default` implementation for `SystemCode` and `ErrorCode`
 
+### Breaking changes
+- Updated the minimum supported `tokio` version to 1.41, which was released one year ago
+
 ## 0.34.1 - 2025-09-30
 
 ### Enhancements
