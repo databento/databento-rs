@@ -10,6 +10,9 @@
 
 ### Breaking changes
 - Updated the minimum supported `tokio` version to 1.41, which was released one year ago
+- Made reference enums `Country`, `Currency`, and `EventSubType` non-exhaustive
+- Removed variants from `Country` and `Currency` that were not present in any data
+- Added more variants to `EventSubType`
 
 ## 0.34.1 - 2025-09-30
 
