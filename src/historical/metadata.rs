@@ -53,10 +53,10 @@ impl MetadataClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
-    pub async fn list_schemas(&mut self, dataset: &str) -> crate::Result<Vec<Schema>> {
+    pub async fn list_schemas(&mut self, dataset: impl AsRef<str>) -> crate::Result<Vec<Schema>> {
         let resp = self
             .get("list_schemas")?
-            .query(&[("dataset", dataset)])
+            .query(&[("dataset", dataset.as_ref())])
             .send()
             .await?;
         handle_response(resp).await
@@ -86,11 +86,11 @@ impl MetadataClient<'_> {
     /// or the API indicates there's an issue with the request.
     pub async fn list_unit_prices(
         &mut self,
-        dataset: &str,
+        dataset: impl AsRef<str>,
     ) -> crate::Result<Vec<UnitPricesForMode>> {
         let builder = self
             .get("list_unit_prices")?
-            .query(&[("dataset", &dataset)]);
+            .query(&[("dataset", &dataset.as_ref())]);
         let resp = builder.send().await?;
         handle_response(resp).await
     }
@@ -123,10 +123,13 @@ impl MetadataClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
-    pub async fn get_dataset_range(&mut self, dataset: &str) -> crate::Result<DatasetRange> {
+    pub async fn get_dataset_range(
+        &mut self,
+        dataset: impl AsRef<str>,
+    ) -> crate::Result<DatasetRange> {
         let resp = self
             .get("get_dataset_range")?
-            .query(&[("dataset", dataset)])
+            .query(&[("dataset", dataset.as_ref())])
             .send()
             .await?;
         handle_response(resp).await

@@ -82,7 +82,7 @@ async fn fetch_symbols_to_parent(metadata: &Metadata) -> anyhow::Result<HashMap<
                 &GetRangeParams::builder()
                     .dataset(metadata.dataset.clone())
                     .schema(Schema::Definition)
-                    .date_time_range((metadata.start(), end))
+                    .date_time_range(metadata.start()..end)
                     .symbols(Vec::from(chunk))
                     .build(),
             )

@@ -751,7 +751,7 @@ mod tests {
                     .dataset(dbn::Dataset::XnasItch)
                     .schema(SCHEMA)
                     .symbols("TSLA")
-                    .date_time_range((START, END))
+                    .date_time_range(START..END)
                     .build(),
             )
             .await?;
