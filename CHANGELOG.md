@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.36.0 - TBD
+## 0.36.0 - 2025-11-19
 
 ### Enhancements
 - Added support for using built-in range syntax for specifying date and datetime ranges
@@ -8,6 +8,10 @@
 - Changed `metadata().get_dataset_range()`, `metadata().list_schemas()`, and
   `metadata().list_unit_prices()` to accept any `impl AsRef<str>` as the dataset
   parameter
+- Upgraded DBN version to 0.44.0:
+  - Added logic to set `code` when upgrading version 1 `SystemMsg` to newer versions
+  - Added `Dataset::publishers()` method to retrieve all `Publisher` values for a
+    dataset
 
 ### Breaking changes
 - Updated the minimum supported `tokio` version to 1.41, which was released one year ago
