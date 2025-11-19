@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.36.0 - 2025-11-19
+
+### Enhancements
+- Added support for using built-in range syntax for specifying date and datetime ranges
+  in the historical API, e.g. `date!(2020-01-01)..=date!(2020-12-31)`
+- Changed `metadata().get_dataset_range()`, `metadata().list_schemas()`, and
+  `metadata().list_unit_prices()` to accept any `impl AsRef<str>` as the dataset
+  parameter
+- Upgraded DBN version to 0.44.0:
+  - Added logic to set `code` when upgrading version 1 `SystemMsg` to newer versions
+  - Added `Dataset::publishers()` method to retrieve all `Publisher` values for a
+    dataset
+
+### Breaking changes
+- Updated the minimum supported `tokio` version to 1.41, which was released one year ago
+- Made reference enums `Country`, `Currency`, and `EventSubType` non-exhaustive
+- Removed variants from `Country` and `Currency` that were not present in any data
+- Added more variants to `EventSubType`
+
 ## 0.35.0 - 2025-10-22
 
 ### Enhancements
@@ -7,7 +26,6 @@
 - Upgraded DBN version to 0.43.0:
   - Added explicit `Unset` variant for `SystemCode` and `ErrorCode`
   - Added `Default` implementation for `SystemCode` and `ErrorCode`
-
 ## 0.34.1 - 2025-09-30
 
 ### Enhancements

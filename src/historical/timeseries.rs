@@ -341,7 +341,7 @@ mod tests {
                     .dataset(dbn::Dataset::XnasItch)
                     .schema(SCHEMA)
                     .symbols(vec!["SPOT", "AAPL"])
-                    .date_time_range((START, END))
+                    .date_time_range(START..END)
                     .build(),
             )
             .await
@@ -399,7 +399,7 @@ mod tests {
                     .schema(SCHEMA)
                     .symbols(vec!["BRN.FUT"])
                     .stype_in(SType::Parent)
-                    .date_time_range((START, END))
+                    .date_time_range(START..END)
                     .path(path.clone())
                     .build(),
             )

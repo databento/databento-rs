@@ -1,7 +1,6 @@
 // Use README as crate-level documentation
 #![doc = include_str!("../README.md")]
-// Experimental feature to allow docs.rs to display features
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::missing_errors_doc)]

@@ -19,10 +19,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .get_range(
             &GetRangeParams::builder()
                 .dataset(Dataset::GlbxMdp3)
-                .date_time_range((
-                    datetime!(2022-06-10 14:30 UTC),
-                    datetime!(2022-06-10 14:40 UTC),
-                ))
+                .date_time_range(datetime!(2022-06-10 14:30 UTC)..datetime!(2022-06-10 14:40 UTC))
                 .symbols("ES.FUT")
                 .stype_in(SType::Parent)
                 .schema(Schema::Trades)

@@ -6,7 +6,10 @@ pub mod metadata;
 pub mod symbology;
 pub mod timeseries;
 
-use std::num::NonZeroU64;
+use std::{
+    num::NonZeroU64,
+    ops::{Range, RangeInclusive},
+};
 
 pub use client::*;
 use serde::Deserialize;
@@ -57,6 +60,24 @@ pub struct DateTimeRange {
     pub end: time::OffsetDateTime,
 }
 
+impl From<Range<time::Date>> for DateRange {
+    fn from(range: Range<time::Date>) -> Self {
+        Self {
+            start: range.start,
+            end: range.end,
+        }
+    }
+}
+
+impl From<RangeInclusive<time::Date>> for DateRange {
+    fn from(range: RangeInclusive<time::Date>) -> Self {
+        Self {
+            start: *range.start(),
+            end: range.end().next_day().unwrap(),
+        }
+    }
+}
+
 impl From<(time::Date, time::Date)> for DateRange {
     fn from(value: (time::Date, time::Date)) -> Self {
         Self {
@@ -71,6 +92,36 @@ impl From<(time::Date, time::Duration)> for DateRange {
         Self {
             start: value.0,
             end: value.0 + value.1,
+        }
+    }
+}
+
+impl From<Range<time::Date>> for DateTimeRange {
+    fn from(range: Range<time::Date>) -> Self {
+        Self::from(DateRange::from(range))
+    }
+}
+
+impl From<RangeInclusive<time::Date>> for DateTimeRange {
+    fn from(range: RangeInclusive<time::Date>) -> Self {
+        Self::from(DateRange::from(range))
+    }
+}
+
+impl From<Range<time::OffsetDateTime>> for DateTimeRange {
+    fn from(range: Range<time::OffsetDateTime>) -> Self {
+        Self {
+            start: range.start,
+            end: range.end,
+        }
+    }
+}
+
+impl From<RangeInclusive<time::OffsetDateTime>> for DateTimeRange {
+    fn from(range: RangeInclusive<time::OffsetDateTime>) -> Self {
+        Self {
+            start: *range.start(),
+            end: *range.end() + time::Duration::NANOSECOND,
         }
     }
 }
@@ -265,6 +316,14 @@ mod tests {
         assert_eq!(
             DateRange::from(date),
             DateRange::from((date!(2025 - 03 - 27), date!(2025 - 03 - 28)))
+        );
+        assert_eq!(
+            DateRange::from(date),
+            DateRange::from(date!(2025 - 03 - 27)..date!(2025 - 03 - 28))
+        );
+        assert_eq!(
+            DateRange::from(date),
+            DateRange::from(date!(2025 - 03 - 27)..=date!(2025 - 03 - 27))
         );
         assert_eq!(
             DateTimeRange::from(date),

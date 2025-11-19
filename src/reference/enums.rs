@@ -129,6 +129,7 @@ impl Serialize for AdjustmentStatus {
 ///
 /// Based ISO 3166-1 alpha-2 country codes with some unofficial extensions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum Country {
     /// Supranational
     Aa,
@@ -146,8 +147,6 @@ pub enum Country {
     Al,
     /// Armenia
     Am,
-    /// Netherlands Antilles
-    An,
     /// Angola
     Ao,
     /// Argentina
@@ -226,8 +225,6 @@ pub enum Country {
     Co,
     /// Costa Rica
     Cr,
-    /// Czechoslovakia
-    Cs,
     /// Cuba
     Cu,
     /// Cape Verde
@@ -278,8 +275,6 @@ pub enum Country {
     Fo,
     /// France
     Fr,
-    /// French Metropolitan
-    Fx,
     /// Gabon
     Ga,
     /// United Kingdom
@@ -542,8 +537,6 @@ pub enum Country {
     Sr,
     /// Sao Tome and Principe
     St,
-    /// USSR
-    Su,
     /// El Salvador
     Sv,
     /// Syria
@@ -643,7 +636,6 @@ impl Country {
             Self::Ai => "AI",
             Self::Al => "AL",
             Self::Am => "AM",
-            Self::An => "AN",
             Self::Ao => "AO",
             Self::Ar => "AR",
             Self::As => "AS",
@@ -683,7 +675,6 @@ impl Country {
             Self::Cn => "CN",
             Self::Co => "CO",
             Self::Cr => "CR",
-            Self::Cs => "CS",
             Self::Cu => "CU",
             Self::Cv => "CV",
             Self::Cw => "CW",
@@ -709,7 +700,6 @@ impl Country {
             Self::Fm => "FM",
             Self::Fo => "FO",
             Self::Fr => "FR",
-            Self::Fx => "FX",
             Self::Ga => "GA",
             Self::Gb => "GB",
             Self::Gd => "GD",
@@ -841,7 +831,6 @@ impl Country {
             Self::So => "SO",
             Self::Sr => "SR",
             Self::St => "ST",
-            Self::Su => "SU",
             Self::Sv => "SV",
             Self::Sy => "SY",
             Self::Sz => "SZ",
@@ -908,7 +897,6 @@ impl std::str::FromStr for Country {
             "AI" => Ok(Self::Ai),
             "AL" => Ok(Self::Al),
             "AM" => Ok(Self::Am),
-            "AN" => Ok(Self::An),
             "AO" => Ok(Self::Ao),
             "AR" => Ok(Self::Ar),
             "AS" => Ok(Self::As),
@@ -948,7 +936,6 @@ impl std::str::FromStr for Country {
             "CN" => Ok(Self::Cn),
             "CO" => Ok(Self::Co),
             "CR" => Ok(Self::Cr),
-            "CS" => Ok(Self::Cs),
             "CU" => Ok(Self::Cu),
             "CV" => Ok(Self::Cv),
             "CW" => Ok(Self::Cw),
@@ -974,7 +961,6 @@ impl std::str::FromStr for Country {
             "FM" => Ok(Self::Fm),
             "FO" => Ok(Self::Fo),
             "FR" => Ok(Self::Fr),
-            "FX" => Ok(Self::Fx),
             "GA" => Ok(Self::Ga),
             "GB" => Ok(Self::Gb),
             "GD" => Ok(Self::Gd),
@@ -1106,7 +1092,6 @@ impl std::str::FromStr for Country {
             "SO" => Ok(Self::So),
             "SR" => Ok(Self::Sr),
             "ST" => Ok(Self::St),
-            "SU" => Ok(Self::Su),
             "SV" => Ok(Self::Sv),
             "SY" => Ok(Self::Sy),
             "SZ" => Ok(Self::Sz),
@@ -1176,9 +1161,8 @@ impl Serialize for Country {
 
 /// A currency.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum Currency {
-    /// Andorra Peseta
-    Adp,
     /// UAE Dirham
     Aed,
     /// Afghanis
@@ -1193,8 +1177,6 @@ pub enum Currency {
     Aoa,
     /// Argentine Peso
     Ars,
-    /// Austrian Schilling
-    Ats,
     /// Australian Dollar
     Aud,
     /// Aruban Guilder
@@ -1207,8 +1189,6 @@ pub enum Currency {
     Bbd,
     /// Bangladesh Taka
     Bdt,
-    /// Belgian Franc
-    Bef,
     /// Bulgarian Lev
     Bgn,
     /// Bahraini Dinar
@@ -1233,8 +1213,6 @@ pub enum Currency {
     Bwp,
     /// Belarusian Ruble (New)
     Byn,
-    /// Belarussian Ruble
-    Byr,
     /// Belize Dollar
     Bzd,
     /// Canadian Dollar
@@ -1263,8 +1241,6 @@ pub enum Currency {
     Cyp,
     /// Czech Koruna
     Czk,
-    /// Deutschmark
-    Dem,
     /// Djibouti Franc
     Djf,
     /// Danish Kroner
@@ -1281,28 +1257,20 @@ pub enum Currency {
     Egp,
     /// Eritrean Nakfa
     Ern,
-    /// Spanish Pesetas
-    Esp,
     /// Ethiopian Birr
     Etb,
     /// Euros
     Eur,
-    /// Finnish Markka
-    Fim,
     /// Fiji Dollar
     Fjd,
     /// Falklands Pounds
     Fkp,
-    /// French Francs
-    Frf,
     /// Pound Sterling
     Gbp,
     /// GB Pence
     Gbx,
     /// Georgian Lari
     Gel,
-    /// Ghana Cedi
-    Ghc,
     /// Ghanaian Cedi
     Ghs,
     /// Gibraltar Pounds
@@ -1329,8 +1297,6 @@ pub enum Currency {
     Huf,
     /// Indonesian Rupiah
     Idr,
-    /// Irish Punt
-    Iep,
     /// Israeli New Shekel
     Ils,
     /// Indian Rupees
@@ -1341,10 +1307,6 @@ pub enum Currency {
     Irr,
     /// Icelandic Krona
     Isk,
-    /// Italian Lire
-    Itl,
-    /// Jersey Pounds
-    Jep,
     /// Jamaican Dollar
     Jmd,
     /// Jordanian Dinar
@@ -1381,10 +1343,6 @@ pub enum Currency {
     Lsl,
     /// Lithuanian Litas
     Ltl,
-    /// Luxembourg Francs
-    Luf,
-    /// Latvian Lats
-    Lvl,
     /// Libyan Dinar
     Lyd,
     /// Moroccan Dirham
@@ -1403,8 +1361,6 @@ pub enum Currency {
     Mop,
     /// Mauritanian Ouguiya
     Mro,
-    /// Maltese Lira
-    Mtl,
     /// Mauritius Rupee
     Mur,
     /// Maldivian Rufiyaa
@@ -1425,8 +1381,6 @@ pub enum Currency {
     Ngn,
     /// Nicaraguan Cordoba Oro
     Nio,
-    /// Netherlands Guilder
-    Nlg,
     /// Norwegian Krone
     Nok,
     /// Nepalese Rupee
@@ -1447,22 +1401,16 @@ pub enum Currency {
     Pkr,
     /// Polish Zloty (New)
     Pln,
-    /// Portuguese Escudo
-    Pte,
     /// Paraguay Guarani
     Pyg,
     /// Qatar Rial
     Qar,
-    /// Romanian Leu
-    Rol,
     /// Romanian Leu (New)
     Ron,
     /// Serbian Dinars
     Rsd,
     /// Russian Ruble (New)
     Rub,
-    /// Russian Ruble
-    Rur,
     /// Rwandan Franc
     Rwf,
     /// Saudi Arabian Riyal
@@ -1481,10 +1429,6 @@ pub enum Currency {
     Sgd,
     /// St. Helena Pounds
     Shp,
-    /// Slovenian Tolar
-    Sit,
-    /// Slovak Koruna
-    Skk,
     /// Sierra Leone
     Sll,
     /// Somalia Shilling
@@ -1509,8 +1453,6 @@ pub enum Currency {
     Tnd,
     /// Tonga Pa`anga
     Top,
-    /// Turkish Lira
-    Trl,
     /// Turkish Lira (New)
     Try,
     /// Trinidad and Tobago Dollar
@@ -1535,9 +1477,7 @@ pub enum Currency {
     Uyw,
     /// Uzbekistan Sum
     Uzs,
-    /// Venezuala Bolivar
-    Veb,
-    /// Venezuala Bolivares Fuertes
+    /// Venezuela Bolivares Fuertes
     Vef,
     /// Venezuela Sovereign Bolivar
     Ves,
@@ -1565,8 +1505,6 @@ pub enum Currency {
     Xxx,
     /// North Yemen Rial
     Yer,
-    /// Yugoslavian Dinar
-    Yum,
     /// South African Cents
     Zac,
     /// South African Rand
@@ -1588,7 +1526,6 @@ impl Currency {
     /// Converts a Currency to its `str` code.
     pub const fn as_str(&self) -> &'static str {
         match self {
-            Self::Adp => "ADP",
             Self::Aed => "AED",
             Self::Afn => "AFN",
             Self::All => "ALL",
@@ -1596,14 +1533,12 @@ impl Currency {
             Self::Ang => "ANG",
             Self::Aoa => "AOA",
             Self::Ars => "ARS",
-            Self::Ats => "ATS",
             Self::Aud => "AUD",
             Self::Awg => "AWG",
             Self::Azn => "AZN",
             Self::Bam => "BAM",
             Self::Bbd => "BBD",
             Self::Bdt => "BDT",
-            Self::Bef => "BEF",
             Self::Bgn => "BGN",
             Self::Bhd => "BHD",
             Self::Bif => "BIF",
@@ -1616,7 +1551,6 @@ impl Currency {
             Self::Btn => "BTN",
             Self::Bwp => "BWP",
             Self::Byn => "BYN",
-            Self::Byr => "BYR",
             Self::Bzd => "BZD",
             Self::Cad => "CAD",
             Self::Cdf => "CDF",
@@ -1631,7 +1565,6 @@ impl Currency {
             Self::Cve => "CVE",
             Self::Cyp => "CYP",
             Self::Czk => "CZK",
-            Self::Dem => "DEM",
             Self::Djf => "DJF",
             Self::Dkk => "DKK",
             Self::Dop => "DOP",
@@ -1640,17 +1573,13 @@ impl Currency {
             Self::Eek => "EEK",
             Self::Egp => "EGP",
             Self::Ern => "ERN",
-            Self::Esp => "ESP",
             Self::Etb => "ETB",
             Self::Eur => "EUR",
-            Self::Fim => "FIM",
             Self::Fjd => "FJD",
             Self::Fkp => "FKP",
-            Self::Frf => "FRF",
             Self::Gbp => "GBP",
             Self::Gbx => "GBX",
             Self::Gel => "GEL",
-            Self::Ghc => "GHC",
             Self::Ghs => "GHS",
             Self::Gip => "GIP",
             Self::Gmd => "GMD",
@@ -1664,14 +1593,11 @@ impl Currency {
             Self::Htg => "HTG",
             Self::Huf => "HUF",
             Self::Idr => "IDR",
-            Self::Iep => "IEP",
             Self::Ils => "ILS",
             Self::Inr => "INR",
             Self::Iqd => "IQD",
             Self::Irr => "IRR",
             Self::Isk => "ISK",
-            Self::Itl => "ITL",
-            Self::Jep => "JEP",
             Self::Jmd => "JMD",
             Self::Jod => "JOD",
             Self::Jpy => "JPY",
@@ -1690,8 +1616,6 @@ impl Currency {
             Self::Lrd => "LRD",
             Self::Lsl => "LSL",
             Self::Ltl => "LTL",
-            Self::Luf => "LUF",
-            Self::Lvl => "LVL",
             Self::Lyd => "LYD",
             Self::Mad => "MAD",
             Self::Mdl => "MDL",
@@ -1701,7 +1625,6 @@ impl Currency {
             Self::Mnt => "MNT",
             Self::Mop => "MOP",
             Self::Mro => "MRO",
-            Self::Mtl => "MTL",
             Self::Mur => "MUR",
             Self::Mvr => "MVR",
             Self::Mwk => "MWK",
@@ -1712,7 +1635,6 @@ impl Currency {
             Self::Nad => "NAD",
             Self::Ngn => "NGN",
             Self::Nio => "NIO",
-            Self::Nlg => "NLG",
             Self::Nok => "NOK",
             Self::Npr => "NPR",
             Self::Nzd => "NZD",
@@ -1723,14 +1645,11 @@ impl Currency {
             Self::Php => "PHP",
             Self::Pkr => "PKR",
             Self::Pln => "PLN",
-            Self::Pte => "PTE",
             Self::Pyg => "PYG",
             Self::Qar => "QAR",
-            Self::Rol => "ROL",
             Self::Ron => "RON",
             Self::Rsd => "RSD",
             Self::Rub => "RUB",
-            Self::Rur => "RUR",
             Self::Rwf => "RWF",
             Self::Sar => "SAR",
             Self::Sbd => "SBD",
@@ -1740,8 +1659,6 @@ impl Currency {
             Self::Sek => "SEK",
             Self::Sgd => "SGD",
             Self::Shp => "SHP",
-            Self::Sit => "SIT",
-            Self::Skk => "SKK",
             Self::Sll => "SLL",
             Self::Sos => "SOS",
             Self::Srd => "SRD",
@@ -1754,7 +1671,6 @@ impl Currency {
             Self::Tmm => "TMM",
             Self::Tnd => "TND",
             Self::Top => "TOP",
-            Self::Trl => "TRL",
             Self::Try => "TRY",
             Self::Ttd => "TTD",
             Self::Twd => "TWD",
@@ -1767,7 +1683,6 @@ impl Currency {
             Self::Uyu => "UYU",
             Self::Uyw => "UYW",
             Self::Uzs => "UZS",
-            Self::Veb => "VEB",
             Self::Vef => "VEF",
             Self::Ves => "VES",
             Self::Vnd => "VND",
@@ -1782,7 +1697,6 @@ impl Currency {
             Self::Xts => "XTS",
             Self::Xxx => "XXX",
             Self::Yer => "YER",
-            Self::Yum => "YUM",
             Self::Zac => "ZAC",
             Self::Zar => "ZAR",
             Self::Zmk => "ZMK",
@@ -1806,7 +1720,6 @@ impl std::str::FromStr for Currency {
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
-            "ADP" => Ok(Self::Adp),
             "AED" => Ok(Self::Aed),
             "AFN" => Ok(Self::Afn),
             "ALL" => Ok(Self::All),
@@ -1814,14 +1727,12 @@ impl std::str::FromStr for Currency {
             "ANG" => Ok(Self::Ang),
             "AOA" => Ok(Self::Aoa),
             "ARS" => Ok(Self::Ars),
-            "ATS" => Ok(Self::Ats),
             "AUD" => Ok(Self::Aud),
             "AWG" => Ok(Self::Awg),
             "AZN" => Ok(Self::Azn),
             "BAM" => Ok(Self::Bam),
             "BBD" => Ok(Self::Bbd),
             "BDT" => Ok(Self::Bdt),
-            "BEF" => Ok(Self::Bef),
             "BGN" => Ok(Self::Bgn),
             "BHD" => Ok(Self::Bhd),
             "BIF" => Ok(Self::Bif),
@@ -1834,7 +1745,6 @@ impl std::str::FromStr for Currency {
             "BTN" => Ok(Self::Btn),
             "BWP" => Ok(Self::Bwp),
             "BYN" => Ok(Self::Byn),
-            "BYR" => Ok(Self::Byr),
             "BZD" => Ok(Self::Bzd),
             "CAD" => Ok(Self::Cad),
             "CDF" => Ok(Self::Cdf),
@@ -1849,7 +1759,6 @@ impl std::str::FromStr for Currency {
             "CVE" => Ok(Self::Cve),
             "CYP" => Ok(Self::Cyp),
             "CZK" => Ok(Self::Czk),
-            "DEM" => Ok(Self::Dem),
             "DJF" => Ok(Self::Djf),
             "DKK" => Ok(Self::Dkk),
             "DOP" => Ok(Self::Dop),
@@ -1858,17 +1767,13 @@ impl std::str::FromStr for Currency {
             "EEK" => Ok(Self::Eek),
             "EGP" => Ok(Self::Egp),
             "ERN" => Ok(Self::Ern),
-            "ESP" => Ok(Self::Esp),
             "ETB" => Ok(Self::Etb),
             "EUR" => Ok(Self::Eur),
-            "FIM" => Ok(Self::Fim),
             "FJD" => Ok(Self::Fjd),
             "FKP" => Ok(Self::Fkp),
-            "FRF" => Ok(Self::Frf),
             "GBP" => Ok(Self::Gbp),
             "GBX" => Ok(Self::Gbx),
             "GEL" => Ok(Self::Gel),
-            "GHC" => Ok(Self::Ghc),
             "GHS" => Ok(Self::Ghs),
             "GIP" => Ok(Self::Gip),
             "GMD" => Ok(Self::Gmd),
@@ -1882,14 +1787,11 @@ impl std::str::FromStr for Currency {
             "HTG" => Ok(Self::Htg),
             "HUF" => Ok(Self::Huf),
             "IDR" => Ok(Self::Idr),
-            "IEP" => Ok(Self::Iep),
             "ILS" => Ok(Self::Ils),
             "INR" => Ok(Self::Inr),
             "IQD" => Ok(Self::Iqd),
             "IRR" => Ok(Self::Irr),
             "ISK" => Ok(Self::Isk),
-            "ITL" => Ok(Self::Itl),
-            "JEP" => Ok(Self::Jep),
             "JMD" => Ok(Self::Jmd),
             "JOD" => Ok(Self::Jod),
             "JPY" => Ok(Self::Jpy),
@@ -1908,8 +1810,6 @@ impl std::str::FromStr for Currency {
             "LRD" => Ok(Self::Lrd),
             "LSL" => Ok(Self::Lsl),
             "LTL" => Ok(Self::Ltl),
-            "LUF" => Ok(Self::Luf),
-            "LVL" => Ok(Self::Lvl),
             "LYD" => Ok(Self::Lyd),
             "MAD" => Ok(Self::Mad),
             "MDL" => Ok(Self::Mdl),
@@ -1919,7 +1819,6 @@ impl std::str::FromStr for Currency {
             "MNT" => Ok(Self::Mnt),
             "MOP" => Ok(Self::Mop),
             "MRO" => Ok(Self::Mro),
-            "MTL" => Ok(Self::Mtl),
             "MUR" => Ok(Self::Mur),
             "MVR" => Ok(Self::Mvr),
             "MWK" => Ok(Self::Mwk),
@@ -1930,7 +1829,6 @@ impl std::str::FromStr for Currency {
             "NAD" => Ok(Self::Nad),
             "NGN" => Ok(Self::Ngn),
             "NIO" => Ok(Self::Nio),
-            "NLG" => Ok(Self::Nlg),
             "NOK" => Ok(Self::Nok),
             "NPR" => Ok(Self::Npr),
             "NZD" => Ok(Self::Nzd),
@@ -1941,14 +1839,11 @@ impl std::str::FromStr for Currency {
             "PHP" => Ok(Self::Php),
             "PKR" => Ok(Self::Pkr),
             "PLN" => Ok(Self::Pln),
-            "PTE" => Ok(Self::Pte),
             "PYG" => Ok(Self::Pyg),
             "QAR" => Ok(Self::Qar),
-            "ROL" => Ok(Self::Rol),
             "RON" => Ok(Self::Ron),
             "RSD" => Ok(Self::Rsd),
             "RUB" => Ok(Self::Rub),
-            "RUR" => Ok(Self::Rur),
             "RWF" => Ok(Self::Rwf),
             "SAR" => Ok(Self::Sar),
             "SBD" => Ok(Self::Sbd),
@@ -1958,8 +1853,6 @@ impl std::str::FromStr for Currency {
             "SEK" => Ok(Self::Sek),
             "SGD" => Ok(Self::Sgd),
             "SHP" => Ok(Self::Shp),
-            "SIT" => Ok(Self::Sit),
-            "SKK" => Ok(Self::Skk),
             "SLL" => Ok(Self::Sll),
             "SOS" => Ok(Self::Sos),
             "SRD" => Ok(Self::Srd),
@@ -1972,7 +1865,6 @@ impl std::str::FromStr for Currency {
             "TMM" => Ok(Self::Tmm),
             "TND" => Ok(Self::Tnd),
             "TOP" => Ok(Self::Top),
-            "TRL" => Ok(Self::Trl),
             "TRY" => Ok(Self::Try),
             "TTD" => Ok(Self::Ttd),
             "TWD" => Ok(Self::Twd),
@@ -1985,7 +1877,6 @@ impl std::str::FromStr for Currency {
             "UYU" => Ok(Self::Uyu),
             "UYW" => Ok(Self::Uyw),
             "UZS" => Ok(Self::Uzs),
-            "VEB" => Ok(Self::Veb),
             "VEF" => Ok(Self::Vef),
             "VES" => Ok(Self::Ves),
             "VND" => Ok(Self::Vnd),
@@ -2000,7 +1891,6 @@ impl std::str::FromStr for Currency {
             "XTS" => Ok(Self::Xts),
             "XXX" => Ok(Self::Xxx),
             "YER" => Ok(Self::Yer),
-            "YUM" => Ok(Self::Yum),
             "ZAC" => Ok(Self::Zac),
             "ZAR" => Ok(Self::Zar),
             "ZMK" => Ok(Self::Zmk),
@@ -2090,7 +1980,7 @@ pub enum Event {
     Ent,
     /// Franking
     Frank,
-    /// Forward Split
+    /// Forward Split, currently only used in US events
     Fsplt,
     /// Financial Transaction Tax
     Ftt,
@@ -2134,7 +2024,7 @@ pub enum Event {
     Rd,
     /// Redemption
     Redem,
-    /// Reverse Split
+    /// Reverse Split, currently only used in US events
     Rsplt,
     /// Rights
     Rts,
@@ -2150,7 +2040,7 @@ pub enum Event {
     Secrc,
     /// Shares Outstanding Change
     Shoch,
-    /// Spin-Off
+    /// Spin-Off, currently only used in US events
     Soff,
     /// Takeover
     Tkovr,
@@ -2322,6 +2212,7 @@ impl Serialize for Event {
 
 /// A corporate actions sub-event type.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum EventSubType {
     /// Annual General Meeting
     Agm,
@@ -2337,14 +2228,16 @@ pub enum EventSubType {
     Sgm,
     /// Dutch Auction
     Dutchauct,
-    /// Depository Receipt Dividend
-    Dprcpdiv,
-    /// Reverse Split
-    Consd,
     /// Buyback
     Bb,
     /// Call Option Exercised
     Call,
+    /// Claim Settled
+    Claimset,
+    /// Default Payment
+    Defpy,
+    /// Drawings
+    Dr,
     /// Drawings by lottery
     Drl,
     /// Early Conversion
@@ -2355,18 +2248,38 @@ pub enum EventSubType {
     Ord,
     /// Put Option Exercised
     Put,
-    /// Spin-Off
-    Dist,
+    /// Redemption Claim
+    Redemclaim,
+    /// Write Down
+    Wrtdn,
     /// Capital Distribution
     Capdist,
-    /// Forward Split
-    Div,
+    /// Capital Gain
+    Capgain,
     /// Derived from Interest Payment
     Intdiv,
+    /// Tax Free Dividend Component
+    Dt,
+    /// Return of Capital Component
+    Rcap,
+    /// Repayment of Debt Component
+    Rod,
+    /// Dividend Accumulation
+    Divacc,
+    /// Dividend Income
+    Divinc,
     /// Interest Basis Unknown
     Int,
-    /// Spin-Off
-    Dmrgr,
+    /// Interest Accumulation
+    Intacc,
+    /// Interest Income
+    Intinc,
+    /// Property Basis Unknown
+    Pro,
+    /// Property Accumulation
+    Proacc,
+    /// Property Income
+    Proinc,
     /// Non Renounceable Rights
     Nrenrts,
     /// Open Offer
@@ -2377,10 +2290,18 @@ pub enum EventSubType {
     Spp,
     /// Fully franked
     F,
+    /// Not known
+    N,
     /// Partially franked
     P,
     /// Unfranked
     U,
+    /// Bonus
+    Bon,
+    /// Dividend
+    Div,
+    /// Subdivision
+    Sd,
     /// Capital Reduction
     Caprd,
     /// Liquidation
@@ -2397,12 +2318,26 @@ pub enum EventSubType {
     Bbed,
     /// Buyback Regular Deadline
     Bbrd,
+    /// Correction
+    Corr,
+    /// Clean Up
+    Cu,
     /// Early Redemption
     Er,
     /// Make Whole Call
     Mwc,
-    /// Forward Split
-    Sd,
+    /// Purchase Fund
+    Pf,
+    /// Residual Maturity
+    Rm,
+    /// Consolidation
+    Consd,
+    /// Depository Receipt Dividend
+    Dprcpdiv,
+    /// Distribution
+    Dist,
+    /// Demerger
+    Dmrgr,
     /// Merger
     Mrgr,
     /// Tender Offer
@@ -2425,28 +2360,43 @@ impl EventSubType {
             Self::Gm => "GM",
             Self::Sgm => "SGM",
             Self::Dutchauct => "DUTCHAUCT",
-            Self::Dprcpdiv => "DPRCPDIV",
-            Self::Consd => "CONSD",
             Self::Bb => "BB",
             Self::Call => "CALL",
+            Self::Claimset => "CLAIMSET",
+            Self::Defpy => "DEFPY",
+            Self::Dr => "DR",
             Self::Drl => "DRL",
             Self::Econv => "ECONV",
             Self::Mat => "MAT",
             Self::Ord => "ORD",
             Self::Put => "PUT",
-            Self::Dist => "DIST",
+            Self::Redemclaim => "REDEMCLAIM",
+            Self::Wrtdn => "WRTDN",
             Self::Capdist => "CAPDIST",
-            Self::Div => "DIV",
+            Self::Capgain => "CAPGAIN",
             Self::Intdiv => "INTDIV",
+            Self::Dt => "DT",
+            Self::Rcap => "RCAP",
+            Self::Rod => "ROD",
+            Self::Divacc => "DIVACC",
+            Self::Divinc => "DIVINC",
             Self::Int => "INT",
-            Self::Dmrgr => "DMRGR",
+            Self::Intacc => "INTACC",
+            Self::Intinc => "INTINC",
+            Self::Pro => "PRO",
+            Self::Proacc => "PROACC",
+            Self::Proinc => "PROINC",
             Self::Nrenrts => "NRENRTS",
             Self::Opoff => "OPOFF",
             Self::Poff => "POFF",
             Self::Spp => "SPP",
             Self::F => "F",
+            Self::N => "N",
             Self::P => "P",
             Self::U => "U",
+            Self::Bon => "BON",
+            Self::Div => "DIV",
+            Self::Sd => "SD",
             Self::Caprd => "CAPRD",
             Self::Liq => "LIQ",
             Self::Res => "RES",
@@ -2455,9 +2405,16 @@ impl EventSubType {
             Self::Amt => "AMT",
             Self::Bbed => "BBED",
             Self::Bbrd => "BBRD",
+            Self::Corr => "CORR",
+            Self::Cu => "CU",
             Self::Er => "ER",
             Self::Mwc => "MWC",
-            Self::Sd => "SD",
+            Self::Pf => "PF",
+            Self::Rm => "RM",
+            Self::Consd => "CONSD",
+            Self::Dprcpdiv => "DPRCPDIV",
+            Self::Dist => "DIST",
+            Self::Dmrgr => "DMRGR",
             Self::Mrgr => "MRGR",
             Self::Tend => "TEND",
             Self::Tendmrgr => "TENDMRGR",
@@ -2485,28 +2442,43 @@ impl std::str::FromStr for EventSubType {
             "GM" => Ok(Self::Gm),
             "SGM" => Ok(Self::Sgm),
             "DUTCHAUCT" => Ok(Self::Dutchauct),
-            "DPRCPDIV" => Ok(Self::Dprcpdiv),
-            "CONSD" => Ok(Self::Consd),
             "BB" => Ok(Self::Bb),
             "CALL" => Ok(Self::Call),
+            "CLAIMSET" => Ok(Self::Claimset),
+            "DEFPY" => Ok(Self::Defpy),
+            "DR" => Ok(Self::Dr),
             "DRL" => Ok(Self::Drl),
             "ECONV" => Ok(Self::Econv),
             "MAT" => Ok(Self::Mat),
             "ORD" => Ok(Self::Ord),
             "PUT" => Ok(Self::Put),
-            "DIST" => Ok(Self::Dist),
+            "REDEMCLAIM" => Ok(Self::Redemclaim),
+            "WRTDN" => Ok(Self::Wrtdn),
             "CAPDIST" => Ok(Self::Capdist),
-            "DIV" => Ok(Self::Div),
+            "CAPGAIN" => Ok(Self::Capgain),
             "INTDIV" => Ok(Self::Intdiv),
+            "DT" => Ok(Self::Dt),
+            "RCAP" => Ok(Self::Rcap),
+            "ROD" => Ok(Self::Rod),
+            "DIVACC" => Ok(Self::Divacc),
+            "DIVINC" => Ok(Self::Divinc),
             "INT" => Ok(Self::Int),
-            "DMRGR" => Ok(Self::Dmrgr),
+            "INTACC" => Ok(Self::Intacc),
+            "INTINC" => Ok(Self::Intinc),
+            "PRO" => Ok(Self::Pro),
+            "PROACC" => Ok(Self::Proacc),
+            "PROINC" => Ok(Self::Proinc),
             "NRENRTS" => Ok(Self::Nrenrts),
             "OPOFF" => Ok(Self::Opoff),
             "POFF" => Ok(Self::Poff),
             "SPP" => Ok(Self::Spp),
             "F" => Ok(Self::F),
+            "N" => Ok(Self::N),
             "P" => Ok(Self::P),
             "U" => Ok(Self::U),
+            "BON" => Ok(Self::Bon),
+            "DIV" => Ok(Self::Div),
+            "SD" => Ok(Self::Sd),
             "CAPRD" => Ok(Self::Caprd),
             "LIQ" => Ok(Self::Liq),
             "RES" => Ok(Self::Res),
@@ -2515,9 +2487,16 @@ impl std::str::FromStr for EventSubType {
             "AMT" => Ok(Self::Amt),
             "BBED" => Ok(Self::Bbed),
             "BBRD" => Ok(Self::Bbrd),
+            "CORR" => Ok(Self::Corr),
+            "CU" => Ok(Self::Cu),
             "ER" => Ok(Self::Er),
             "MWC" => Ok(Self::Mwc),
-            "SD" => Ok(Self::Sd),
+            "PF" => Ok(Self::Pf),
+            "RM" => Ok(Self::Rm),
+            "CONSD" => Ok(Self::Consd),
+            "DPRCPDIV" => Ok(Self::Dprcpdiv),
+            "DIST" => Ok(Self::Dist),
+            "DMRGR" => Ok(Self::Dmrgr),
             "MRGR" => Ok(Self::Mrgr),
             "TEND" => Ok(Self::Tend),
             "TENDMRGR" => Ok(Self::Tendmrgr),
@@ -2609,10 +2588,6 @@ impl Serialize for Fraction {
 /// The dividend frequency.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Frequency {
-    /// 28 Days
-    Days28,
-    /// Every 35 Days
-    Days35,
     /// Annual
     Annual,
     /// BiMonthly
@@ -2625,8 +2600,6 @@ pub enum Frequency {
     Interim,
     /// Interest on Maturity
     Intonmat,
-    /// Interest on Trigger
-    Intontrig,
     /// Irregular
     Irregular,
     /// Interest on Maturity
@@ -2648,15 +2621,12 @@ impl Frequency {
     /// Converts a Frequency to its `str` code.
     pub const fn as_str(&self) -> &'static str {
         match self {
-            Self::Days28 => "28D",
-            Self::Days35 => "35DAY",
             Self::Annual => "ANL",
             Self::BiMonthly => "BIM",
             Self::Daily => "DLY",
             Self::Final => "FNL",
             Self::Interim => "INT",
             Self::Intonmat => "INTONMAT",
-            Self::Intontrig => "INTONTRIG",
             Self::Irregular => "IRG",
             Self::Itm => "ITM",
             Self::Monthly => "MNT",
@@ -2680,15 +2650,12 @@ impl std::str::FromStr for Frequency {
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
-            "28D" => Ok(Self::Days28),
-            "35DAY" => Ok(Self::Days35),
             "ANL" => Ok(Self::Annual),
             "BIM" => Ok(Self::BiMonthly),
             "DLY" => Ok(Self::Daily),
             "FNL" => Ok(Self::Final),
             "INT" => Ok(Self::Interim),
             "INTONMAT" => Ok(Self::Intonmat),
-            "INTONTRIG" => Ok(Self::Intontrig),
             "IRG" => Ok(Self::Irregular),
             "ITM" => Ok(Self::Itm),
             "MNT" => Ok(Self::Monthly),

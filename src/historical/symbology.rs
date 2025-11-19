@@ -250,7 +250,7 @@ mod tests {
                     .dataset(dbn::Dataset::GlbxMdp3)
                     .symbols(vec!["ES.c.0", "ES.d.0"])
                     .stype_in(SType::Continuous)
-                    .date_range((date!(2023 - 06 - 14), date!(2023 - 06 - 17)))
+                    .date_range(date!(2023 - 06 - 14)..date!(2023 - 06 - 17))
                     .build(),
             )
             .await
