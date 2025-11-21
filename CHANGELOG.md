@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.37.0 - TBD
+
+#### Breaking changes
+- The `map_symbols` parameter for `SubmitJobParams::builder()` now defaults to `true` for JSON and CSV encodings
+
 ## 0.36.0 - 2025-11-19
 
 ### Enhancements
