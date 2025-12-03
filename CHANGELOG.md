@@ -2,8 +2,13 @@
 
 ## 0.37.0 - TBD
 
-#### Breaking changes
-- The `map_symbols` parameter for `SubmitJobParams::builder()` now defaults to `true` for JSON and CSV encodings
+### Breaking changes
+- Changed the default to `true` for the `map_symbols` parameter in
+  `SubmitJobParams::builder()` for JSON and CSV encodings
+
+### Bug fixes
+- Fixed checksum verification for resumed downloads in `batch().download()`. Previously,
+  it would erroneously fail
 
 ## 0.36.0 - 2025-11-19
 

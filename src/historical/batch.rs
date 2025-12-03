@@ -16,7 +16,10 @@ use reqwest::RequestBuilder;
 use serde::{de, Deserialize, Deserializer};
 use sha2::{Digest, Sha256};
 use time::OffsetDateTime;
-use tokio::io::BufWriter;
+use tokio::{
+    fs::File,
+    io::{AsyncReadExt, BufWriter},
+};
 use tracing::{debug, error, info, info_span, warn, Instrument};
 use typed_builder::TypedBuilder;
 
@@ -211,7 +214,7 @@ impl BatchClient<'_> {
             let mut retries = 0;
             'retry: loop {
                 let mut req = self.inner.get_with_path(url.path())?;
-                match Self::check_if_exists(path, exp_size).await? {
+                match Self::check_if_exists(path, exp_size, &mut hasher).await? {
                     Header::Skip => {
                         return Ok(());
                     }
@@ -261,7 +264,11 @@ impl BatchClient<'_> {
         .await
     }
 
-    async fn check_if_exists(path: &Path, exp_size: u64) -> crate::Result<Header> {
+    async fn check_if_exists(
+        path: &Path,
+        exp_size: u64,
+        hasher: &mut Option<Sha256>,
+    ) -> crate::Result<Header> {
         let Ok(metadata) = tokio::fs::metadata(path).await else {
             return Ok(Header::Range(None));
         };
@@ -273,6 +280,17 @@ impl BatchClient<'_> {
                     total_bytes = exp_size,
                     "Found existing file, resuming download"
                 );
+                if let Some(hasher) = hasher {
+                    let mut buf = vec![0; 1 << 23];
+                    let mut file = File::open(path).await?;
+                    loop {
+                        let read_size = file.read(&mut buf).await?;
+                        if read_size == 0 {
+                            break;
+                        }
+                        hasher.update(&buf[..read_size]);
+                    }
+                }
             }
             Ordering::Equal => {
                 debug!("Skipping download as file already exists and matches expected size");
@@ -299,7 +317,7 @@ impl BatchClient<'_> {
         if hash_hex != exp_hash_hex {
             warn!(
                 hash_hex,
-                exp_hash_hex, "Downloaded file failed checksum validation"
+                exp_hash_hex, "Downloaded file failed checksum verification"
             );
         } else {
             debug!("Successfully verified checksum");
