@@ -26,6 +26,7 @@ cargo add databento
 
 - `historical`: enables the historical client for data older than 24 hours
 - `live`: enables the live client for real-time and intraday historical data
+- `chrono`: enables passing `chrono` types as datetime parameters
 
 By default both features are enabled and the historical client uses OpenSSL for TLS.
 To use `rustls`, disable default features for both the databento crate and [reqwest](https://github.com/seanmonstar/reqwest).

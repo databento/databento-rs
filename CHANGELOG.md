@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.37.0 - TBD
+
+### Enhancements
+- Added optional `chrono` feature for converting `chrono` date and datetime types to
+  `DateRange`, `DateTimeRange`, and `Subscription::start` (credit: @wtn)
+
 ## 0.36.0 - 2025-11-19
 
 ### Enhancements
