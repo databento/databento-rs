@@ -8,11 +8,8 @@ use typed_builder::TypedBuilder;
 use crate::{
     deserialize::deserialize_date_time,
     historical::{handle_zstd_jsonl_response, AddToForm},
-    reference::{
-        AdjustmentStatus, Country, Currency, DateTimeLike, End, Event, Frequency, SecurityType,
-        Start,
-    },
-    Symbols,
+    reference::{AdjustmentStatus, Country, Currency, End, Event, Frequency, SecurityType, Start},
+    DateTimeLike, Symbols,
 };
 
 /// A client for the adjustment factors group of Reference API endpoints.

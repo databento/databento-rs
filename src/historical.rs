@@ -202,6 +202,127 @@ impl From<(time::OffsetDateTime, time::Duration)> for DateTimeRange {
     }
 }
 
+#[cfg(feature = "chrono")]
+mod chrono_impl {
+    use super::{DateRange, DateTimeRange};
+
+    fn chrono_datetime_to_time(dt: chrono::DateTime<chrono::Utc>) -> time::OffsetDateTime {
+        // timestamp_nanos_opt() returns None for dates outside ~1677-2262.
+        // from_unix_timestamp_nanos() fails for dates outside ~1000-9999.
+        // Practical timestamps fall well within these bounds, so unwrap is safe.
+        time::OffsetDateTime::from_unix_timestamp_nanos(dt.timestamp_nanos_opt().unwrap() as i128)
+            .unwrap()
+    }
+
+    fn chrono_date_to_time(date: chrono::NaiveDate) -> time::Date {
+        use chrono::Datelike;
+        time::Date::from_calendar_date(
+            date.year(),
+            time::Month::try_from(date.month() as u8).unwrap(),
+            date.day() as u8,
+        )
+        .unwrap()
+    }
+
+    impl<Tz: chrono::TimeZone> From<std::ops::Range<chrono::DateTime<Tz>>> for DateTimeRange {
+        fn from(range: std::ops::Range<chrono::DateTime<Tz>>) -> Self {
+            Self {
+                start: chrono_datetime_to_time(range.start.to_utc()),
+                end: chrono_datetime_to_time(range.end.to_utc()),
+            }
+        }
+    }
+
+    impl<Tz: chrono::TimeZone> From<std::ops::RangeInclusive<chrono::DateTime<Tz>>> for DateTimeRange {
+        fn from(range: std::ops::RangeInclusive<chrono::DateTime<Tz>>) -> Self {
+            Self {
+                start: chrono_datetime_to_time(range.start().to_utc()),
+                end: chrono_datetime_to_time(range.end().to_utc()) + time::Duration::NANOSECOND,
+            }
+        }
+    }
+
+    impl<Tz: chrono::TimeZone> From<(chrono::DateTime<Tz>, chrono::DateTime<Tz>)> for DateTimeRange {
+        fn from(value: (chrono::DateTime<Tz>, chrono::DateTime<Tz>)) -> Self {
+            Self {
+                start: chrono_datetime_to_time(value.0.to_utc()),
+                end: chrono_datetime_to_time(value.1.to_utc()),
+            }
+        }
+    }
+
+    impl<Tz: chrono::TimeZone> From<(chrono::DateTime<Tz>, chrono::Duration)> for DateTimeRange {
+        fn from(value: (chrono::DateTime<Tz>, chrono::Duration)) -> Self {
+            let start = chrono_datetime_to_time(value.0.to_utc());
+            let duration_nanos = value.1.num_nanoseconds().unwrap();
+            Self {
+                start,
+                end: start + time::Duration::nanoseconds(duration_nanos),
+            }
+        }
+    }
+
+    impl From<chrono::NaiveDate> for DateRange {
+        fn from(date: chrono::NaiveDate) -> Self {
+            Self {
+                start: chrono_date_to_time(date),
+                end: chrono_date_to_time(date.succ_opt().unwrap()),
+            }
+        }
+    }
+
+    impl From<std::ops::Range<chrono::NaiveDate>> for DateRange {
+        fn from(range: std::ops::Range<chrono::NaiveDate>) -> Self {
+            Self {
+                start: chrono_date_to_time(range.start),
+                end: chrono_date_to_time(range.end),
+            }
+        }
+    }
+
+    impl From<std::ops::RangeInclusive<chrono::NaiveDate>> for DateRange {
+        fn from(range: std::ops::RangeInclusive<chrono::NaiveDate>) -> Self {
+            Self {
+                start: chrono_date_to_time(*range.start()),
+                end: chrono_date_to_time(range.end().succ_opt().unwrap()),
+            }
+        }
+    }
+
+    impl From<(chrono::NaiveDate, chrono::NaiveDate)> for DateRange {
+        fn from(value: (chrono::NaiveDate, chrono::NaiveDate)) -> Self {
+            Self {
+                start: chrono_date_to_time(value.0),
+                end: chrono_date_to_time(value.1),
+            }
+        }
+    }
+
+    impl From<chrono::NaiveDate> for DateTimeRange {
+        fn from(date: chrono::NaiveDate) -> Self {
+            Self::from(DateRange::from(date))
+        }
+    }
+
+    impl From<std::ops::Range<chrono::NaiveDate>> for DateTimeRange {
+        fn from(range: std::ops::Range<chrono::NaiveDate>) -> Self {
+            Self::from(DateRange::from(range))
+        }
+    }
+
+    impl From<std::ops::RangeInclusive<chrono::NaiveDate>> for DateTimeRange {
+        fn from(range: std::ops::RangeInclusive<chrono::NaiveDate>) -> Self {
+            Self::from(DateRange::from(range))
+        }
+    }
+
+    impl From<(chrono::NaiveDate, chrono::NaiveDate)> for DateTimeRange {
+        fn from(value: (chrono::NaiveDate, chrono::NaiveDate)) -> Self {
+            Self::from(DateRange::from(value))
+        }
+    }
+}
+
 impl TryFrom<(u64, u64)> for DateTimeRange {
     type Error = crate::Error;
 
@@ -297,6 +418,232 @@ mod tests {
     use super::*;
 
     use time::macros::{date, datetime};
+
+    #[cfg(feature = "chrono")]
+    mod chrono_tests {
+        use super::*;
+        use chrono::{TimeZone, Utc};
+
+        #[test]
+        fn datetime_utc_range() {
+            let start = Utc.with_ymd_and_hms(2024, 3, 15, 9, 30, 0).unwrap();
+            let end = Utc.with_ymd_and_hms(2024, 3, 15, 16, 0, 0).unwrap();
+
+            let range = DateTimeRange::from(start..end);
+
+            assert_eq!(
+                range,
+                DateTimeRange::from((
+                    datetime!(2024-03-15 09:30:00 UTC),
+                    datetime!(2024-03-15 16:00:00 UTC)
+                ))
+            );
+        }
+
+        #[test]
+        fn datetime_utc_range_inclusive() {
+            let start = Utc.with_ymd_and_hms(2024, 3, 15, 9, 30, 0).unwrap();
+            let end = Utc.with_ymd_and_hms(2024, 3, 15, 16, 0, 0).unwrap();
+
+            let range = DateTimeRange::from(start..=end);
+
+            // Inclusive end should add 1 nanosecond
+            assert_eq!(
+                range,
+                DateTimeRange::from((
+                    datetime!(2024-03-15 09:30:00 UTC),
+                    datetime!(2024-03-15 16:00:00.000000001 UTC)
+                ))
+            );
+        }
+
+        #[test]
+        fn datetime_utc_tuple() {
+            let start = Utc.with_ymd_and_hms(2024, 3, 15, 9, 30, 0).unwrap();
+            let end = Utc.with_ymd_and_hms(2024, 3, 15, 16, 0, 0).unwrap();
+
+            let range = DateTimeRange::from((start, end));
+
+            assert_eq!(
+                range,
+                DateTimeRange::from((
+                    datetime!(2024-03-15 09:30:00 UTC),
+                    datetime!(2024-03-15 16:00:00 UTC)
+                ))
+            );
+        }
+
+        #[test]
+        fn datetime_utc_with_duration() {
+            let start = Utc.with_ymd_and_hms(2024, 3, 15, 9, 30, 0).unwrap();
+            let duration = chrono::Duration::hours(6) + chrono::Duration::minutes(30);
+
+            let range = DateTimeRange::from((start, duration));
+
+            assert_eq!(
+                range,
+                DateTimeRange::from((
+                    datetime!(2024-03-15 09:30:00 UTC),
+                    datetime!(2024-03-15 16:00:00 UTC)
+                ))
+            );
+        }
+
+        #[test]
+        fn naive_date_single() {
+            let date = chrono::NaiveDate::from_ymd_opt(2024, 3, 15).unwrap();
+
+            let range = DateTimeRange::from(date);
+
+            assert_eq!(
+                range,
+                DateTimeRange::from((
+                    datetime!(2024-03-15 00:00:00 UTC),
+                    datetime!(2024-03-16 00:00:00 UTC)
+                ))
+            );
+        }
+
+        #[test]
+        fn naive_date_range() {
+            let start = chrono::NaiveDate::from_ymd_opt(2024, 3, 15).unwrap();
+            let end = chrono::NaiveDate::from_ymd_opt(2024, 3, 20).unwrap();
+
+            let range = DateTimeRange::from(start..end);
+
+            assert_eq!(
+                range,
+                DateTimeRange::from((
+                    datetime!(2024-03-15 00:00:00 UTC),
+                    datetime!(2024-03-20 00:00:00 UTC)
+                ))
+            );
+        }
+
+        #[test]
+        fn naive_date_range_inclusive() {
+            let start = chrono::NaiveDate::from_ymd_opt(2024, 3, 15).unwrap();
+            let end = chrono::NaiveDate::from_ymd_opt(2024, 3, 20).unwrap();
+
+            let range = DateTimeRange::from(start..=end);
+
+            // Inclusive end date means next day at midnight
+            assert_eq!(
+                range,
+                DateTimeRange::from((
+                    datetime!(2024-03-15 00:00:00 UTC),
+                    datetime!(2024-03-21 00:00:00 UTC)
+                ))
+            );
+        }
+
+        #[test]
+        fn naive_date_tuple() {
+            let start = chrono::NaiveDate::from_ymd_opt(2024, 3, 15).unwrap();
+            let end = chrono::NaiveDate::from_ymd_opt(2024, 3, 20).unwrap();
+
+            let range = DateTimeRange::from((start, end));
+
+            assert_eq!(
+                range,
+                DateTimeRange::from((
+                    datetime!(2024-03-15 00:00:00 UTC),
+                    datetime!(2024-03-20 00:00:00 UTC)
+                ))
+            );
+        }
+
+        #[test]
+        fn fixed_offset_datetime_range() {
+            use chrono::FixedOffset;
+
+            let offset = FixedOffset::west_opt(4 * 3600).unwrap(); // UTC-4
+            let start = offset.with_ymd_and_hms(2024, 3, 15, 9, 30, 0).unwrap();
+            let end = offset.with_ymd_and_hms(2024, 3, 15, 16, 0, 0).unwrap();
+
+            let range = DateTimeRange::from(start..end);
+
+            // Should convert to UTC: 09:30 UTC-4 = 13:30 UTC, 16:00 UTC-4 = 20:00 UTC
+            assert_eq!(
+                range,
+                DateTimeRange::from((
+                    datetime!(2024-03-15 13:30:00 UTC),
+                    datetime!(2024-03-15 20:00:00 UTC)
+                ))
+            );
+        }
+
+        #[test]
+        fn fixed_offset_datetime_tuple() {
+            use chrono::FixedOffset;
+
+            let offset = FixedOffset::east_opt(5 * 3600 + 30 * 60).unwrap(); // UTC+5:30
+            let start = offset.with_ymd_and_hms(2024, 3, 15, 15, 0, 0).unwrap();
+            let end = offset.with_ymd_and_hms(2024, 3, 15, 21, 30, 0).unwrap();
+
+            let range = DateTimeRange::from((start, end));
+
+            // 15:00 UTC+5:30 = 09:30 UTC, 21:30 UTC+5:30 = 16:00 UTC
+            assert_eq!(
+                range,
+                DateTimeRange::from((
+                    datetime!(2024-03-15 09:30:00 UTC),
+                    datetime!(2024-03-15 16:00:00 UTC)
+                ))
+            );
+        }
+
+        #[test]
+        fn date_range_from_naive_date_single() {
+            let chrono_date = chrono::NaiveDate::from_ymd_opt(2024, 3, 15).unwrap();
+
+            let range = DateRange::from(chrono_date);
+
+            assert_eq!(
+                range,
+                DateRange::from((date!(2024 - 03 - 15), date!(2024 - 03 - 16)))
+            );
+        }
+
+        #[test]
+        fn date_range_from_naive_date_range() {
+            let start = chrono::NaiveDate::from_ymd_opt(2024, 3, 15).unwrap();
+            let end = chrono::NaiveDate::from_ymd_opt(2024, 3, 20).unwrap();
+
+            let range = DateRange::from(start..end);
+
+            assert_eq!(
+                range,
+                DateRange::from((date!(2024 - 03 - 15), date!(2024 - 03 - 20)))
+            );
+        }
+
+        #[test]
+        fn date_range_from_naive_date_range_inclusive() {
+            let start = chrono::NaiveDate::from_ymd_opt(2024, 3, 15).unwrap();
+            let end = chrono::NaiveDate::from_ymd_opt(2024, 3, 20).unwrap();
+
+            let range = DateRange::from(start..=end);
+
+            assert_eq!(
+                range,
+                DateRange::from((date!(2024 - 03 - 15), date!(2024 - 03 - 21)))
+            );
+        }
+
+        #[test]
+        fn date_range_from_naive_date_tuple() {
+            let start = chrono::NaiveDate::from_ymd_opt(2024, 3, 15).unwrap();
+            let end = chrono::NaiveDate::from_ymd_opt(2024, 3, 20).unwrap();
+
+            let range = DateRange::from((start, end));
+
+            assert_eq!(
+                range,
+                DateRange::from((date!(2024 - 03 - 15), date!(2024 - 03 - 20)))
+            );
+        }
+    }
 
     #[test]
     fn date_range_from_lt_day_duration() {

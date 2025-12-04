@@ -12,10 +12,9 @@ use crate::{
     deserialize::deserialize_date_time,
     historical::{handle_zstd_jsonl_response, AddToForm},
     reference::{
-        Country, Currency, DateTimeLike, End, ListingSource, ListingStatus, SecurityType, Start,
-        Voting,
+        Country, Currency, End, ListingSource, ListingStatus, SecurityType, Start, Voting,
     },
-    Symbols,
+    DateTimeLike, Symbols,
 };
 
 /// A client for the security master group of Reference API endpoints.

@@ -9,7 +9,7 @@ mod enums;
 pub mod security;
 
 use reqwest::{header::ACCEPT, RequestBuilder, Url};
-use time::{Date, OffsetDateTime};
+use time::OffsetDateTime;
 
 use crate::{
     historical::{AddToForm, HistoricalGateway, ReqwestForm, API_VERSION},
@@ -259,23 +259,6 @@ impl AddToForm<Vec<SecurityType>> for ReqwestForm {
             ));
         }
         self
-    }
-}
-
-/// A date time or object that can be non-fallibly converted to a datetime.
-pub trait DateTimeLike {
-    /// Converts the object to a date time.
-    fn to_date_time(self) -> OffsetDateTime;
-}
-
-impl DateTimeLike for OffsetDateTime {
-    fn to_date_time(self) -> OffsetDateTime {
-        self
-    }
-}
-impl DateTimeLike for Date {
-    fn to_date_time(self) -> OffsetDateTime {
-        self.with_time(time::Time::MIDNIGHT).assume_utc()
     }
 }
 

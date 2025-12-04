@@ -11,7 +11,7 @@ use tokio::net::{lookup_host, ToSocketAddrs};
 use tracing::warn;
 use typed_builder::TypedBuilder;
 
-use crate::{ApiKey, Symbols};
+use crate::{ApiKey, DateTimeLike, Symbols};
 
 pub use client::Client;
 
@@ -32,7 +32,7 @@ pub struct Subscription {
     ///
     /// Cannot be specified after the session is started with [`LiveClient::start`](crate::LiveClient::start).
     /// See [`Intraday Replay`](https://databento.com/docs/api-reference-live/basics/intraday-replay).
-    #[builder(default, setter(strip_option))]
+    #[builder(default, setter(transform = |dt: impl DateTimeLike| Some(dt.to_date_time())))]
     pub start: Option<OffsetDateTime>,
     #[doc(hidden)]
     /// Request subscription with snapshot. Only supported with `Mbo` schema.
@@ -202,5 +202,76 @@ impl ClientBuilder<ApiKey, String> {
     /// to connect and authenticate with the Live gateway.
     pub async fn build(self) -> crate::Result<Client> {
         Client::new(self).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use dbn::Schema;
+    use time::macros::datetime;
+
+    #[test]
+    fn subscription_with_time_offset_datetime() {
+        let start = datetime!(2024-03-15 09:30:00 UTC);
+        let sub = Subscription::builder()
+            .symbols("AAPL")
+            .schema(Schema::Trades)
+            .start(start)
+            .build();
+        assert_eq!(sub.start, Some(start));
+    }
+
+    #[test]
+    fn subscription_with_time_date() {
+        let date = time::macros::date!(2024 - 03 - 15);
+        let sub = Subscription::builder()
+            .symbols("AAPL")
+            .schema(Schema::Trades)
+            .start(date)
+            .build();
+        assert_eq!(sub.start, Some(datetime!(2024-03-15 00:00:00 UTC)));
+    }
+
+    #[cfg(feature = "chrono")]
+    mod chrono_tests {
+        use super::*;
+        use chrono::{TimeZone, Utc};
+
+        #[test]
+        fn subscription_with_chrono_datetime_utc() {
+            let start = Utc.with_ymd_and_hms(2024, 3, 15, 9, 30, 0).unwrap();
+            let sub = Subscription::builder()
+                .symbols("AAPL")
+                .schema(Schema::Trades)
+                .start(start)
+                .build();
+            assert_eq!(sub.start, Some(datetime!(2024-03-15 09:30:00 UTC)));
+        }
+
+        #[test]
+        fn subscription_with_chrono_datetime_fixed_offset() {
+            use chrono::FixedOffset;
+            let est = FixedOffset::west_opt(5 * 3600).unwrap();
+            let start = est.with_ymd_and_hms(2024, 3, 15, 9, 30, 0).unwrap();
+            let sub = Subscription::builder()
+                .symbols("AAPL")
+                .schema(Schema::Trades)
+                .start(start)
+                .build();
+            // 09:30 EST = 14:30 UTC
+            assert_eq!(sub.start, Some(datetime!(2024-03-15 14:30:00 UTC)));
+        }
+
+        #[test]
+        fn subscription_with_chrono_naive_date() {
+            let date = chrono::NaiveDate::from_ymd_opt(2024, 3, 15).unwrap();
+            let sub = Subscription::builder()
+                .symbols("AAPL")
+                .schema(Schema::Trades)
+                .start(date)
+                .build();
+            assert_eq!(sub.start, Some(datetime!(2024-03-15 00:00:00 UTC)));
+        }
     }
 }

@@ -2,9 +2,14 @@
 
 ## 0.37.0 - TBD
 
+### Enhancements
+- Added optional `chrono` feature for converting `chrono` date and datetime types to
+  `DateRange`, `DateTimeRange`, and `Subscription::start` (credit: @wtn)
+
 ### Breaking changes
 - Changed the default to `true` for the `map_symbols` parameter in
   `SubmitJobParams::builder()` for JSON and CSV encodings
+- Moved `DateTimeLike` trait to top level
 
 ### Bug fixes
 - Fixed checksum verification for resumed downloads in `batch().download()`. Previously,
