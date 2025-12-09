@@ -3,8 +3,7 @@
 use std::{
     cmp::Ordering,
     collections::HashMap,
-    fmt,
-    fmt::Write,
+    fmt::{self, Write},
     num::NonZeroU64,
     path::{Path, PathBuf},
     str::FromStr,
@@ -17,7 +16,10 @@ use reqwest::RequestBuilder;
 use serde::{de, Deserialize, Deserializer};
 use sha2::{Digest, Sha256};
 use time::OffsetDateTime;
-use tokio::io::BufWriter;
+use tokio::{
+    fs::File,
+    io::{AsyncReadExt, BufWriter},
+};
 use tracing::{debug, error, info, info_span, warn, Instrument};
 use typed_builder::TypedBuilder;
 
@@ -212,7 +214,7 @@ impl BatchClient<'_> {
             let mut retries = 0;
             'retry: loop {
                 let mut req = self.inner.get_with_path(url.path())?;
-                match Self::check_if_exists(path, exp_size).await? {
+                match Self::check_if_exists(path, exp_size, &mut hasher).await? {
                     Header::Skip => {
                         return Ok(());
                     }
@@ -262,7 +264,11 @@ impl BatchClient<'_> {
         .await
     }
 
-    async fn check_if_exists(path: &Path, exp_size: u64) -> crate::Result<Header> {
+    async fn check_if_exists(
+        path: &Path,
+        exp_size: u64,
+        hasher: &mut Option<Sha256>,
+    ) -> crate::Result<Header> {
         let Ok(metadata) = tokio::fs::metadata(path).await else {
             return Ok(Header::Range(None));
         };
@@ -274,6 +280,17 @@ impl BatchClient<'_> {
                     total_bytes = exp_size,
                     "Found existing file, resuming download"
                 );
+                if let Some(hasher) = hasher {
+                    let mut buf = vec![0; 1 << 23];
+                    let mut file = File::open(path).await?;
+                    loop {
+                        let read_size = file.read(&mut buf).await?;
+                        if read_size == 0 {
+                            break;
+                        }
+                        hasher.update(&buf[..read_size]);
+                    }
+                }
             }
             Ordering::Equal => {
                 debug!("Skipping download as file already exists and matches expected size");
@@ -300,7 +317,7 @@ impl BatchClient<'_> {
         if hash_hex != exp_hash_hex {
             warn!(
                 hash_hex,
-                exp_hash_hex, "Downloaded file failed checksum validation"
+                exp_hash_hex, "Downloaded file failed checksum verification"
             );
         } else {
             debug!("Successfully verified checksum");
@@ -382,9 +399,9 @@ pub struct SubmitJobParams {
     #[builder(default)]
     pub pretty_ts: bool,
     /// If `true`, a symbol field will be included with each text-encoded
-    /// record, reducing the need to look at the `symbology.json`. Only valid for
-    /// [`Encoding::Csv`] and [`Encoding::Json`].
-    #[builder(default)]
+    /// record. If `None`, will default to `true` for [`Encoding::Csv`] and [`Encoding::Json`] encodings,
+    /// and `false` for [`Encoding::Dbn`].
+    #[builder(default_code = "*encoding != Encoding::Dbn")]
     pub map_symbols: bool,
     /// If `true`, files will be split by raw symbol. Cannot be requested with [`Symbols::All`].
     #[builder(default)]
@@ -672,6 +689,7 @@ enum Header {
 
 #[cfg(test)]
 mod tests {
+    use dbn::Dataset;
     use reqwest::StatusCode;
     use serde_json::json;
     use time::macros::datetime;
@@ -756,6 +774,45 @@ mod tests {
             )
             .await?;
         assert_eq!(job_desc.dataset, dbn::Dataset::XnasItch.as_str());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_submit_job_param_map_symbols() -> crate::Result<()> {
+        const START: time::OffsetDateTime = datetime!(2023 - 06 - 14 00:00 UTC);
+        const END: time::OffsetDateTime = datetime!(2023 - 06 - 17 00:00 UTC);
+
+        let params = SubmitJobParams::builder()
+            .dataset(Dataset::GlbxMdp3)
+            .encoding(Encoding::Dbn)
+            .symbols("ESM5")
+            .schema(Schema::Mbo)
+            .date_time_range(START..END)
+            .build();
+        assert_eq!(params.encoding, Encoding::Dbn);
+        assert_eq!(params.map_symbols, false);
+
+        let params = SubmitJobParams::builder()
+            .dataset(Dataset::GlbxMdp3)
+            .encoding(Encoding::Csv)
+            .symbols("ESM5")
+            .schema(Schema::Mbo)
+            .date_time_range(START..END)
+            .build();
+        assert_eq!(params.encoding, Encoding::Csv);
+        assert_eq!(params.map_symbols, true);
+
+        let params = SubmitJobParams::builder()
+            .dataset(Dataset::GlbxMdp3)
+            .encoding(Encoding::Json)
+            .symbols("ESM5")
+            .schema(Schema::Mbo)
+            .date_time_range(START..END)
+            .map_symbols(false)
+            .build();
+        assert_eq!(params.encoding, Encoding::Json);
+        assert_eq!(params.map_symbols, false);
+
         Ok(())
     }
 

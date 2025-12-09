@@ -229,7 +229,7 @@ pub enum Country {
     Cu,
     /// Cape Verde
     Cv,
-    /// Curacao
+    /// Curaçao
     Cw,
     /// Christmas Islands
     Cx,
@@ -1369,7 +1369,7 @@ pub enum Currency {
     Mwk,
     /// Mexican Nuevo Peso
     Mxn,
-    /// Mexican Unidad de Inversion (UDI)
+    /// Mexican Unidad de Inversión (UDI)
     Mxv,
     /// Malaysian Ringgit
     Myr,
@@ -1399,7 +1399,7 @@ pub enum Currency {
     Php,
     /// Pakistan Rupee
     Pkr,
-    /// Polish Zloty (New)
+    /// Polish Złoty (New)
     Pln,
     /// Paraguay Guarani
     Pyg,

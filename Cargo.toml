@@ -1,7 +1,7 @@
 [package]
 name = "databento"
 authors = ["Databento <support@databento.com>"]
-version = "0.36.0"
+version = "0.37.0"
 edition = "2021"
 repository = "https://github.com/databento/databento-rs"
 description = "Official Databento client library"
@@ -30,11 +30,13 @@ historical = [
   "tokio/fs"
 ]
 live = ["tokio/net"]
+chrono = ["dep:chrono"]
 
 [dependencies]
-dbn = { version = "0.44.0", features = ["async", "serde"] }
+dbn = { version = "0.45.0", features = ["async", "serde"] }
 
 async-compression = { version = "0.4", features = ["tokio", "zstd"], optional = true }
+chrono = { version = ">=0.4.34", optional = true, default-features = false, features = ["alloc"] }
 # Async stream trait
 futures = { version = "0.3", optional = true }
 # Used for Live authentication and historical checksums
@@ -55,6 +57,7 @@ zstd = { version = "0.13", optional = true }
 
 [dev-dependencies]
 anyhow = "1.0.100"
+chrono = { version = ">=0.4.34", default-features = false, features = ["alloc"] }
 async-compression = { version = "0.4", features = ["tokio", "zstd"] }
 clap = { version = "4.5.51", features = ["derive"] }
 rstest = "0.26.1"

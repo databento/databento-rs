@@ -294,6 +294,53 @@ static USER_AGENT: LazyLock<String> = LazyLock::new(|| {
     )
 });
 
+/// A datetime or object that can be non-fallibly converted to a datetime.
+pub trait DateTimeLike {
+    /// Converts the object to a datetime.
+    fn to_date_time(self) -> time::OffsetDateTime;
+}
+
+impl DateTimeLike for time::OffsetDateTime {
+    fn to_date_time(self) -> time::OffsetDateTime {
+        self
+    }
+}
+
+impl DateTimeLike for time::Date {
+    fn to_date_time(self) -> time::OffsetDateTime {
+        self.with_time(time::Time::MIDNIGHT).assume_utc()
+    }
+}
+
+#[cfg(feature = "chrono")]
+impl<Tz: chrono::TimeZone> DateTimeLike for chrono::DateTime<Tz> {
+    fn to_date_time(self) -> time::OffsetDateTime {
+        // timestamp_nanos_opt() returns None for dates outside ~1677-2262.
+        // from_unix_timestamp_nanos() fails for dates outside ~1000-9999.
+        // Practical timestamps fall well within these bounds, so unwrap is safe.
+        time::OffsetDateTime::from_unix_timestamp_nanos(
+            self.to_utc().timestamp_nanos_opt().unwrap() as i128,
+        )
+        .unwrap()
+    }
+}
+
+#[cfg(feature = "chrono")]
+impl DateTimeLike for chrono::NaiveDate {
+    fn to_date_time(self) -> time::OffsetDateTime {
+        use chrono::Datelike;
+        // Conversion is infallible for valid NaiveDate: month is 1-12, day is 1-31.
+        time::Date::from_calendar_date(
+            self.year(),
+            time::Month::try_from(self.month() as u8).unwrap(),
+            self.day() as u8,
+        )
+        .unwrap()
+        .with_time(time::Time::MIDNIGHT)
+        .assume_utc()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

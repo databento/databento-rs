@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.37.0 - 2025-12-09
+
+### Enhancements
+- Added optional `chrono` feature for converting `chrono` date and datetime types to
+  `DateRange`, `DateTimeRange`, and `Subscription::start` (credit: @wtn)
+- Upgraded DBN version to 0.45.0:
+  - Added new venue, dataset, and publisher for Cboe Futures Exchange (`XCBF.PITCH`)
+
+
+### Breaking changes
+- Changed the default to `true` for the `map_symbols` parameter in
+  `SubmitJobParams::builder()` for JSON and CSV encodings
+- Moved `DateTimeLike` trait to top level
+
+### Bug fixes
+- Fixed checksum verification for resumed downloads in `batch().download()`. Previously,
+  it would erroneously fail
+
 ## 0.36.0 - 2025-11-19
 
 ### Enhancements
