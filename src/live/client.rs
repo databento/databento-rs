@@ -255,7 +255,7 @@ impl Client {
     pub async fn start(&mut self) -> crate::Result<Metadata> {
         if self.fsm.has_decoded_metadata() {
             return Err(crate::Error::BadArgument {
-                param_name: "self".to_owned(),
+                param_name: "self",
                 desc: "ignored request to start session that has already been started".to_owned(),
             });
         };
@@ -282,7 +282,7 @@ impl Client {
     pub async fn next_record(&mut self) -> crate::Result<Option<RecordRef<'_>>> {
         if !self.fsm.has_decoded_metadata() {
             return Err(crate::Error::BadArgument {
-                param_name: "self".to_owned(),
+                param_name: "self",
                 desc: "Can't call LiveClient::next_record before starting session".to_owned(),
             });
         };

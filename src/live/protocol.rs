@@ -95,7 +95,7 @@ where
             &challenge,
         );
         debug!(?auth_req, "Sending CRAM reply");
-        self.sender.write_all(auth_req.as_bytes()).await.unwrap();
+        self.sender.write_all(auth_req.as_bytes()).await?;
 
         response.clear();
         recver.read_line(&mut response).await?;
@@ -138,8 +138,8 @@ where
 
         if *use_snapshot && start.is_some() {
             return Err(Error::BadArgument {
-                param_name: "use_snapshot".to_string(),
-                desc: "cannot request snapshot with start time".to_string(),
+                param_name: "use_snapshot",
+                desc: "cannot request snapshot with start time".to_owned(),
             });
         }
         let start_nanos = sub.start.as_ref().map(|start| start.unix_timestamp_nanos());
@@ -205,8 +205,8 @@ impl<'a> Challenge<'a> {
     /// Returns an error if the response does not begin with "cram=".
     // Can't use `FromStr` with lifetime
     pub fn parse(response: &'a str) -> crate::Result<Self> {
-        if response.starts_with("cram=") {
-            Ok(Self(response.split_once('=').unwrap().1))
+        if let Some(challenge) = response.strip_prefix("cram=") {
+            Ok(Self(challenge))
         } else {
             Err(Error::internal(
                 "no CRAM challenge in response from gateway",

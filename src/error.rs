@@ -9,7 +9,7 @@ pub enum Error {
     #[error("bad argument `{param_name}`: {desc}")]
     BadArgument {
         /// The name of the parameter to which the bad argument was passed.
-        param_name: String,
+        param_name: &'static str,
         /// The description of why the argument was invalid.
         desc: String,
     },
@@ -60,9 +60,9 @@ pub struct ApiError {
 }
 
 impl Error {
-    pub(crate) fn bad_arg(param_name: impl ToString, desc: impl ToString) -> Self {
+    pub(crate) fn bad_arg(param_name: &'static str, desc: impl ToString) -> Self {
         Self::BadArgument {
-            param_name: param_name.to_string(),
+            param_name,
             desc: desc.to_string(),
         }
     }
