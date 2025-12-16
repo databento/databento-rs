@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.38.0 - TBD
+## 0.38.0 - 2025-12-16
 
 ### Breaking changes
 - Changed `Error::BadArgument::param_name` from a `String` to a `&'static str`
