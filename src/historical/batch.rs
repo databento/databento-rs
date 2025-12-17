@@ -425,6 +425,9 @@ pub struct SubmitJobParams {
     pub stype_in: SType,
     /// The symbology type of the output `symbols`. Defaults to
     /// [`InstrumentId`](dbn::enums::SType::InstrumentId).
+    ///
+    /// Must be a valid symbology combination with [`stype_in`](Self::stype_in).
+    /// See [symbology combinations](https://databento.com/docs/standards-and-conventions/symbology#supported-symbology-combinations).
     #[builder(default = SType::InstrumentId)]
     pub stype_out: SType,
     /// The optional maximum number of records to return. Defaults to no limit.
