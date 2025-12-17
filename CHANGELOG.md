@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.38.0 - 2025-12-16
+
+### Breaking changes
+- Changed `Error::BadArgument::param_name` from a `String` to a `&'static str`
+
+### Bug fixes
+- Fixed panic on failed write during authentication
+
 ## 0.37.0 - 2025-12-09
 
 ### Enhancements
@@ -7,7 +15,6 @@
   `DateRange`, `DateTimeRange`, and `Subscription::start` (credit: @wtn)
 - Upgraded DBN version to 0.45.0:
   - Added new venue, dataset, and publisher for Cboe Futures Exchange (`XCBF.PITCH`)
-
 
 ### Breaking changes
 - Changed the default to `true` for the `map_symbols` parameter in
