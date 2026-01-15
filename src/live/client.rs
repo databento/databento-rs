@@ -1,8 +1,11 @@
 use std::{fmt, net::SocketAddr};
 
 use dbn::{
-    decode::dbn::{async_decode_metadata_with_fsm, async_decode_record_ref_with_fsm, fsm::DbnFsm},
-    Metadata, RecordRef, VersionUpgradePolicy,
+    decode::{
+        dbn::{async_decode_metadata_with_fsm, async_decode_record_ref_with_fsm, fsm::DbnFsm},
+        AsyncDynReader,
+    },
+    Compression, Metadata, RecordRef, VersionUpgradePolicy,
 };
 use time::Duration;
 use tokio::{
@@ -14,7 +17,7 @@ use tracing::{info, info_span, instrument, warn, Span};
 use crate::ApiKey;
 
 use super::{
-    protocol::{self, Protocol},
+    protocol::{self, Protocol, SessionOptions},
     ClientBuilder, Subscription, Unset,
 };
 
@@ -29,11 +32,12 @@ pub struct Client {
     upgrade_policy: VersionUpgradePolicy,
     heartbeat_interval: Option<Duration>,
     user_agent_ext: Option<String>,
+    compression: Compression,
     protocol: Protocol<WriteHalf<TcpStream>>,
     peer_addr: SocketAddr,
     sub_counter: u32,
     subscriptions: Vec<Subscription>,
-    reader: ReadHalf<TcpStream>,
+    reader: AsyncDynReader<BufReader<ReadHalf<TcpStream>>>,
     fsm: DbnFsm,
     session_id: String,
     span: Span,
@@ -106,6 +110,7 @@ impl Client {
             heartbeat_interval,
             buf_size,
             user_agent_ext,
+            compression,
         }: ClientBuilder<ApiKey, String>,
     ) -> crate::Result<Self> {
         let stream = if let Some(addr) = addr {
@@ -122,11 +127,16 @@ impl Client {
                 &mut recver,
                 &key,
                 &dataset,
-                send_ts_out,
-                heartbeat_interval.map(|i| i.whole_seconds()),
-                user_agent_ext.as_deref(),
+                SessionOptions {
+                    compression,
+                    send_ts_out,
+                    heartbeat_interval_s: heartbeat_interval.map(|i| i.whole_seconds()),
+                    user_agent_ext: user_agent_ext.as_deref(),
+                },
             )
             .await?;
+        // Construct reader based on compression mode
+        let reader = AsyncDynReader::with_buffer(recver, compression);
         let span = info_span!("LiveClient", %dataset, session_id);
         Ok(Self {
             key,
@@ -135,9 +145,10 @@ impl Client {
             upgrade_policy,
             heartbeat_interval,
             user_agent_ext,
+            compression,
             protocol,
             peer_addr,
-            reader: recver.into_inner(),
+            reader,
             fsm: DbnFsm::builder()
                 .upgrade_policy(upgrade_policy)
                 .buffer_size(buf_size.unwrap_or(DbnFsm::DEFAULT_BUF_SIZE))
@@ -186,6 +197,11 @@ impl Client {
     /// Returns the heartbeat interval override if there is one, otherwise `None`.
     pub fn heartbeat_interval(&self) -> Option<Duration> {
         self.heartbeat_interval
+    }
+
+    /// Returns the compression mode for the live data stream.
+    pub fn compression(&self) -> Compression {
+        self.compression
     }
 
     /// Returns an immutable reference to all subscriptions made with this instance.
@@ -319,12 +335,16 @@ impl Client {
                 &mut recver,
                 &self.key,
                 &self.dataset,
-                self.send_ts_out,
-                self.heartbeat_interval.map(|i| i.whole_seconds()),
-                self.user_agent_ext.as_deref(),
+                SessionOptions {
+                    compression: self.compression,
+                    send_ts_out: self.send_ts_out,
+                    heartbeat_interval_s: self.heartbeat_interval.map(|i| i.whole_seconds()),
+                    user_agent_ext: self.user_agent_ext.as_deref(),
+                },
             )
             .await?;
-        self.reader = recver.into_inner();
+        // Reconstruct reader with same compression mode
+        self.reader = AsyncDynReader::with_buffer(recver, self.compression);
         self.fsm.reset();
         self.span = info_span!("LiveClient", dataset = %self.dataset, session_id = self.session_id);
         Ok(())
@@ -366,6 +386,7 @@ impl fmt::Debug for Client {
 mod tests {
     use std::{ffi::c_char, fmt};
 
+    use async_compression::tokio::write::ZstdEncoder;
     use dbn::{
         encode::AsyncDbnMetadataEncoder,
         enums::rtype,
@@ -485,6 +506,34 @@ mod tests {
             self.stream().write_all(&bytes[..half]).await.unwrap();
             self.stream().flush().await.unwrap();
             self.stream().write_all(&bytes[half..]).await.unwrap();
+        }
+
+        /// Start with compressed output - sends compressed metadata and returns encoder
+        async fn start_compressed(&mut self) -> ZstdEncoder<&mut BufReader<TcpStream>> {
+            let start_line = self.read_line().await;
+            assert_eq!(start_line, "start_session\n");
+            let dataset = self.dataset.clone();
+
+            // Create zstd encoder wrapping the stream
+            let stream = self.stream.as_mut().unwrap();
+            let mut encoder = ZstdEncoder::new(stream);
+
+            // Encode metadata into the compressed stream
+            let mut meta_encoder = AsyncDbnMetadataEncoder::new(&mut encoder);
+            meta_encoder
+                .encode(
+                    &MetadataBuilder::new()
+                        .dataset(dataset)
+                        .start(time::OffsetDateTime::now_utc().unix_timestamp_nanos() as u64)
+                        .schema(None)
+                        .stype_in(None)
+                        .stype_out(SType::InstrumentId)
+                        .build(),
+                )
+                .await
+                .unwrap();
+            encoder.flush().await.unwrap();
+            encoder
         }
 
         async fn read_line(&mut self) -> String {
@@ -913,5 +962,61 @@ mod tests {
         );
 
         fixture.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_next_record_with_zstd_compression() {
+        const REC: OhlcvMsg = OhlcvMsg {
+            hd: RecordHeader::new::<OhlcvMsg>(rtype::OHLCV_1M, 1, 2, 3),
+            open: 1,
+            high: 2,
+            low: 3,
+            close: 4,
+            volume: 5,
+        };
+        let _ = tracing_subscriber::FmtSubscriber::builder()
+            .with_max_level(LevelFilter::DEBUG)
+            .with_test_writer()
+            .try_init();
+
+        let mut mock = MockGateway::new(Dataset::GlbxMdp3.to_string(), false).await;
+        let port = mock.listener.local_addr().unwrap().port();
+
+        // Spawn mock server task
+        let mock_task = tokio::spawn(async move {
+            mock.authenticate(None).await;
+            let mut encoder = mock.start_compressed().await;
+
+            // Send records through compressed stream
+            encoder.write_all(REC.as_ref()).await.unwrap();
+            encoder.write_all(REC.as_ref()).await.unwrap();
+            encoder.flush().await.unwrap();
+            encoder.shutdown().await.unwrap();
+        });
+
+        // Build client with compression
+        let mut client = Client::builder()
+            .addr(format!("127.0.0.1:{}", port))
+            .await
+            .unwrap()
+            .key("32-character-with-lots-of-filler".to_owned())
+            .unwrap()
+            .dataset(Dataset::GlbxMdp3.to_string())
+            .compression(Compression::Zstd)
+            .build()
+            .await
+            .unwrap();
+
+        // Start session and read records
+        let metadata = client.start().await.unwrap();
+        assert_eq!(metadata.dataset, Dataset::GlbxMdp3.to_string());
+
+        let rec1 = client.next_record().await.unwrap().unwrap();
+        assert_eq!(*rec1.get::<OhlcvMsg>().unwrap(), REC);
+
+        let rec2 = client.next_record().await.unwrap().unwrap();
+        assert_eq!(*rec2.get::<OhlcvMsg>().unwrap(), REC);
+
+        mock_task.await.unwrap();
     }
 }

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.41.0 - TBD
+
+### Enhancements
+- Added support for using compression in the live API:
+  - Added `compression()` setter on the live client builder
+  - Added `compression()` getter on the live client
+
+### Breaking changes
+- Refactor `live::protocol` messages to implement a new `RawApiMsg` trait
+- Move optional session parameters into `SessionOptions` struct which implements
+  `Default`
+
 ## 0.40.0 - TBD
 
 ### Enhancements
@@ -411,7 +423,7 @@ upgrading data to version 3.
   to resume a live session after losing the connection to the live gateway
 - Added `subscriptions()` and `subscriptions_mut()` getters to `LiveClient` for getting all
   active subscriptions
-- Added `shutdown()` method to `live::Protocol` to clean up the active session
+- Added `shutdown()` method to `live::protocol` to clean up the active session
 - Downgraded to tracing span level on `LiveClient::next_record()` to "debug" to reduce
   performance impact
 - Added `From<&[&str]>` and `From<[str; N]>` implementations for `Symbols`

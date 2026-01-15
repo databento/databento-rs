@@ -5,7 +5,7 @@ pub mod protocol;
 
 use std::{net::SocketAddr, sync::Arc};
 
-use dbn::{SType, Schema, VersionUpgradePolicy};
+use dbn::{Compression, SType, Schema, VersionUpgradePolicy};
 use time::{Duration, OffsetDateTime};
 use tokio::net::{lookup_host, ToSocketAddrs};
 use tracing::warn;
@@ -62,6 +62,7 @@ pub struct ClientBuilder<AK, D> {
     heartbeat_interval: Option<Duration>,
     buf_size: Option<usize>,
     user_agent_ext: Option<String>,
+    compression: Compression,
 }
 
 impl Default for ClientBuilder<Unset, Unset> {
@@ -75,6 +76,7 @@ impl Default for ClientBuilder<Unset, Unset> {
             heartbeat_interval: None,
             buf_size: None,
             user_agent_ext: None,
+            compression: Compression::None,
         }
     }
 }
@@ -140,6 +142,12 @@ impl<AK, D> ClientBuilder<AK, D> {
         self.user_agent_ext = Some(extension);
         self
     }
+
+    /// Sets the compression mode for the read stream. Default is [`Compression::None`].
+    pub fn compression(mut self, compression: Compression) -> Self {
+        self.compression = compression;
+        self
+    }
 }
 
 impl ClientBuilder<Unset, Unset> {
@@ -164,6 +172,7 @@ impl<D> ClientBuilder<Unset, D> {
             heartbeat_interval: self.heartbeat_interval,
             buf_size: self.buf_size,
             user_agent_ext: self.user_agent_ext,
+            compression: self.compression,
         })
     }
 
@@ -191,6 +200,7 @@ impl<AK> ClientBuilder<AK, Unset> {
             heartbeat_interval: self.heartbeat_interval,
             buf_size: self.buf_size,
             user_agent_ext: self.user_agent_ext,
+            compression: self.compression,
         }
     }
 }

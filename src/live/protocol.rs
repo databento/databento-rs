@@ -5,11 +5,12 @@
 //! subject to change without warning.
 
 use std::{
+    borrow::Cow,
     collections::HashMap,
     fmt::{Debug, Display},
 };
 
-use dbn::{SType, Schema};
+use dbn::{Compression, SType, Schema};
 use hex::ToHex;
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
@@ -55,15 +56,13 @@ where
     /// [`tokio::select!`] statement and another branch completes first, the
     /// authentication may have been only partially sent, resulting in the gateway
     /// rejecting the authentication and closing the connection.
-    #[instrument(skip(self, recver, key))]
+    #[instrument(skip(self, recver, key, options))]
     pub async fn authenticate<R>(
         &mut self,
         recver: &mut R,
         key: &ApiKey,
         dataset: &str,
-        send_ts_out: bool,
-        heartbeat_interval_s: Option<i64>,
-        user_agent_ext: Option<&str>,
+        options: SessionOptions<'_>,
     ) -> crate::Result<String>
     where
         R: AsyncBufReadExt + Unpin,
@@ -86,14 +85,7 @@ where
         debug!(%challenge, "Received CRAM challenge");
 
         // Send CRAM reply/auth request
-        let auth_req = AuthRequest::new(
-            key,
-            dataset,
-            send_ts_out,
-            heartbeat_interval_s,
-            user_agent_ext,
-            &challenge,
-        );
+        let auth_req = AuthRequest::new(key, dataset, &challenge, options);
         debug!(?auth_req, "Sending CRAM reply");
         self.sender.write_all(auth_req.as_bytes()).await?;
 
@@ -111,9 +103,8 @@ where
 
         let auth_resp = AuthResponse::parse(&response)?;
         Ok(auth_resp
-            .0
-            .get("session_id")
-            .map(|sid| (*sid).to_owned())
+            .session_id()
+            .map(ToOwned::to_owned)
             .unwrap_or_default())
     }
 
@@ -195,7 +186,7 @@ where
 ///
 /// See the [raw API documentation](https://databento.com/docs/api-reference-live/gateway-control-messages/challenge-request?live=raw)
 /// for more information.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Challenge<'a>(&'a str);
 
 impl<'a> Challenge<'a> {
@@ -221,10 +212,51 @@ impl Display for Challenge<'_> {
     }
 }
 
+/// Optional configuration options for live sessions sent on authentication requests.
+#[derive(Clone, Debug)]
+pub struct SessionOptions<'a> {
+    /// The compression mode for the session.
+    pub compression: Compression,
+    /// Whether to `ts_out` should be appended to each record.
+    pub send_ts_out: bool,
+    /// The heartbeat interval in seconds.
+    pub heartbeat_interval_s: Option<i64>,
+    /// Extension string to append to the user agent.
+    pub user_agent_ext: Option<&'a str>,
+}
+
+impl Default for SessionOptions<'_> {
+    fn default() -> Self {
+        Self {
+            compression: Compression::None,
+            send_ts_out: false,
+            heartbeat_interval_s: None,
+            user_agent_ext: None,
+        }
+    }
+}
+
+/// Parses a pipe-delimited string of key=value pairs into an iterator.
+fn parse_kv_pairs(s: &str) -> impl Iterator<Item = (&str, &str)> {
+    s.split('|').filter_map(|kvp| kvp.split_once('='))
+}
+
+/// A raw API message to be sent to the live gateway.
+pub trait RawApiMsg {
+    /// Returns the request as a string slice.
+    fn as_str(&self) -> &str;
+
+    /// Returns the request as a byte slice.
+    fn as_bytes(&self) -> &[u8] {
+        self.as_str().as_bytes()
+    }
+}
+
 /// An authentication request to be sent to the live gateway.
 ///
 /// See the [raw API documentation](https://databento.com/docs/api-reference-live/client-control-messages/authentication-request?live=raw)
 /// for more information.
+#[derive(Clone)]
 pub struct AuthRequest(String);
 
 impl AuthRequest {
@@ -232,10 +264,8 @@ impl AuthRequest {
     pub fn new(
         key: &ApiKey,
         dataset: &str,
-        send_ts_out: bool,
-        heartbeat_interval_s: Option<i64>,
-        user_agent_ext: Option<&str>,
         challenge: &Challenge,
+        options: SessionOptions,
     ) -> Self {
         let challenge_key = format!("{challenge}|{}", key.0);
         let mut hasher = Sha256::new();
@@ -243,27 +273,26 @@ impl AuthRequest {
         let hashed = hasher.finalize();
         let bucket_id = key.bucket_id();
         let encoded_response = hashed.encode_hex::<String>();
-        let send_ts_out = send_ts_out as u8;
-        let user_agent = user_agent_ext
-            .map(|ext| format!("{} {ext}", *USER_AGENT))
-            .unwrap_or_else(|| USER_AGENT.clone());
-        let mut req =
-                format!("auth={encoded_response}-{bucket_id}|dataset={dataset}|encoding=dbn|ts_out={send_ts_out}|client={user_agent}");
-        if let Some(heartbeat_interval_s) = heartbeat_interval_s {
+        let send_ts_out = options.send_ts_out as u8;
+        let user_agent: Cow<'_, str> = match options.user_agent_ext {
+            Some(ext) => Cow::Owned(format!("{} {ext}", *USER_AGENT)),
+            None => Cow::Borrowed(&USER_AGENT),
+        };
+        let mut req = format!(
+            "auth={encoded_response}-{bucket_id}|dataset={dataset}|encoding=dbn|compression={compression}|ts_out={send_ts_out}|client={user_agent}",
+            compression = options.compression,
+        );
+        if let Some(heartbeat_interval_s) = options.heartbeat_interval_s {
             req = format!("{req}|heartbeat_interval_s={heartbeat_interval_s}");
         }
         req.push('\n');
         Self(req)
     }
+}
 
-    /// Returns the string slice of the request.
-    pub fn as_str(&self) -> &str {
+impl RawApiMsg for AuthRequest {
+    fn as_str(&self) -> &str {
         self.0.as_str()
-    }
-
-    /// Returns the request as a byte slice.
-    pub fn as_bytes(&self) -> &[u8] {
-        self.0.as_bytes()
     }
 }
 
@@ -287,10 +316,7 @@ impl<'a> AuthResponse<'a> {
     /// Returns an error if the response does not begin with "cram=".
     // Can't use `FromStr` with lifetime
     pub fn parse(response: &'a str) -> crate::Result<Self> {
-        let auth_keys: HashMap<&'a str, &'a str> = response
-            .split('|')
-            .filter_map(|kvp| kvp.split_once('='))
-            .collect();
+        let auth_keys: HashMap<&'a str, &'a str> = parse_kv_pairs(response).collect();
         // Lack of success key also indicates something went wrong
         if auth_keys.get("success").map(|v| *v != "1").unwrap_or(true) {
             return Err(Error::Auth(
@@ -303,6 +329,11 @@ impl<'a> AuthResponse<'a> {
         Ok(Self(auth_keys))
     }
 
+    /// Returns the session ID if present or `None`.
+    pub fn session_id(&self) -> Option<&str> {
+        self.0.get("session_id").copied()
+    }
+
     /// Returns a reference to the key-value pairs.
     pub fn get_ref(&self) -> &HashMap<&'a str, &'a str> {
         &self.0
@@ -313,6 +344,7 @@ impl<'a> AuthResponse<'a> {
 ///
 /// See the [raw API documentation](https://databento.com/docs/api-reference-live/client-control-messages/subscription-request?live=raw)
 /// for more information.
+#[derive(Clone)]
 pub struct SubRequest(String);
 
 impl SubRequest {
@@ -343,15 +375,11 @@ impl SubRequest {
         args.push('\n');
         Self(args)
     }
+}
 
-    /// Returns the string slice of the request.
-    pub fn as_str(&self) -> &str {
+impl RawApiMsg for SubRequest {
+    fn as_str(&self) -> &str {
         self.0.as_str()
-    }
-
-    /// Returns the request as a byte slice.
-    pub fn as_bytes(&self) -> &[u8] {
-        self.0.as_bytes()
     }
 }
 
@@ -366,16 +394,11 @@ impl Debug for SubRequest {
 ///
 /// See the [raw API documentation](https://databento.com/docs/api-reference-live/client-control-messages/session-start?live=raw)
 /// for more information.
+#[derive(Debug, Clone, Copy)]
 pub struct StartRequest;
 
-impl StartRequest {
-    /// Returns the string slice of the request.
-    pub fn as_str(&self) -> &str {
+impl RawApiMsg for StartRequest {
+    fn as_str(&self) -> &str {
         "start_session\n"
-    }
-
-    /// Returns the request as a byte slice.
-    pub fn as_bytes(&self) -> &[u8] {
-        self.as_str().as_bytes()
     }
 }

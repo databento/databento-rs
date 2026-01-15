@@ -6,6 +6,7 @@ use databento::{
     live::Subscription,
     LiveClient,
 };
+use dbn::Compression;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -14,6 +15,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .init();
     let mut client = LiveClient::builder()
         .key_from_env()?
+        .compression(Compression::Zstd)
         .dataset(Dataset::GlbxMdp3)
         .build()
         .await?;
