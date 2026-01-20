@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.39.0 - 2026-01-20
+
+### Enhancements
+- Upgraded DBN version to 0.47.0:
+  - Added new off-market publisher for Cboe Futures Exchange (`XCBF_PITCH_XOFF`)
+  - Added new `StatType` variants to be used by `XCBF.PITCH` dataset:
+    - `UpperPriceLimit`
+    - `LowerPriceLimit`
+    - `BlockVolume`
+    - `VenueSpecificVolume1`
+  - Upgraded `time` version to 0.3.45
+- Improved documentation of heartbeat intervals
+
 ## 0.38.0 - 2025-12-16
 
 ### Breaking changes
@@ -605,8 +618,8 @@ upgrading data to version 3.
 ## 0.7.0 - 2024-03-01
 
 #### Enhancements
-- Document cancellation safety of `LiveClient` methods (credit: @yongqli)
-- Document `live::Subscription::start` is based on `ts_event`
+- Documented cancellation safety of `LiveClient` methods (credit: @yongqli)
+- Documented `live::Subscription::start` is based on `ts_event`
 - Allow constructing a `DateRange` and `DateTimeRange` with an `end` based on a
   `time::Duration`
 - Implemented `Debug` for `LiveClient`, `live::ClientBuilder`, `HistoricalClient`,
