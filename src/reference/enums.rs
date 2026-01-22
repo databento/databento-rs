@@ -1,4 +1,8 @@
-use std::str::FromStr;
+use std::{
+    convert::Infallible,
+    fmt::{self, Display},
+    str::FromStr,
+};
 
 use serde::{de, Deserialize, Deserializer, Serialize};
 
@@ -128,7 +132,7 @@ impl Serialize for AdjustmentStatus {
 /// A country code.
 ///
 /// Based ISO 3166-1 alpha-2 country codes with some unofficial extensions.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 pub enum Country {
     /// Supranational
@@ -623,10 +627,12 @@ pub enum Country {
     Zw,
     /// Unclassified
     Zz,
+    /// Fallback for unknown variants.
+    Unknown(String),
 }
-impl Country {
-    /// Converts a Country to its `str` code.
-    pub const fn as_str(&self) -> &'static str {
+
+impl AsRef<str> for Country {
+    fn as_ref(&self) -> &str {
         match self {
             Self::Aa => "AA",
             Self::Ad => "AD",
@@ -874,20 +880,15 @@ impl Country {
             Self::Zm => "ZM",
             Self::Zw => "ZW",
             Self::Zz => "ZZ",
+            Self::Unknown(s) => s,
         }
     }
 }
 
-impl AsRef<str> for Country {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
-
 impl std::str::FromStr for Country {
-    type Err = Error;
+    type Err = Infallible;
 
-    fn from_str(s: &str) -> Result<Self> {
+    fn from_str(s: &str) -> std::result::Result<Self, Infallible> {
         match s {
             "AA" => Ok(Self::Aa),
             "AD" => Ok(Self::Ad),
@@ -1135,10 +1136,7 @@ impl std::str::FromStr for Country {
             "ZM" => Ok(Self::Zm),
             "ZW" => Ok(Self::Zw),
             "ZZ" => Ok(Self::Zz),
-            _ => Err(Error::bad_arg(
-                "s",
-                format!("no Country variant associated with {s}"),
-            )),
+            s => Ok(Self::Unknown(s.to_owned())),
         }
     }
 }
@@ -1155,12 +1153,18 @@ impl Serialize for Country {
     where
         S: serde::Serializer,
     {
-        self.as_str().serialize(serializer)
+        self.as_ref().serialize(serializer)
+    }
+}
+
+impl Display for Country {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
+        write!(f, "{}", self.as_ref())
     }
 }
 
 /// A currency.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 pub enum Currency {
     /// UAE Dirham
@@ -1521,10 +1525,12 @@ pub enum Currency {
     Zwg,
     /// Zimbabwean Dollar
     Zwl,
+    /// Fallback for unknown variants.
+    Unknown(String),
 }
-impl Currency {
-    /// Converts a Currency to its `str` code.
-    pub const fn as_str(&self) -> &'static str {
+
+impl AsRef<str> for Currency {
+    fn as_ref(&self) -> &str {
         match self {
             Self::Aed => "AED",
             Self::Afn => "AFN",
@@ -1705,20 +1711,15 @@ impl Currency {
             Self::Zwd => "ZWD",
             Self::Zwg => "ZWG",
             Self::Zwl => "ZWL",
+            Self::Unknown(s) => s,
         }
     }
 }
 
-impl AsRef<str> for Currency {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
-
 impl std::str::FromStr for Currency {
-    type Err = Error;
+    type Err = Infallible;
 
-    fn from_str(s: &str) -> Result<Self> {
+    fn from_str(s: &str) -> std::result::Result<Self, Infallible> {
         match s {
             "AED" => Ok(Self::Aed),
             "AFN" => Ok(Self::Afn),
@@ -1899,10 +1900,7 @@ impl std::str::FromStr for Currency {
             "ZWD" => Ok(Self::Zwd),
             "ZWG" => Ok(Self::Zwg),
             "ZWL" => Ok(Self::Zwl),
-            _ => Err(Error::bad_arg(
-                "s",
-                format!("no Currency variant associated with {s}"),
-            )),
+            s => Ok(Self::Unknown(s.to_owned())),
         }
     }
 }
@@ -1919,12 +1917,19 @@ impl Serialize for Currency {
     where
         S: serde::Serializer,
     {
-        self.as_str().serialize(serializer)
+        self.as_ref().serialize(serializer)
+    }
+}
+
+impl Display for Currency {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
+        write!(f, "{}", self.as_ref())
     }
 }
 
 /// A corporate actions event type.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum Event {
     /// Company Meeting
     Agm,
@@ -2046,10 +2051,12 @@ pub enum Event {
     Tkovr,
     /// Warrant Exercise
     Warex,
+    /// Fallback for unknown variants.
+    Unknown(String),
 }
-impl Event {
-    /// Converts a Event to its `str` code.
-    pub const fn as_str(&self) -> &'static str {
+
+impl AsRef<str> for Event {
+    fn as_ref(&self) -> &str {
         match self {
             Self::Agm => "AGM",
             Self::Ann => "ANN",
@@ -2111,20 +2118,15 @@ impl Event {
             Self::Soff => "SOFF",
             Self::Tkovr => "TKOVR",
             Self::Warex => "WAREX",
+            Self::Unknown(s) => s,
         }
     }
 }
 
-impl AsRef<str> for Event {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
-
 impl std::str::FromStr for Event {
-    type Err = Error;
+    type Err = Infallible;
 
-    fn from_str(s: &str) -> Result<Self> {
+    fn from_str(s: &str) -> std::result::Result<Self, Infallible> {
         match s {
             "AGM" => Ok(Self::Agm),
             "ANN" => Ok(Self::Ann),
@@ -2186,10 +2188,7 @@ impl std::str::FromStr for Event {
             "SOFF" => Ok(Self::Soff),
             "TKOVR" => Ok(Self::Tkovr),
             "WAREX" => Ok(Self::Warex),
-            _ => Err(Error::bad_arg(
-                "s",
-                format!("no Event variant associated with {s}"),
-            )),
+            s => Ok(Self::Unknown(s.to_owned())),
         }
     }
 }
@@ -2206,12 +2205,18 @@ impl Serialize for Event {
     where
         S: serde::Serializer,
     {
-        self.as_str().serialize(serializer)
+        self.as_ref().serialize(serializer)
+    }
+}
+
+impl Display for Event {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
+        write!(f, "{}", self.as_ref())
     }
 }
 
 /// A corporate actions sub-event type.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 pub enum EventSubType {
     /// Annual General Meeting
@@ -2348,10 +2353,12 @@ pub enum EventSubType {
     Tkovrmini,
     /// Insufficient data to assign a TKOVR event subtype
     Ukwnsubtyp,
+    /// Fallback for unknown variants.
+    Unknown(String),
 }
-impl EventSubType {
-    /// Converts a EventSubType to its `str` code.
-    pub const fn as_str(&self) -> &'static str {
+
+impl AsRef<str> for EventSubType {
+    fn as_ref(&self) -> &str {
         match self {
             Self::Agm => "AGM",
             Self::Bhm => "BHM",
@@ -2420,20 +2427,15 @@ impl EventSubType {
             Self::Tendmrgr => "TENDMRGR",
             Self::Tkovrmini => "TKOVRMINI",
             Self::Ukwnsubtyp => "UKWNSUBTYP",
+            Self::Unknown(s) => s,
         }
     }
 }
 
-impl AsRef<str> for EventSubType {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
-
 impl std::str::FromStr for EventSubType {
-    type Err = Error;
+    type Err = Infallible;
 
-    fn from_str(s: &str) -> Result<Self> {
+    fn from_str(s: &str) -> std::result::Result<Self, Infallible> {
         match s {
             "AGM" => Ok(Self::Agm),
             "BHM" => Ok(Self::Bhm),
@@ -2502,10 +2504,7 @@ impl std::str::FromStr for EventSubType {
             "TENDMRGR" => Ok(Self::Tendmrgr),
             "TKOVRMINI" => Ok(Self::Tkovrmini),
             "UKWNSUBTYP" => Ok(Self::Ukwnsubtyp),
-            _ => Err(Error::bad_arg(
-                "s",
-                format!("no EventSubType variant associated with {s}"),
-            )),
+            s => Ok(Self::Unknown(s.to_owned())),
         }
     }
 }
@@ -2522,7 +2521,13 @@ impl Serialize for EventSubType {
     where
         S: serde::Serializer,
     {
-        self.as_str().serialize(serializer)
+        self.as_ref().serialize(serializer)
+    }
+}
+
+impl Display for EventSubType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
+        write!(f, "{}", self.as_ref())
     }
 }
 
@@ -2617,6 +2622,7 @@ pub enum Frequency {
     /// Weekly
     Weekly,
 }
+
 impl Frequency {
     /// Converts a Frequency to its `str` code.
     pub const fn as_str(&self) -> &'static str {
@@ -2685,6 +2691,12 @@ impl Serialize for Frequency {
         S: serde::Serializer,
     {
         self.as_str().serialize(serializer)
+    }
+}
+
+impl Display for Frequency {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -2944,6 +2956,7 @@ pub enum OutturnStyle {
     /// New for Old Securities
     Newo,
 }
+
 impl OutturnStyle {
     /// Converts a OutturnStyle to its `str` code.
     pub const fn as_str(&self) -> &'static str {
@@ -2988,6 +3001,12 @@ impl Serialize for OutturnStyle {
         S: serde::Serializer,
     {
         self.as_str().serialize(serializer)
+    }
+}
+
+impl Display for OutturnStyle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -3117,6 +3136,7 @@ pub enum SecurityType {
     /// When Issued
     Wis,
 }
+
 impl SecurityType {
     /// Converts a SecurityType to its `str` code.
     pub const fn as_str(&self) -> &'static str {
@@ -3217,6 +3237,12 @@ impl Serialize for SecurityType {
         S: serde::Serializer,
     {
         self.as_str().serialize(serializer)
+    }
+}
+
+impl Display for SecurityType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
+        write!(f, "{}", self.as_str())
     }
 }
 

@@ -221,7 +221,7 @@ impl AddToForm<Vec<Event>> for ReqwestForm {
                 "events",
                 events
                     .iter()
-                    .map(|e| e.as_str().to_owned())
+                    .map(|e| e.to_string())
                     .collect::<Vec<_>>()
                     .join(","),
             ));
@@ -237,7 +237,7 @@ impl AddToForm<Vec<Country>> for ReqwestForm {
                 "countries",
                 countries
                     .iter()
-                    .map(|e| e.as_str().to_owned())
+                    .map(|e| e.to_string())
                     .collect::<Vec<_>>()
                     .join(","),
             ));
@@ -253,7 +253,7 @@ impl AddToForm<Vec<SecurityType>> for ReqwestForm {
                 "security_types",
                 security_types
                     .iter()
-                    .map(|e| e.as_str().to_owned())
+                    .map(|e| e.to_string())
                     .collect::<Vec<_>>()
                     .join(","),
             ));

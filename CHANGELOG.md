@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.40.0 - TBD
+
+### Enhancements
+- A new `Unknown(String)` variant was added to the reference data enums `Country`,
+  `Currency`, `Event`, and `EventSubType`. This allows for forward compatibility when
+  new variants are added
+- The following reference data enums now implement `Display`:
+  - `Country`
+  - `Currency`
+  - `Event`
+  - `EventSubType`
+  - `Frequency`
+  - `OutturnStyle`
+  - `SecurityType`
+
+### Breaking changes
+- As part of adding the new variant to the four reference data enums:
+  - `Country`, `Currency`, `Event`, and `EventSubType` are no longer `Copy`
+  - The `Error` type of the `FromStr` implementation was changed to `Infallible`: any
+    unknown string will be parsed to the `Unknown` variant
+  - The `as_str` method on these enums was removed: use `as_ref` instead
+- `Event` has been marked non-exhaustive
+
 ## 0.39.0 - 2026-01-20
 
 ### Enhancements
