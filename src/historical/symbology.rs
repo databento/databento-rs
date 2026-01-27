@@ -5,6 +5,7 @@ use std::{collections::HashMap, sync::Arc};
 use dbn::{MappingInterval, Metadata, SType, TsSymbolMap};
 use reqwest::RequestBuilder;
 use serde::Deserialize;
+use tracing::instrument;
 use typed_builder::TypedBuilder;
 
 use crate::{historical::AddToForm, Symbols};
@@ -25,6 +26,7 @@ impl SymbologyClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "symbology.resolve")]
     pub async fn resolve(&mut self, params: &ResolveParams) -> crate::Result<Resolution> {
         let form = vec![
             ("dataset", params.dataset.to_string()),

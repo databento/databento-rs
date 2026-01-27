@@ -93,12 +93,12 @@ pub struct Unset;
 
 /// A type-safe builder for the [`ReferenceClient`](Client). It will not allow you to
 /// call [`Self::build()`] before setting the required `key` field.
-#[derive(Clone)]
 pub struct ClientBuilder<AK> {
     key: AK,
     base_url: Option<Url>,
     gateway: HistoricalGateway,
     user_agent_ext: Option<String>,
+    http_client_builder: Option<reqwest::ClientBuilder>,
 }
 
 impl Default for ClientBuilder<Unset> {
@@ -108,6 +108,7 @@ impl Default for ClientBuilder<Unset> {
             base_url: None,
             gateway: HistoricalGateway::default(),
             user_agent_ext: None,
+            http_client_builder: None,
         }
     }
 }
@@ -120,7 +121,7 @@ impl<AK> ClientBuilder<AK> {
         self
     }
 
-    /// Sets the gateway to use.
+    /// Sets the gateway to use. Defaults to the BO1 gateway.
     pub fn gateway(mut self, gateway: HistoricalGateway) -> Self {
         self.gateway = gateway;
         self
@@ -129,6 +130,32 @@ impl<AK> ClientBuilder<AK> {
     /// Extends the user agent. Intended for library authors.
     pub fn user_agent_extension(mut self, extension: String) -> Self {
         self.user_agent_ext = Some(extension);
+        self
+    }
+
+    /// Provides a custom [`reqwest::ClientBuilder`] for advanced HTTP client
+    /// configuration.
+    ///
+    /// This allows configuring timeouts, TLS settings, and other HTTP client options.
+    /// The builder will be finalized with Databento's settings (user-agent and default
+    /// headers).
+    ///
+    /// # Example
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// let client = databento::ReferenceClient::builder()
+    ///     .key("db-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx")?
+    ///     .http_client_builder(
+    ///         reqwest::ClientBuilder::new()
+    ///             .timeout(Duration::from_secs(60))
+    ///             .connect_timeout(Duration::from_secs(10))
+    ///     )
+    ///     .build()?;
+    /// # Ok::<(), databento::Error>(())
+    /// ```
+    pub fn http_client_builder(mut self, builder: reqwest::ClientBuilder) -> Self {
+        self.http_client_builder = Some(builder);
         self
     }
 }
@@ -149,6 +176,7 @@ impl ClientBuilder<Unset> {
             base_url: self.base_url,
             gateway: self.gateway,
             user_agent_ext: self.user_agent_ext,
+            http_client_builder: self.http_client_builder,
         })
     }
 
@@ -184,14 +212,17 @@ impl ClientBuilder<ApiKey> {
             .user_agent_ext
             .map(|ext| format!("{} {ext}", *USER_AGENT))
             .unwrap_or_else(|| USER_AGENT.clone());
+        let http_client = self
+            .http_client_builder
+            .unwrap_or_default()
+            .user_agent(user_agent)
+            .default_headers(headers)
+            .build()?;
         Ok(Client {
             key: self.key,
             base_url,
             gateway: self.gateway,
-            client: reqwest::ClientBuilder::new()
-                .user_agent(user_agent)
-                .default_headers(headers)
-                .build()?,
+            client: http_client,
         })
     }
 }

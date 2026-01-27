@@ -20,7 +20,7 @@ use tokio::{
     fs::File,
     io::{AsyncReadExt, BufWriter},
 };
-use tracing::{debug, error, info, info_span, warn, Instrument};
+use tracing::{debug, error, info, info_span, instrument, warn, Instrument};
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -66,6 +66,7 @@ impl BatchClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "batch.submit_job")]
     pub async fn submit_job(&mut self, params: &SubmitJobParams) -> crate::Result<BatchJob> {
         let form = vec![
             ("dataset", params.dataset.to_string()),
@@ -95,6 +96,7 @@ impl BatchClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "batch.list_jobs")]
     pub async fn list_jobs(&mut self, params: &ListJobsParams) -> crate::Result<Vec<BatchJob>> {
         let mut builder = self.get("list_jobs")?;
         if let Some(ref states) = params.states {
@@ -120,6 +122,7 @@ impl BatchClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "batch.list_files")]
     pub async fn list_files(&mut self, job_id: &str) -> crate::Result<Vec<BatchFileDesc>> {
         let resp = self
             .get("list_files")?
@@ -135,6 +138,7 @@ impl BatchClient<'_> {
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request. It will also return an
     /// error if it encounters an issue downloading a file.
+    #[instrument(name = "batch.download")]
     pub async fn download(&mut self, params: &DownloadParams) -> crate::Result<Vec<PathBuf>> {
         let job_dir = params.output_dir.join(&params.job_id);
         if job_dir.exists() {
@@ -185,6 +189,7 @@ impl BatchClient<'_> {
         }
     }
 
+    #[instrument(name = "batch.download_file")]
     async fn download_file(
         &mut self,
         url: &str,
