@@ -15,6 +15,7 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter},
 };
 use tokio_util::{bytes::Bytes, io::StreamReader};
+use tracing::{error, instrument};
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -46,6 +47,7 @@ impl TimeseriesClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "timeseries.get_range")]
     pub async fn get_range(
         &mut self,
         params: &GetRangeParams,
@@ -79,6 +81,7 @@ impl TimeseriesClient<'_> {
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request. An error will also be returned
     /// if it fails to create a new file at `path`.
+    #[instrument(name = "timeseries.get_range_to_file")]
     pub async fn get_range_to_file(
         &mut self,
         params: &GetRangeToFileParams,
@@ -146,7 +149,10 @@ impl TimeseriesClient<'_> {
             .await?
             .error_for_status()?
             .bytes_stream()
-            .map_err(std::io::Error::other);
+            .map_err(|err| {
+                error!(?err, "Failed reading from HTTP stream");
+                std::io::Error::other(err)
+            });
         Ok(tokio_util::io::StreamReader::new(stream))
     }
 
@@ -177,6 +183,9 @@ pub struct GetRangeParams {
     pub stype_in: SType,
     /// The symbology type of the output `symbols`. Defaults to
     /// [`InstrumentId`](dbn::enums::SType::InstrumentId).
+    ///
+    /// Must be a valid symbology combination with [`stype_in`](Self::stype_in).
+    /// See [symbology combinations](https://databento.com/docs/standards-and-conventions/symbology#supported-symbology-combinations).
     #[builder(default = SType::InstrumentId)]
     pub stype_out: SType,
     /// The optional maximum number of records to return. Defaults to no limit.
@@ -214,6 +223,9 @@ pub struct GetRangeToFileParams {
     pub stype_in: SType,
     /// The symbology type of the output `symbols`. Defaults to
     /// [`InstrumentId`](dbn::enums::SType::InstrumentId).
+    ///
+    /// Must be a valid symbology combination with [`stype_in`](Self::stype_in).
+    /// See [symbology combinations](https://databento.com/docs/standards-and-conventions/symbology#supported-symbology-combinations).
     #[builder(default = SType::InstrumentId)]
     pub stype_out: SType,
     /// The optional maximum number of records to return. Defaults to no limit.

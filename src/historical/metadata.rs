@@ -5,6 +5,7 @@ use std::{collections::HashMap, num::NonZeroU64, str::FromStr};
 use dbn::{Encoding, SType, Schema};
 use reqwest::RequestBuilder;
 use serde::{Deserialize, Deserializer};
+use tracing::instrument;
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -26,6 +27,7 @@ impl MetadataClient<'_> {
     ///
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API.
+    #[instrument(name = "metadata.list_publishers")]
     pub async fn list_publishers(&mut self) -> crate::Result<Vec<PublisherDetail>> {
         let resp = self.get("list_publishers")?.send().await?;
         handle_response(resp).await
@@ -36,6 +38,7 @@ impl MetadataClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "metadata.list_datasets")]
     pub async fn list_datasets(
         &mut self,
         date_range: Option<DateRange>,
@@ -53,6 +56,7 @@ impl MetadataClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "metadata.list_schemas", skip(dataset), fields(dataset = %dataset.as_ref()))]
     pub async fn list_schemas(&mut self, dataset: impl AsRef<str>) -> crate::Result<Vec<Schema>> {
         let resp = self
             .get("list_schemas")?
@@ -67,6 +71,7 @@ impl MetadataClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "metadata.list_fields")]
     pub async fn list_fields(
         &mut self,
         params: &ListFieldsParams,
@@ -84,6 +89,7 @@ impl MetadataClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "metadata.list_unit_prices", skip(dataset), fields(dataset = %dataset.as_ref()))]
     pub async fn list_unit_prices(
         &mut self,
         dataset: impl AsRef<str>,
@@ -102,6 +108,7 @@ impl MetadataClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "metadata.get_dataset_condition")]
     pub async fn get_dataset_condition(
         &mut self,
         params: &GetDatasetConditionParams,
@@ -123,6 +130,7 @@ impl MetadataClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "metadata.get_dataset_range", skip(dataset), fields(dataset = %dataset.as_ref()))]
     pub async fn get_dataset_range(
         &mut self,
         dataset: impl AsRef<str>,
@@ -140,6 +148,7 @@ impl MetadataClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "metadata.get_record_count")]
     pub async fn get_record_count(&mut self, params: &GetRecordCountParams) -> crate::Result<u64> {
         let form = ReqwestForm::new().add_to_form(params);
         let resp = self.post("get_record_count")?.form(&form).send().await?;
@@ -152,6 +161,7 @@ impl MetadataClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "metadata.get_billable_size")]
     pub async fn get_billable_size(
         &mut self,
         params: &GetBillableSizeParams,
@@ -167,6 +177,7 @@ impl MetadataClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "metadata.get_cost")]
     pub async fn get_cost(&mut self, params: &GetCostParams) -> crate::Result<f64> {
         let form = ReqwestForm::new().add_to_form(params);
         let resp = self.post("get_cost")?.form(&form).send().await?;

@@ -6,6 +6,7 @@ use dbn::{Compression, SType};
 use reqwest::RequestBuilder;
 use serde::Deserialize;
 use time::{Date, OffsetDateTime};
+use tracing::instrument;
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -29,6 +30,7 @@ impl SecurityMasterClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "security_master.get_range")]
     pub async fn get_range(
         &mut self,
         params: &GetRangeParams,
@@ -59,6 +61,7 @@ impl SecurityMasterClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "security_master.get_last")]
     pub async fn get_last(&mut self, params: &GetLastParams) -> crate::Result<Vec<SecurityMaster>> {
         let form = vec![
             ("stype_in", params.stype_in.to_string()),
@@ -67,6 +70,7 @@ impl SecurityMasterClient<'_> {
         ]
         .add_to_form(&params.countries)
         .add_to_form(&params.security_types);
+
         let resp = self.post("get_last")?.form(&form).send().await?;
         let mut security_masters = handle_zstd_jsonl_response::<SecurityMaster>(resp).await?;
         security_masters.sort_by_key(|s| s.ts_effective);

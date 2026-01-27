@@ -3,6 +3,7 @@
 use dbn::{Compression, SType};
 use serde::Deserialize;
 use time::{Date, OffsetDateTime};
+use tracing::instrument;
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -24,6 +25,7 @@ impl AdjustmentFactorsClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "adjustment_factors.get_range")]
     pub async fn get_range(
         &mut self,
         params: &GetRangeParams,
@@ -37,6 +39,7 @@ impl AdjustmentFactorsClient<'_> {
         .add_to_form(&End(params.end))
         .add_to_form(&params.countries)
         .add_to_form(&params.security_types);
+
         let resp = self
             .inner
             .post("adjustment_factors.get_range")?

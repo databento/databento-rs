@@ -5,6 +5,7 @@ use std::{collections::HashMap, fmt::Display};
 use dbn::{Compression, SType};
 use serde::Deserialize;
 use time::{Date, OffsetDateTime};
+use tracing::instrument;
 use typed_builder::TypedBuilder;
 
 use crate::{
@@ -29,6 +30,7 @@ impl CorporateActionsClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "corporate_actions.get_range")]
     pub async fn get_range(
         &mut self,
         params: &GetRangeParams,
@@ -45,6 +47,7 @@ impl CorporateActionsClient<'_> {
         .add_to_form(&params.countries)
         .add_to_form(&Exchanges(&params.exchanges))
         .add_to_form(&params.security_types);
+
         let resp = self
             .inner
             .post("corporate_actions.get_range")?
@@ -588,5 +591,41 @@ mod tests {
         assert_eq!(res.register_country, Some(Country::Vg));
         assert!(res.rate_info.contains_key("par_value_old"));
         assert!(res.rate_info.contains_key("par_value_new"));
+    }
+
+    #[test]
+    fn test_deserialize_unknown_related_event() {
+        let json = r#"{
+            "ts_record": "2023-10-10T03:37:14Z",
+            "event_unique_id": "U-123",
+            "event_id": "E-123",
+            "listing_id": "L-123",
+            "listing_group_id": "LG-123",
+            "security_id": "S-123",
+            "issuer_id": "I-123",
+            "event_action": "I",
+            "event": "DIV",
+            "event_date_label": "ex_date",
+            "event_created_date": "2023-01-01",
+            "related_event": "CORR",
+            "global_status": "A",
+            "listing_status": "L",
+            "listing_source": "M",
+            "issuer_name": "Test Inc",
+            "security_description": "Test",
+            "exchange": "TEST",
+            "multi_currency": false,
+            "mand_volu_flag": "M",
+            "date_info": {},
+            "rate_info": {},
+            "event_info": {},
+            "ts_created": "2023-01-01T00:00:00Z"
+        }"#;
+
+        let action: CorporateAction = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            action.related_event,
+            Some(Event::Unknown("CORR".to_owned()))
+        );
     }
 }

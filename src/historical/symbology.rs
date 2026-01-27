@@ -5,6 +5,7 @@ use std::{collections::HashMap, sync::Arc};
 use dbn::{MappingInterval, Metadata, SType, TsSymbolMap};
 use reqwest::RequestBuilder;
 use serde::Deserialize;
+use tracing::instrument;
 use typed_builder::TypedBuilder;
 
 use crate::{historical::AddToForm, Symbols};
@@ -25,6 +26,7 @@ impl SymbologyClient<'_> {
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
+    #[instrument(name = "symbology.resolve")]
     pub async fn resolve(&mut self, params: &ResolveParams) -> crate::Result<Resolution> {
         let form = vec![
             ("dataset", params.dataset.to_string()),
@@ -69,6 +71,9 @@ pub struct ResolveParams {
     pub stype_in: SType,
     /// The symbology type of the output `symbols`. Defaults to
     /// [`InstrumentId`](dbn::enums::SType::InstrumentId).
+    ///
+    /// Must be a valid symbology combination with [`stype_in`](Self::stype_in).
+    /// See [symbology combinations](https://databento.com/docs/standards-and-conventions/symbology#supported-symbology-combinations).
     #[builder(default = SType::InstrumentId)]
     pub stype_out: SType,
     /// The UTC date range with an inclusive start and an exclusive end.

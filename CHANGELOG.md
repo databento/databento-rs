@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.40.0 - 2026-01-27
+
+### Enhancements
+- Added support for using compression in the live API:
+  - Added `compression()` setter on the live client builder
+  - Added `compression()` getter on the live client
+- A new `Unknown(String)` variant was added to the reference data enums `Country`,
+  `Currency`, `Event`, and `EventSubType`. This allows for forward compatibility when
+  new variants are added
+- Upgraded DBN version to 0.48.0:
+  - Added initial support for splitting DBN files
+  - Added new publisher for Blue Ocean ATS (`OCEA_MEMOIR_OCEA`)
+- Added `http_client_builder` method to the reference and historical client builders
+  to allow more customization over the HTTP client used
+- Improved logging in Historical and Reference APIs
+- The following reference data enums now implement `Display`:
+  - `Country`
+  - `Currency`
+  - `Event`
+  - `EventSubType`
+  - `Frequency`
+  - `OutturnStyle`
+  - `SecurityType`
+
+### Breaking changes
+- Refactor `live::protocol` messages to implement a new `RawApiMsg` trait
+- Move optional session parameters into `SessionOptions` struct which implements
+  `Default`
+- As part of adding the new variant to the four reference data enums:
+  - `Country`, `Currency`, `Event`, and `EventSubType` are no longer `Copy`
+  - The `Error` type of the `FromStr` implementation was changed to `Infallible`: any
+    unknown string will be parsed to the `Unknown` variant
+  - The `as_str` method on these enums was removed: use `as_ref` instead
+- `Event` has been marked non-exhaustive
+- `historical::ClientBuilder` and `reference::ClientBuilder` are no longer `Clone`
+
+### Bug fixes
+- From DBN:
+  - Fixed issue where `AsyncDynReader` instances created from `with_buffer()` would only
+    decode the first frame of multi-frame Zstandard files
+
 ## 0.39.0 - 2026-01-20
 
 ### Enhancements
@@ -64,6 +105,7 @@
 - Upgraded DBN version to 0.43.0:
   - Added explicit `Unset` variant for `SystemCode` and `ErrorCode`
   - Added `Default` implementation for `SystemCode` and `ErrorCode`
+
 ## 0.34.1 - 2025-09-30
 
 ### Enhancements
@@ -388,7 +430,7 @@ upgrading data to version 3.
   to resume a live session after losing the connection to the live gateway
 - Added `subscriptions()` and `subscriptions_mut()` getters to `LiveClient` for getting all
   active subscriptions
-- Added `shutdown()` method to `live::Protocol` to clean up the active session
+- Added `shutdown()` method to `live::protocol` to clean up the active session
 - Downgraded to tracing span level on `LiveClient::next_record()` to "debug" to reduce
   performance impact
 - Added `From<&[&str]>` and `From<[str; N]>` implementations for `Symbols`
