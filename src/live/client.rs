@@ -2,14 +2,17 @@ use std::{fmt, net::SocketAddr};
 
 use dbn::{
     decode::{
-        dbn::{async_decode_metadata_with_fsm, async_decode_record_ref_with_fsm, fsm::DbnFsm},
+        dbn::{
+            async_decode_metadata_with_fsm, async_decode_record_ref_with_fsm,
+            fsm::{DbnFsm, ProcessResult},
+        },
         AsyncDynReader,
     },
     Compression, Metadata, RecordRef, VersionUpgradePolicy,
 };
 use time::Duration;
 use tokio::{
-    io::{BufReader, ReadHalf, WriteHalf},
+    io::{AsyncReadExt, BufReader, ReadHalf, WriteHalf},
     net::{TcpStream, ToSocketAddrs},
 };
 use tracing::{info, info_span, instrument, warn, Span};
@@ -40,6 +43,7 @@ pub struct Client {
     reader: AsyncDynReader<BufReader<ReadHalf<TcpStream>>>,
     fsm: DbnFsm,
     session_id: String,
+    is_closed: bool,
     span: Span,
 }
 
@@ -156,6 +160,7 @@ impl Client {
                 // Not setting input version so it's infallible
                 .unwrap(),
             session_id,
+            is_closed: false,
             span,
             sub_counter: 0,
             subscriptions: Vec::new(),
@@ -221,6 +226,7 @@ impl Client {
     /// means the stream is no longer usable.
     pub async fn close(&mut self) -> crate::Result<()> {
         self.protocol.shutdown().await
+        // Don't set is_closed since it'll be set after in-flight records are read
     }
 
     /// Attempts to add a new subscription to the session. Note that
@@ -302,7 +308,112 @@ impl Client {
                 desc: "Can't call LiveClient::next_record before starting session".to_owned(),
             });
         };
-        Ok(async_decode_record_ref_with_fsm(&mut self.reader, &mut self.fsm).await?)
+        let record = async_decode_record_ref_with_fsm(&mut self.reader, &mut self.fsm).await?;
+        if record.is_none() {
+            self.is_closed = true;
+        }
+        Ok(record)
+    }
+
+    /// Reads available data from the socket into the internal buffer.
+    ///
+    /// Returns the number of bytes read. A return value of 0 indicates that the
+    /// connection has been closed gracefully.
+    ///
+    /// This method is intended to be used with [`try_next_record()`](Self::try_next_record)
+    /// for fine-grained control over I/O and record processing.
+    ///
+    /// # Errors
+    /// This function returns an error if it's unable to read from the TCP stream
+    /// or if the session hasn't been started.
+    ///
+    /// # Cancel safety
+    /// This method is cancel safe. It can be used within a [`tokio::select!`] statement
+    /// without the potential for corrupting the input stream.
+    ///
+    /// # Example
+    /// ```ignore
+    /// loop {
+    ///     // Process all buffered records
+    ///     while let Some(record) = client.try_next_record()? {
+    ///         process(record);
+    ///     }
+    ///     // Read more data from the socket
+    ///     if client.fill_buf().await? == 0 {
+    ///         break; // Connection closed
+    ///     }
+    /// }
+    /// ```
+    #[instrument(parent = &self.span, level = "debug", skip_all)]
+    pub async fn fill_buf(&mut self) -> crate::Result<usize> {
+        if !self.fsm.has_decoded_metadata() {
+            return Err(crate::Error::BadArgument {
+                param_name: "self",
+                desc: "Can't call LiveClient::fill_buf before starting session".to_owned(),
+            });
+        };
+        match self.reader.read(self.fsm.space()).await {
+            Ok(nbytes) => {
+                if nbytes == 0 {
+                    self.is_closed = true;
+                } else {
+                    self.fsm.fill(nbytes);
+                }
+                Ok(nbytes)
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::UnexpectedEof => {
+                self.is_closed = true;
+                Ok(0)
+            }
+            Err(err) => Err(crate::Error::Io(err)),
+        }
+    }
+
+    /// Returns the next record from the internal buffer without performing any I/O.
+    ///
+    /// Returns `Ok(None)` if there are no complete records in the buffer. Use
+    /// [`fill_buf()`](Self::fill_buf) to read more data from the socket, or
+    /// [`is_closed()`](Self::is_closed) to check if the connection is closed.
+    ///
+    /// # Errors
+    /// This function returns an error if it encounters an invalid record or if the
+    /// session hasn't been started.
+    ///
+    /// # Example
+    /// ```ignore
+    /// loop {
+    ///     while let Some(record) = client.try_next_record()? {
+    ///         process(record);
+    ///     }
+    ///     if client.fill_buf().await? == 0 {
+    ///         break;
+    ///     }
+    /// }
+    /// ```
+    pub fn try_next_record(&mut self) -> crate::Result<Option<RecordRef<'_>>> {
+        if !self.fsm.has_decoded_metadata() {
+            return Err(crate::Error::BadArgument {
+                param_name: "self",
+                desc: "Can't call LiveClient::try_next_record before starting session".to_owned(),
+            });
+        };
+        match self.fsm.process() {
+            ProcessResult::Record(_) => Ok(self.fsm.last_record()),
+            ProcessResult::ReadMore(_) => Ok(None),
+            ProcessResult::Err(err) => Err(err.into()),
+            ProcessResult::Metadata(_) => unreachable!("metadata already decoded"),
+        }
+    }
+
+    /// Returns `true` if the connection is closed.
+    ///
+    /// The connection is considered closed after [`next_record()`](Self::next_record)
+    /// or [`fill_buf()`](Self::fill_buf) returns `Ok(None)` or `Ok(0)` respectively.
+    ///
+    /// After a connection is closed, use [`reconnect()`](Self::reconnect) to
+    /// establish a new connection.
+    pub fn is_closed(&self) -> bool {
+        self.is_closed
     }
 
     /// Closes the current connection, then reopens the connection and authenticates
@@ -346,6 +457,7 @@ impl Client {
         // Reconstruct reader with same compression mode
         self.reader = AsyncDynReader::with_buffer(recver, self.compression);
         self.fsm.reset();
+        self.is_closed = false;
         self.span = info_span!("LiveClient", dataset = %self.dataset, session_id = self.session_id);
         Ok(())
     }
@@ -1018,5 +1130,55 @@ mod tests {
         assert_eq!(*rec2.get::<OhlcvMsg>().unwrap(), REC);
 
         mock_task.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_try_next_record_and_fill_buf() {
+        const REC1: OhlcvMsg = OhlcvMsg {
+            hd: RecordHeader::new::<OhlcvMsg>(rtype::OHLCV_1M, 1, 2, 3),
+            open: 1,
+            high: 2,
+            low: 3,
+            close: 4,
+            volume: 5,
+        };
+        const REC2: OhlcvMsg = OhlcvMsg {
+            hd: RecordHeader::new::<OhlcvMsg>(rtype::OHLCV_1M, 4, 5, 6),
+            open: 10,
+            high: 20,
+            low: 30,
+            close: 40,
+            volume: 50,
+        };
+        let (mut fixture, mut client) = setup(Dataset::GlbxMdp3, false, None).await;
+        fixture.start();
+        client.start().await.unwrap();
+
+        // Initially no records buffered
+        assert!(!client.is_closed());
+        assert!(client.try_next_record().unwrap().is_none());
+
+        // Send and read records
+        fixture.send_record(REC1);
+        fixture.send_record(REC2);
+        let nbytes = client.fill_buf().await.unwrap();
+        assert!(nbytes > 0);
+        assert!(!client.is_closed());
+
+        let rec1 = client.try_next_record().unwrap().unwrap();
+        assert_eq!(*rec1.get::<OhlcvMsg>().unwrap(), REC1);
+        let rec2 = client.try_next_record().unwrap().unwrap();
+        assert_eq!(*rec2.get::<OhlcvMsg>().unwrap(), REC2);
+
+        // No more records in buffer
+        assert!(client.try_next_record().unwrap().is_none());
+
+        // Disconnect and verify is_closed
+        fixture.disconnect();
+        let nbytes = client.fill_buf().await.unwrap();
+        assert_eq!(nbytes, 0);
+        assert!(client.is_closed());
+
+        fixture.stop().await;
     }
 }
