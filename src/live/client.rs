@@ -21,7 +21,7 @@ use crate::ApiKey;
 
 use super::{
     protocol::{self, Protocol, SessionOptions},
-    ClientBuilder, Subscription, Unset,
+    ClientBuilder, SlowReadBehavior, Subscription, Unset,
 };
 
 /// The Live client. Used for subscribing to real-time and intraday historical market data.
@@ -36,6 +36,7 @@ pub struct Client {
     heartbeat_interval: Option<Duration>,
     user_agent_ext: Option<String>,
     compression: Compression,
+    slow_read_behavior: Option<SlowReadBehavior>,
     protocol: Protocol<WriteHalf<TcpStream>>,
     peer_addr: SocketAddr,
     sub_counter: u32,
@@ -115,6 +116,7 @@ impl Client {
             buf_size,
             user_agent_ext,
             compression,
+            slow_read_behavior,
         }: ClientBuilder<ApiKey, String>,
     ) -> crate::Result<Self> {
         let stream = if let Some(addr) = addr {
@@ -136,6 +138,7 @@ impl Client {
                     send_ts_out,
                     heartbeat_interval_s: heartbeat_interval.map(|i| i.whole_seconds()),
                     user_agent_ext: user_agent_ext.as_deref(),
+                    slow_read_behavior,
                 },
             )
             .await?;
@@ -150,6 +153,7 @@ impl Client {
             heartbeat_interval,
             user_agent_ext,
             compression,
+            slow_read_behavior,
             protocol,
             peer_addr,
             reader,
@@ -207,6 +211,11 @@ impl Client {
     /// Returns the compression mode for the live data stream.
     pub fn compression(&self) -> Compression {
         self.compression
+    }
+
+    /// Returns the slow read behavior setting, if configured.
+    pub fn slow_read_behavior(&self) -> Option<SlowReadBehavior> {
+        self.slow_read_behavior
     }
 
     /// Returns an immutable reference to all subscriptions made with this instance.
@@ -451,6 +460,7 @@ impl Client {
                     send_ts_out: self.send_ts_out,
                     heartbeat_interval_s: self.heartbeat_interval.map(|i| i.whole_seconds()),
                     user_agent_ext: self.user_agent_ext.as_deref(),
+                    slow_read_behavior: self.slow_read_behavior,
                 },
             )
             .await?;
@@ -480,12 +490,15 @@ impl Client {
 
 impl fmt::Debug for Client {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Implemented manually because TCP types don't implement Debug
         f.debug_struct("LiveClient")
             .field("key", &self.key)
             .field("dataset", &self.dataset)
             .field("send_ts_out", &self.send_ts_out)
             .field("upgrade_policy", &self.upgrade_policy)
             .field("heartbeat_interval", &self.heartbeat_interval)
+            .field("compression", &self.compression)
+            .field("slow_reader_warning", &self.slow_read_behavior)
             .field("peer_addr", &self.peer_addr)
             .field("sub_counter", &self.sub_counter)
             .field("subscriptions", &self.subscriptions)
@@ -520,9 +533,12 @@ mod tests {
     use super::*;
     use crate::USER_AGENT;
 
+    const TEST_KEY: &str = "32-character-with-lots-of-filler";
+
     struct MockGateway {
         dataset: String,
         send_ts_out: bool,
+        slow_read_behavior: Option<SlowReadBehavior>,
         listener: TcpListener,
         stream: Option<BufReader<TcpStream>>,
     }
@@ -533,6 +549,7 @@ mod tests {
             Self {
                 dataset,
                 send_ts_out,
+                slow_read_behavior: None,
                 listener,
                 stream: None,
             }
@@ -569,6 +586,11 @@ mod tests {
                 )));
             } else {
                 assert!(!auth_line.contains("heartbeat_interval_s="));
+            }
+            if let Some(slow_read_behavior) = self.slow_read_behavior {
+                assert!(auth_line.contains(&format!("slow_read_behavior={slow_read_behavior}")));
+            } else {
+                assert!(!auth_line.contains("slow_read_behavior="));
             }
             self.send("success=1|session_id=5\n").await;
         }
@@ -657,6 +679,10 @@ mod tests {
 
         fn stream(&mut self) -> &mut BufReader<TcpStream> {
             self.stream.as_mut().unwrap()
+        }
+
+        fn addr(&self) -> String {
+            format!("127.0.0.1:{}", self.listener.local_addr().unwrap().port())
         }
 
         async fn close(&mut self) {
@@ -756,6 +782,10 @@ mod tests {
                 .unwrap();
         }
 
+        pub fn addr(&self) -> String {
+            format!("127.0.0.1:{}", self.port)
+        }
+
         pub fn disconnect(&mut self) {
             self.send.send(Event::Disconnect).unwrap()
         }
@@ -778,10 +808,10 @@ mod tests {
         let mut fixture = Fixture::new(dataset.to_string(), send_ts_out).await;
         fixture.authenticate(heartbeat_interval);
         let builder = Client::builder()
-            .addr(format!("127.0.0.1:{}", fixture.port))
+            .addr(fixture.addr())
             .await
             .unwrap()
-            .key("32-character-with-lots-of-filler".to_owned())
+            .key(TEST_KEY.to_owned())
             .unwrap()
             .dataset(dataset.to_string())
             .send_ts_out(send_ts_out);
@@ -936,12 +966,13 @@ mod tests {
     async fn test_error_without_success() {
         const DATASET: Dataset = Dataset::OpraPillar;
         let mut fixture = Fixture::new(DATASET.to_string(), false).await;
+        let addr = fixture.addr();
         let client_task = tokio::spawn(async move {
             let res = Client::builder()
-                .addr(format!("127.0.0.1:{}", fixture.port))
+                .addr(addr)
                 .await
                 .unwrap()
-                .key("32-character-with-lots-of-filler".to_owned())
+                .key(TEST_KEY.to_owned())
                 .unwrap()
                 .dataset(DATASET.to_string())
                 .build()
@@ -1092,7 +1123,7 @@ mod tests {
             .try_init();
 
         let mut mock = MockGateway::new(Dataset::GlbxMdp3.to_string(), false).await;
-        let port = mock.listener.local_addr().unwrap().port();
+        let addr = mock.addr();
 
         // Spawn mock server task
         let mock_task = tokio::spawn(async move {
@@ -1108,10 +1139,10 @@ mod tests {
 
         // Build client with compression
         let mut client = Client::builder()
-            .addr(format!("127.0.0.1:{}", port))
+            .addr(addr)
             .await
             .unwrap()
-            .key("32-character-with-lots-of-filler".to_owned())
+            .key(TEST_KEY.to_owned())
             .unwrap()
             .dataset(Dataset::GlbxMdp3.to_string())
             .compression(Compression::Zstd)
@@ -1180,5 +1211,57 @@ mod tests {
         assert!(client.is_closed());
 
         fixture.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_slow_read_behavior_warn() {
+        let _ = tracing_subscriber::FmtSubscriber::builder()
+            .with_max_level(LevelFilter::DEBUG)
+            .with_test_writer()
+            .try_init();
+        let mut mock = MockGateway::new(Dataset::XnasItch.to_string(), false).await;
+        mock.slow_read_behavior = Some(SlowReadBehavior::Warn);
+        let addr = mock.addr();
+        let mock_task = tokio::spawn(async move {
+            mock.authenticate(None).await;
+        });
+        let _client = Client::builder()
+            .addr(addr)
+            .await
+            .unwrap()
+            .key(TEST_KEY.to_owned())
+            .unwrap()
+            .dataset(Dataset::XnasItch.to_string())
+            .slow_read_behavior(SlowReadBehavior::Warn)
+            .build()
+            .await
+            .unwrap();
+        mock_task.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_slow_read_behavior_skip() {
+        let _ = tracing_subscriber::FmtSubscriber::builder()
+            .with_max_level(LevelFilter::DEBUG)
+            .with_test_writer()
+            .try_init();
+        let mut mock = MockGateway::new(Dataset::XnasItch.to_string(), false).await;
+        mock.slow_read_behavior = Some(SlowReadBehavior::Skip);
+        let addr = mock.addr();
+        let mock_task = tokio::spawn(async move {
+            mock.authenticate(None).await;
+        });
+        let _client = Client::builder()
+            .addr(addr)
+            .await
+            .unwrap()
+            .key(TEST_KEY.to_owned())
+            .unwrap()
+            .dataset(Dataset::XnasItch.to_string())
+            .slow_read_behavior(SlowReadBehavior::Skip)
+            .build()
+            .await
+            .unwrap();
+        mock_task.await.unwrap();
     }
 }

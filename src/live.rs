@@ -3,7 +3,7 @@
 mod client;
 pub mod protocol;
 
-use std::{net::SocketAddr, sync::Arc};
+use std::{fmt::Display, net::SocketAddr, sync::Arc};
 
 use dbn::{Compression, SType, Schema, VersionUpgradePolicy};
 use time::{Duration, OffsetDateTime};
@@ -14,6 +14,16 @@ use typed_builder::TypedBuilder;
 use crate::{ApiKey, DateTimeLike, Symbols};
 
 pub use client::Client;
+
+/// Live session parameter which controls gateway behavior when the client
+/// falls behind real time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SlowReadBehavior {
+    /// Send a warning but continue reading.
+    Warn,
+    /// Skip records to catch up.
+    Skip,
+}
 
 /// A subscription for real-time or intraday historical data.
 #[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
@@ -63,6 +73,7 @@ pub struct ClientBuilder<AK, D> {
     buf_size: Option<usize>,
     user_agent_ext: Option<String>,
     compression: Compression,
+    slow_read_behavior: Option<SlowReadBehavior>,
 }
 
 impl Default for ClientBuilder<Unset, Unset> {
@@ -77,6 +88,7 @@ impl Default for ClientBuilder<Unset, Unset> {
             buf_size: None,
             user_agent_ext: None,
             compression: Compression::None,
+            slow_read_behavior: None,
         }
     }
 }
@@ -148,6 +160,12 @@ impl<AK, D> ClientBuilder<AK, D> {
         self.compression = compression;
         self
     }
+
+    /// Sets the behavior of the gateway when the client falls behind real time.
+    pub fn slow_read_behavior(mut self, slow_read_behavior: SlowReadBehavior) -> Self {
+        self.slow_read_behavior = Some(slow_read_behavior);
+        self
+    }
 }
 
 impl ClientBuilder<Unset, Unset> {
@@ -173,6 +191,7 @@ impl<D> ClientBuilder<Unset, D> {
             buf_size: self.buf_size,
             user_agent_ext: self.user_agent_ext,
             compression: self.compression,
+            slow_read_behavior: self.slow_read_behavior,
         })
     }
 
@@ -201,6 +220,7 @@ impl<AK> ClientBuilder<AK, Unset> {
             buf_size: self.buf_size,
             user_agent_ext: self.user_agent_ext,
             compression: self.compression,
+            slow_read_behavior: self.slow_read_behavior,
         }
     }
 }
@@ -213,6 +233,15 @@ impl ClientBuilder<ApiKey, String> {
     /// to connect and authenticate with the Live gateway.
     pub async fn build(self) -> crate::Result<Client> {
         Client::new(self).await
+    }
+}
+
+impl Display for SlowReadBehavior {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Warn => write!(f, "warn"),
+            Self::Skip => write!(f, "skip"),
+        }
     }
 }
 

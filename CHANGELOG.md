@@ -10,6 +10,10 @@
   - `try_next_record()`: returns the next record from the internal buffer without
      performing any I/O. Returns `Ok(None)` if no complete records are available in the buffer.
   - `is_closed()`: returns whether the connection has been closed
+- Added `SlowReadBehavior` enum and `slow_reader_behavior()` setter on the live client builder to configure
+  gateway behavior when client falls behind
+- Added `slow_reader_behavior()` getter to `LiveClient`
+
 ## 0.40.0 - 2026-01-27
 
 ### Enhancements
