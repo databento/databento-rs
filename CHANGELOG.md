@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.41.0 - TBD
+## 0.41.0 - 2026-02-18
 
 ### Enhancements
 - Added three new methods to the Live client for more control over when I/O occurs. Together
@@ -13,6 +13,15 @@
 - Added `SlowReaderBehavior` enum and `slow_reader_behavior()` setter on the live client builder to configure
   gateway behavior when client falls behind
 - Added `slow_reader_behavior()` getter to `LiveClient`
+- Upgraded DBN version to 0.49.0:
+  - Added `encode_records` to `EncodeRecord` and `AsyncEncodeRecord` traits for more
+    efficient batch encoding
+  - Added `encode_record_refs` to `EncodeRecordRef` and `AsyncEncodeRecordRef` traits with
+    more efficient vectored I/O implementation for DBN
+
+### Breaking changes
+- From DBN:
+  - Moved `encode_records` method from the `EncodeDbn` trait to `EncodeRecord`
 
 ## 0.40.0 - 2026-01-27
 
