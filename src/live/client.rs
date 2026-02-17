@@ -21,7 +21,7 @@ use crate::ApiKey;
 
 use super::{
     protocol::{self, Protocol, SessionOptions},
-    ClientBuilder, SlowReadBehavior, Subscription, Unset,
+    ClientBuilder, SlowReaderBehavior, Subscription, Unset,
 };
 
 /// The Live client. Used for subscribing to real-time and intraday historical market data.
@@ -36,7 +36,7 @@ pub struct Client {
     heartbeat_interval: Option<Duration>,
     user_agent_ext: Option<String>,
     compression: Compression,
-    slow_read_behavior: Option<SlowReadBehavior>,
+    slow_reader_behavior: Option<SlowReaderBehavior>,
     protocol: Protocol<WriteHalf<TcpStream>>,
     peer_addr: SocketAddr,
     sub_counter: u32,
@@ -116,7 +116,7 @@ impl Client {
             buf_size,
             user_agent_ext,
             compression,
-            slow_read_behavior,
+            slow_reader_behavior,
         }: ClientBuilder<ApiKey, String>,
     ) -> crate::Result<Self> {
         let stream = if let Some(addr) = addr {
@@ -138,7 +138,7 @@ impl Client {
                     send_ts_out,
                     heartbeat_interval_s: heartbeat_interval.map(|i| i.whole_seconds()),
                     user_agent_ext: user_agent_ext.as_deref(),
-                    slow_read_behavior,
+                    slow_reader_behavior,
                 },
             )
             .await?;
@@ -153,7 +153,7 @@ impl Client {
             heartbeat_interval,
             user_agent_ext,
             compression,
-            slow_read_behavior,
+            slow_reader_behavior,
             protocol,
             peer_addr,
             reader,
@@ -214,8 +214,8 @@ impl Client {
     }
 
     /// Returns the slow read behavior setting, if configured.
-    pub fn slow_read_behavior(&self) -> Option<SlowReadBehavior> {
-        self.slow_read_behavior
+    pub fn slow_reader_behavior(&self) -> Option<SlowReaderBehavior> {
+        self.slow_reader_behavior
     }
 
     /// Returns an immutable reference to all subscriptions made with this instance.
@@ -460,7 +460,7 @@ impl Client {
                     send_ts_out: self.send_ts_out,
                     heartbeat_interval_s: self.heartbeat_interval.map(|i| i.whole_seconds()),
                     user_agent_ext: self.user_agent_ext.as_deref(),
-                    slow_read_behavior: self.slow_read_behavior,
+                    slow_reader_behavior: self.slow_reader_behavior,
                 },
             )
             .await?;
@@ -498,7 +498,7 @@ impl fmt::Debug for Client {
             .field("upgrade_policy", &self.upgrade_policy)
             .field("heartbeat_interval", &self.heartbeat_interval)
             .field("compression", &self.compression)
-            .field("slow_reader_warning", &self.slow_read_behavior)
+            .field("slow_reader_warning", &self.slow_reader_behavior)
             .field("peer_addr", &self.peer_addr)
             .field("sub_counter", &self.sub_counter)
             .field("subscriptions", &self.subscriptions)
@@ -538,7 +538,7 @@ mod tests {
     struct MockGateway {
         dataset: String,
         send_ts_out: bool,
-        slow_read_behavior: Option<SlowReadBehavior>,
+        slow_reader_behavior: Option<SlowReaderBehavior>,
         listener: TcpListener,
         stream: Option<BufReader<TcpStream>>,
     }
@@ -549,7 +549,7 @@ mod tests {
             Self {
                 dataset,
                 send_ts_out,
-                slow_read_behavior: None,
+                slow_reader_behavior: None,
                 listener,
                 stream: None,
             }
@@ -587,10 +587,10 @@ mod tests {
             } else {
                 assert!(!auth_line.contains("heartbeat_interval_s="));
             }
-            if let Some(slow_read_behavior) = self.slow_read_behavior {
-                assert!(auth_line.contains(&format!("slow_read_behavior={slow_read_behavior}")));
+            if let Some(slow_reader_behavior) = self.slow_reader_behavior {
+                assert!(auth_line.contains(&format!("slow_reader_behavior={slow_reader_behavior}")));
             } else {
-                assert!(!auth_line.contains("slow_read_behavior="));
+                assert!(!auth_line.contains("slow_reader_behavior="));
             }
             self.send("success=1|session_id=5\n").await;
         }
@@ -1214,13 +1214,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_slow_read_behavior_warn() {
+    async fn test_slow_reader_behavior_warn() {
         let _ = tracing_subscriber::FmtSubscriber::builder()
             .with_max_level(LevelFilter::DEBUG)
             .with_test_writer()
             .try_init();
         let mut mock = MockGateway::new(Dataset::XnasItch.to_string(), false).await;
-        mock.slow_read_behavior = Some(SlowReadBehavior::Warn);
+        mock.slow_reader_behavior = Some(SlowReaderBehavior::Warn);
         let addr = mock.addr();
         let mock_task = tokio::spawn(async move {
             mock.authenticate(None).await;
@@ -1232,7 +1232,7 @@ mod tests {
             .key(TEST_KEY.to_owned())
             .unwrap()
             .dataset(Dataset::XnasItch.to_string())
-            .slow_read_behavior(SlowReadBehavior::Warn)
+            .slow_reader_behavior(SlowReaderBehavior::Warn)
             .build()
             .await
             .unwrap();
@@ -1240,13 +1240,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_slow_read_behavior_skip() {
+    async fn test_slow_reader_behavior_skip() {
         let _ = tracing_subscriber::FmtSubscriber::builder()
             .with_max_level(LevelFilter::DEBUG)
             .with_test_writer()
             .try_init();
         let mut mock = MockGateway::new(Dataset::XnasItch.to_string(), false).await;
-        mock.slow_read_behavior = Some(SlowReadBehavior::Skip);
+        mock.slow_reader_behavior = Some(SlowReaderBehavior::Skip);
         let addr = mock.addr();
         let mock_task = tokio::spawn(async move {
             mock.authenticate(None).await;
@@ -1258,7 +1258,7 @@ mod tests {
             .key(TEST_KEY.to_owned())
             .unwrap()
             .dataset(Dataset::XnasItch.to_string())
-            .slow_read_behavior(SlowReadBehavior::Skip)
+            .slow_reader_behavior(SlowReaderBehavior::Skip)
             .build()
             .await
             .unwrap();

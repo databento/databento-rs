@@ -18,7 +18,7 @@ pub use client::Client;
 /// Live session parameter which controls gateway behavior when the client
 /// falls behind real time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SlowReadBehavior {
+pub enum SlowReaderBehavior {
     /// Send a warning but continue reading.
     Warn,
     /// Skip records to catch up.
@@ -73,7 +73,7 @@ pub struct ClientBuilder<AK, D> {
     buf_size: Option<usize>,
     user_agent_ext: Option<String>,
     compression: Compression,
-    slow_read_behavior: Option<SlowReadBehavior>,
+    slow_reader_behavior: Option<SlowReaderBehavior>,
 }
 
 impl Default for ClientBuilder<Unset, Unset> {
@@ -88,7 +88,7 @@ impl Default for ClientBuilder<Unset, Unset> {
             buf_size: None,
             user_agent_ext: None,
             compression: Compression::None,
-            slow_read_behavior: None,
+            slow_reader_behavior: None,
         }
     }
 }
@@ -162,8 +162,8 @@ impl<AK, D> ClientBuilder<AK, D> {
     }
 
     /// Sets the behavior of the gateway when the client falls behind real time.
-    pub fn slow_read_behavior(mut self, slow_read_behavior: SlowReadBehavior) -> Self {
-        self.slow_read_behavior = Some(slow_read_behavior);
+    pub fn slow_reader_behavior(mut self, slow_reader_behavior: SlowReaderBehavior) -> Self {
+        self.slow_reader_behavior = Some(slow_reader_behavior);
         self
     }
 }
@@ -191,7 +191,7 @@ impl<D> ClientBuilder<Unset, D> {
             buf_size: self.buf_size,
             user_agent_ext: self.user_agent_ext,
             compression: self.compression,
-            slow_read_behavior: self.slow_read_behavior,
+            slow_reader_behavior: self.slow_reader_behavior,
         })
     }
 
@@ -220,7 +220,7 @@ impl<AK> ClientBuilder<AK, Unset> {
             buf_size: self.buf_size,
             user_agent_ext: self.user_agent_ext,
             compression: self.compression,
-            slow_read_behavior: self.slow_read_behavior,
+            slow_reader_behavior: self.slow_reader_behavior,
         }
     }
 }
@@ -236,11 +236,11 @@ impl ClientBuilder<ApiKey, String> {
     }
 }
 
-impl Display for SlowReadBehavior {
+impl Display for SlowReaderBehavior {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Warn => write!(f, "warn"),
-            Self::Skip => write!(f, "skip"),
+            Self::Skip => write!(f, "drop"),
         }
     }
 }

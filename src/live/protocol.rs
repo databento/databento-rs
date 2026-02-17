@@ -18,7 +18,7 @@ use tracing::{debug, error, instrument};
 
 use crate::{ApiKey, Error, USER_AGENT};
 
-use super::{SlowReadBehavior, Subscription};
+use super::{SlowReaderBehavior, Subscription};
 
 /// Returns the host and port for the live gateway for the given dataset.
 ///
@@ -224,7 +224,7 @@ pub struct SessionOptions<'a> {
     /// Extension string to append to the user agent.
     pub user_agent_ext: Option<&'a str>,
     /// The behavior of the gateway when the client falls behind real time.
-    pub slow_read_behavior: Option<SlowReadBehavior>,
+    pub slow_reader_behavior: Option<SlowReaderBehavior>,
 }
 
 impl Default for SessionOptions<'_> {
@@ -234,7 +234,7 @@ impl Default for SessionOptions<'_> {
             send_ts_out: false,
             heartbeat_interval_s: None,
             user_agent_ext: None,
-            slow_read_behavior: None,
+            slow_reader_behavior: None,
         }
     }
 }
@@ -288,8 +288,8 @@ impl AuthRequest {
         if let Some(heartbeat_interval_s) = options.heartbeat_interval_s {
             req = format!("{req}|heartbeat_interval_s={heartbeat_interval_s}");
         }
-        if let Some(slow_read_behavior) = options.slow_read_behavior {
-            req = format!("{req}|slow_read_behavior={slow_read_behavior}");
+        if let Some(slow_reader_behavior) = options.slow_reader_behavior {
+            req = format!("{req}|slow_reader_behavior={slow_reader_behavior}");
         }
         req.push('\n');
         Self(req)
