@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.42.0 - TBD
+
+### Enhancements
+- Upgraded DBN version to 0.50.0:
+  - Added `SkippedRecordsAfterSlowReading` to the `ErrorCode` enum for gateway errors
+    originating from slow client catch-up
+- Upgraded reqwest version to 0.13
+
 ## 0.41.0 - 2026-02-18
 
 ### Enhancements
