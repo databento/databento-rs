@@ -27,13 +27,15 @@ cargo add databento
 - `historical`: enables the historical client for data older than 24 hours
 - `live`: enables the live client for real-time and intraday historical data
 - `chrono`: enables passing `chrono` types as datetime parameters
+- `default-tls`: enables [`reqwest`](https://github.com/seanmonstar/reqwest)'s `default-tls` backend (currently selects `rustls` in `reqwest` `0.13`)
+- `rustls`: uses the `rustls` TLS backend
+- `rustls-no-provider`: uses the `rustls` backend without the default crypto provider
+- `native-tls`: uses the system native TLS backend (OpenSSL / platform TLS)
+- `native-tls-no-alpn`: uses native TLS without ALPN
+- `native-tls-vendored`: uses vendored OpenSSL
+- `native-tls-vendored-no-alpn`: uses vendored OpenSSL without ALPN
 
-By default both features are enabled and the historical client uses OpenSSL for TLS.
-To use `rustls`, disable default features for both the databento crate and [reqwest](https://github.com/seanmonstar/reqwest).
-```toml
-databento = { features = ["historical"], default-features = false }
-reqwest = { features = ["rustls-tls"], default-features = false }
-```
+By default both `historical` and `live` features are enabled and the historical client uses `reqwest` `default-tls` backend.
 
 ## Usage
 

@@ -18,7 +18,7 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["historical", "live", "reqwest/default-tls"]
+default = ["historical", "live", "default-tls"]
 historical = [
   "dep:async-compression",
   "dep:futures",
@@ -31,6 +31,13 @@ historical = [
 ]
 live = ["tokio/net"]
 chrono = ["dep:chrono"]
+default-tls = ["reqwest/default-tls"]
+rustls = ["reqwest/rustls"]
+rustls-no-provider = ["reqwest/rustls-no-provider"]
+native-tls = ["reqwest/native-tls"]
+native-tls-no-alpn = ["reqwest/native-tls-no-alpn"]
+native-tls-vendored = ["reqwest/native-tls-vendored"]
+native-tls-vendored-no-alpn = ["reqwest/native-tls-vendored-no-alpn"]
 
 [dependencies]
 dbn = { version = "0.50.0", features = ["async", "serde"] }
