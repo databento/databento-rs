@@ -1,6 +1,15 @@
 # Changelog
 
-## 0.42.0 - TBD
+## 0.43.0 - 2026-03-04
+
+### Enhancements
+- Upgraded DBN version to 0.51.0:
+  - Added logic to set `code` when upgrading version 1 `ErrorMsg` to newer versions
+  - Upgraded `async-compression` dependency version to 0.4.41
+  - Upgraded `time` version to 0.3.47
+  - Fixed miri issue with potential for unaligned data when decoding DBN through `DbnFsm`
+
+## 0.42.0 - 2026-02-24
 
 ### Enhancements
 - Upgraded DBN version to 0.50.0:
