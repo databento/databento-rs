@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.45.0 - TBD
+
+### Enhancements
+- Changed `SlowReaderBehavior::Skip` to send "skip" instead of "drop" to the gateway
+
 ## 0.44.0 - 2026-03-17
 
 ### Enhancements

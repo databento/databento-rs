@@ -240,7 +240,7 @@ impl Display for SlowReaderBehavior {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Warn => write!(f, "warn"),
-            Self::Skip => write!(f, "drop"),
+            Self::Skip => write!(f, "skip"),
         }
     }
 }
