@@ -512,6 +512,10 @@ pub struct BatchJob {
     /// The timestamp of when the batch job will expire from the Download center.
     #[serde(deserialize_with = "deserialize_opt_date_time")]
     pub ts_expiration: Option<OffsetDateTime>,
+    /// The progress percentage of the batch job (0-100). `None` for jobs that
+    /// were just submitted.
+    #[serde(default)]
+    pub progress: Option<u8>,
 }
 
 /// The parameters for [`BatchClient::list_jobs()`]. Use [`ListJobsParams::builder()`] to
@@ -918,6 +922,7 @@ mod tests {
         assert!(!job_desc.pretty_ts);
         assert!(job_desc.map_symbols);
         assert_eq!(job_desc.split_duration, Some(SplitDuration::Day));
+        assert!(job_desc.progress.is_none());
 
         job_desc = &job_descs[1];
         assert_eq!(
@@ -936,6 +941,7 @@ mod tests {
         assert!(job_desc.map_symbols);
         assert!(!job_desc.split_symbols);
         assert_eq!(job_desc.split_duration, None);
+        assert_eq!(job_desc.progress, Some(100));
 
         Ok(())
     }
