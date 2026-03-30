@@ -41,6 +41,10 @@ pub enum Error {
     /// An when authentication failed.
     #[error("authentication failed: {0}")]
     Auth(String),
+    /// A heartbeat timeout, i.e. no data received within the expected interval.
+    #[cfg(feature = "live")]
+    #[error("heartbeat timeout: no data received for {0:?}")]
+    HeartbeatTimeout(time::Duration),
 }
 /// An alias for a `Result` with [`databento::Error`](crate::Error) as the error type.
 pub type Result<T> = std::result::Result<T, Error>;
