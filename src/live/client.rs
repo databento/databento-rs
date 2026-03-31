@@ -1,4 +1,4 @@
-use std::{fmt, net::SocketAddr};
+use std::{fmt, net::SocketAddr, time::Duration as StdDuration};
 
 use dbn::{
     decode::{
@@ -302,9 +302,11 @@ impl Client {
     /// can be read.
     ///
     /// # Errors
-    /// This function returns an error when it's unable to decode the next record
-    /// or it's unable to read from the TCP stream. It will also return an error if the
-    /// session hasn't been started.
+    /// This function returns an error when:
+    /// - it's unable to decode the next record
+    /// - it's unable to read from the TCP stream
+    /// - no data has been received within the expected interval
+    /// - the session hasn't been started
     ///
     /// # Cancel safety
     /// This method is cancel safe. It can be used within a [`tokio::select!`] statement
@@ -317,7 +319,19 @@ impl Client {
                 desc: "Can't call LiveClient::next_record before starting session".to_owned(),
             });
         };
-        let record = async_decode_record_ref_with_fsm(&mut self.reader, &mut self.fsm).await?;
+        let timeout = self.heartbeat_timeout();
+        let record = tokio::time::timeout(
+            timeout,
+            async_decode_record_ref_with_fsm(&mut self.reader, &mut self.fsm),
+        )
+        .await
+        .map_err(|_elapsed| {
+            self.is_closed = true;
+            crate::Error::HeartbeatTimeout(
+                // timeout should be well within range
+                time::Duration::try_from(timeout).unwrap(),
+            )
+        })??;
         if record.is_none() {
             self.is_closed = true;
         }
@@ -333,8 +347,10 @@ impl Client {
     /// for fine-grained control over I/O and record processing.
     ///
     /// # Errors
-    /// This function returns an error if it's unable to read from the TCP stream
-    /// or if the session hasn't been started.
+    /// This function returns an error when:
+    /// - it's unable to read from the TCP stream
+    /// - no data has been received within the expected interval
+    /// - the session hasn't been started
     ///
     /// # Cancel safety
     /// This method is cancel safe. It can be used within a [`tokio::select!`] statement
@@ -361,7 +377,17 @@ impl Client {
                 desc: "Can't call LiveClient::fill_buf before starting session".to_owned(),
             });
         };
-        match self.reader.read(self.fsm.space()).await {
+        let timeout = self.heartbeat_timeout();
+        let read_result = tokio::time::timeout(timeout, self.reader.read(self.fsm.space()))
+            .await
+            .map_err(|_elapsed| {
+                self.is_closed = true;
+                crate::Error::HeartbeatTimeout(
+                    // timeout should be well within range
+                    time::Duration::try_from(timeout).unwrap(),
+                )
+            })?;
+        match read_result {
             Ok(nbytes) => {
                 if nbytes == 0 {
                     self.is_closed = true;
@@ -423,6 +449,12 @@ impl Client {
     /// establish a new connection.
     pub fn is_closed(&self) -> bool {
         self.is_closed
+    }
+
+    fn heartbeat_timeout(&self) -> StdDuration {
+        self.heartbeat_interval
+            .map(|i| StdDuration::from_secs(i.whole_seconds().unsigned_abs() + 5))
+            .unwrap_or_else(|| StdDuration::from_secs(35))
     }
 
     /// Closes the current connection, then reopens the connection and authenticates
@@ -1263,5 +1295,71 @@ mod tests {
             .await
             .unwrap();
         mock_task.await.unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_heartbeat_timeout_next_record() {
+        let (mut fixture, mut client) =
+            setup(Dataset::GlbxMdp3, false, Some(Duration::seconds(1))).await;
+        fixture.start();
+        client.start().await.unwrap();
+
+        // With paused time, the timeout fires immediately when we advance
+        let err = client.next_record().await.unwrap_err();
+        assert!(
+            matches!(&err, crate::Error::HeartbeatTimeout(_)),
+            "Expected HeartbeatTimeout, got: {err}"
+        );
+        assert!(client.is_closed());
+        fixture.stop().await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_heartbeat_timeout_fill_buf() {
+        let (mut fixture, mut client) =
+            setup(Dataset::GlbxMdp3, false, Some(Duration::seconds(1))).await;
+        fixture.start();
+        client.start().await.unwrap();
+
+        let err = client.fill_buf().await.unwrap_err();
+        assert!(
+            matches!(&err, crate::Error::HeartbeatTimeout(_)),
+            "Expected HeartbeatTimeout, got: {err}"
+        );
+        assert!(client.is_closed());
+        fixture.stop().await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_reconnect_resets_heartbeat_timer() {
+        let (mut fixture, mut client) =
+            setup(Dataset::GlbxMdp3, false, Some(Duration::seconds(1))).await;
+        fixture.start();
+        client.start().await.unwrap();
+
+        // Resume real time so the TCP EOF is delivered before the heartbeat timeout
+        tokio::time::resume();
+        fixture.disconnect();
+        // Read until closed. Should get None (disconnect), not heartbeat timeout
+        let rec = client.next_record().await.unwrap();
+        assert!(rec.is_none());
+        assert!(client.is_closed());
+        tokio::time::pause();
+
+        // Reconnect should reset the timer
+        fixture.authenticate(Some(Duration::seconds(1)));
+        client.reconnect().await.unwrap();
+        assert!(!client.is_closed());
+
+        // Need to start session again after reconnect
+        fixture.start();
+        client.start().await.unwrap();
+
+        tokio::time::resume();
+        fixture.disconnect();
+        let rec = client.next_record().await.unwrap();
+        assert!(rec.is_none()); // closed, not timeout
+
+        fixture.stop().await;
     }
 }

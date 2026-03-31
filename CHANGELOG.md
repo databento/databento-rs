@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.45.0 - 2026-03-31
+
+### Enhancements
+- Upgraded DBN version to 0.52.0
+- Added `HeartbeatTimeout` error variant:  `next_record` and `fill_buf` return
+  `Error::HeartbeatTimeout` if no data is received for `heartbeat_interval` + 5 seconds
+  (defaults to 35 seconds)
+- Changed `SlowReaderBehavior::Skip` to send "skip" instead of "drop" to the gateway
+
 ## 0.44.0 - 2026-03-17
 
 ### Enhancements
