@@ -1,4 +1,4 @@
-use std::{fmt, net::SocketAddr, time::Duration as StdDuration};
+use std::{fmt, future::Future, net::SocketAddr, time::Duration as StdDuration};
 
 use dbn::{
     decode::{
@@ -21,7 +21,7 @@ use crate::ApiKey;
 
 use super::{
     protocol::{self, Protocol, SessionOptions},
-    ClientBuilder, SlowReaderBehavior, Subscription, Unset,
+    ClientBuilder, SlowReaderBehavior, Subscription, TimeoutConf, Unset,
 };
 
 /// The Live client. Used for subscribing to real-time and intraday historical market data.
@@ -37,6 +37,7 @@ pub struct Client {
     user_agent_ext: Option<String>,
     compression: Compression,
     slow_reader_behavior: Option<SlowReaderBehavior>,
+    timeout_conf: TimeoutConf,
     protocol: Protocol<WriteHalf<TcpStream>>,
     peer_addr: SocketAddr,
     sub_counter: u32,
@@ -117,31 +118,33 @@ impl Client {
             user_agent_ext,
             compression,
             slow_reader_behavior,
+            timeout_conf,
         }: ClientBuilder<ApiKey, String>,
     ) -> crate::Result<Self> {
-        let stream = if let Some(addr) = addr {
-            TcpStream::connect(addr.as_slice()).await
-        } else {
-            TcpStream::connect(protocol::determine_gateway(&dataset)).await
-        }?;
+        let connect_fut = async {
+            if let Some(addr) = addr {
+                TcpStream::connect(addr.as_slice()).await
+            } else {
+                TcpStream::connect(protocol::determine_gateway(&dataset)).await
+            }
+        };
+        let stream = apply_connect_timeout(connect_fut, timeout_conf.connect).await?;
         let peer_addr = stream.peer_addr()?;
         let (recver, sender) = tokio::io::split(stream);
         let mut recver = BufReader::new(recver);
         let mut protocol = Protocol::new(sender);
-        let session_id = protocol
-            .authenticate(
-                &mut recver,
-                &key,
-                &dataset,
-                SessionOptions {
-                    compression,
-                    send_ts_out,
-                    heartbeat_interval_s: heartbeat_interval.map(|i| i.whole_seconds()),
-                    user_agent_ext: user_agent_ext.as_deref(),
-                    slow_reader_behavior,
-                },
-            )
-            .await?;
+        let options = SessionOptions {
+            compression,
+            send_ts_out,
+            heartbeat_interval_s: heartbeat_interval.map(|i| i.whole_seconds()),
+            user_agent_ext: user_agent_ext.as_deref(),
+            slow_reader_behavior,
+        };
+        let session_id = apply_auth_timeout(
+            protocol.authenticate(&mut recver, &key, &dataset, options),
+            timeout_conf.auth,
+        )
+        .await?;
         // Construct reader based on compression mode
         let reader = AsyncDynReader::with_buffer(recver, compression);
         let span = info_span!("LiveClient", %dataset, session_id);
@@ -154,6 +157,7 @@ impl Client {
             user_agent_ext,
             compression,
             slow_reader_behavior,
+            timeout_conf,
             protocol,
             peer_addr,
             reader,
@@ -216,6 +220,11 @@ impl Client {
     /// Returns the slow read behavior setting, if configured.
     pub fn slow_reader_behavior(&self) -> Option<SlowReaderBehavior> {
         self.slow_reader_behavior
+    }
+
+    /// Returns the timeouts for connecting and authenticating with the gateway.
+    pub fn timeout_conf(&self) -> &TimeoutConf {
+        &self.timeout_conf
     }
 
     /// Returns an immutable reference to all subscriptions made with this instance.
@@ -476,26 +485,25 @@ impl Client {
                 "Failed to close connection before reconnect. Proceeding"
             );
         }
-        let stream = TcpStream::connect(self.peer_addr).await?;
+        let connect_fut = TcpStream::connect(self.peer_addr);
+        let stream = apply_connect_timeout(connect_fut, self.timeout_conf.connect).await?;
         let (recver, sender) = tokio::io::split(stream);
         let mut recver = BufReader::new(recver);
         self.protocol = Protocol::new(sender);
         self.sub_counter = 0;
-        self.session_id = self
-            .protocol
-            .authenticate(
-                &mut recver,
-                &self.key,
-                &self.dataset,
-                SessionOptions {
-                    compression: self.compression,
-                    send_ts_out: self.send_ts_out,
-                    heartbeat_interval_s: self.heartbeat_interval.map(|i| i.whole_seconds()),
-                    user_agent_ext: self.user_agent_ext.as_deref(),
-                    slow_reader_behavior: self.slow_reader_behavior,
-                },
-            )
-            .await?;
+        let options = SessionOptions {
+            compression: self.compression,
+            send_ts_out: self.send_ts_out,
+            heartbeat_interval_s: self.heartbeat_interval.map(|i| i.whole_seconds()),
+            user_agent_ext: self.user_agent_ext.as_deref(),
+            slow_reader_behavior: self.slow_reader_behavior,
+        };
+        self.session_id = apply_auth_timeout(
+            self.protocol
+                .authenticate(&mut recver, &self.key, &self.dataset, options),
+            self.timeout_conf.auth,
+        )
+        .await?;
         // Reconstruct reader with same compression mode
         self.reader = AsyncDynReader::with_buffer(recver, self.compression);
         self.fsm.reset();
@@ -531,11 +539,42 @@ impl fmt::Debug for Client {
             .field("heartbeat_interval", &self.heartbeat_interval)
             .field("compression", &self.compression)
             .field("slow_reader_warning", &self.slow_reader_behavior)
+            .field("timeout_conf", &self.timeout_conf)
             .field("peer_addr", &self.peer_addr)
             .field("sub_counter", &self.sub_counter)
             .field("subscriptions", &self.subscriptions)
             .field("session_id", &self.session_id)
             .finish_non_exhaustive()
+    }
+}
+
+fn to_std_duration(d: Duration) -> StdDuration {
+    StdDuration::from_secs(d.whole_seconds().unsigned_abs())
+}
+
+async fn apply_connect_timeout(
+    connect_fut: impl Future<Output = std::io::Result<TcpStream>>,
+    timeout: Option<Duration>,
+) -> crate::Result<TcpStream> {
+    if let Some(t) = timeout {
+        Ok(tokio::time::timeout(to_std_duration(t), connect_fut)
+            .await
+            .map_err(|_| crate::Error::ConnectTimeout(t))??)
+    } else {
+        Ok(connect_fut.await?)
+    }
+}
+
+async fn apply_auth_timeout(
+    auth_fut: impl Future<Output = crate::Result<String>>,
+    timeout: Option<Duration>,
+) -> crate::Result<String> {
+    if let Some(t) = timeout {
+        tokio::time::timeout(to_std_duration(t), auth_fut)
+            .await
+            .map_err(|_| crate::Error::AuthTimeout(t))?
+    } else {
+        auth_fut.await
     }
 }
 
@@ -846,7 +885,11 @@ mod tests {
             .key(TEST_KEY.to_owned())
             .unwrap()
             .dataset(dataset.to_string())
-            .send_ts_out(send_ts_out);
+            .send_ts_out(send_ts_out)
+            .timeout_conf(TimeoutConf {
+                connect: None,
+                auth: None,
+            });
         let target = if let Some(heartbeat_interval) = heartbeat_interval {
             builder.heartbeat_interval(heartbeat_interval)
         } else {
@@ -1221,16 +1264,26 @@ mod tests {
         assert!(!client.is_closed());
         assert!(client.try_next_record().unwrap().is_none());
 
-        // Send and read records
+        // Send and read records. May require multiple fill_buf calls since TCP
+        // can deliver partial data.
         fixture.send_record(REC1);
         fixture.send_record(REC2);
-        let nbytes = client.fill_buf().await.unwrap();
-        assert!(nbytes > 0);
-        assert!(!client.is_closed());
-
-        let rec1 = client.try_next_record().unwrap().unwrap();
+        let rec1 = loop {
+            if let Some(rec) = client.try_next_record().unwrap() {
+                break rec;
+            }
+            let nbytes = client.fill_buf().await.unwrap();
+            assert!(nbytes > 0);
+            assert!(!client.is_closed());
+        };
         assert_eq!(*rec1.get::<OhlcvMsg>().unwrap(), REC1);
-        let rec2 = client.try_next_record().unwrap().unwrap();
+        let rec2 = loop {
+            if let Some(rec) = client.try_next_record().unwrap() {
+                break rec;
+            }
+            let nbytes = client.fill_buf().await.unwrap();
+            assert!(nbytes > 0);
+        };
         assert_eq!(*rec2.get::<OhlcvMsg>().unwrap(), REC2);
 
         // No more records in buffer
@@ -1361,5 +1414,66 @@ mod tests {
         assert!(rec.is_none()); // closed, not timeout
 
         fixture.stop().await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_connect_timeout() {
+        // Use a non-routable address to guarantee a timeout (loopback would get
+        // ECONNREFUSED immediately). With paused time, the timeout fires instantly.
+        let result = Client::builder()
+            .addr("192.0.2.1:13000")
+            .await
+            .unwrap()
+            .key(TEST_KEY.to_owned())
+            .unwrap()
+            .dataset("GLBX.MDP3")
+            .timeout_conf(TimeoutConf {
+                connect: Some(Duration::seconds(1)),
+                auth: None,
+            })
+            .build()
+            .await;
+        assert!(
+            matches!(result, Err(crate::Error::ConnectTimeout(_))),
+            "Expected ConnectTimeout, got {result:?}"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_auth_timeout() {
+        // Accept TCP connection but never send the CRAM greeting
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (_stream, _addr) = listener.accept().await.unwrap();
+            // Hold the connection open but never send anything
+            tokio::time::sleep(StdDuration::from_secs(60)).await;
+        });
+        let result = Client::builder()
+            .addr(addr)
+            .await
+            .unwrap()
+            .key(TEST_KEY.to_owned())
+            .unwrap()
+            .dataset("GLBX.MDP3")
+            .timeout_conf(TimeoutConf {
+                connect: None,
+                auth: Some(Duration::seconds(1)),
+            })
+            .build()
+            .await;
+        assert!(
+            matches!(result, Err(crate::Error::AuthTimeout(_))),
+            "Expected AuthTimeout, got {result:?}"
+        );
+        server.abort();
+    }
+
+    #[test]
+    fn test_default_timeout_conf() {
+        let builder = Client::builder();
+        let timeout_conf = builder.timeout_conf;
+        assert_eq!(timeout_conf.connect, Some(Duration::seconds(10)));
+        assert_eq!(timeout_conf.auth, Some(Duration::seconds(30)));
     }
 }

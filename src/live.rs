@@ -15,6 +15,24 @@ use crate::{ApiKey, DateTimeLike, Symbols};
 
 pub use client::Client;
 
+/// Timeouts for the Live client's connection and authentication phases.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TimeoutConf {
+    /// The timeout for the TCP connection to the gateway. Defaults to 10 seconds.
+    pub connect: Option<Duration>,
+    /// The timeout for CRAM authentication with the gateway. Defaults to 30 seconds.
+    pub auth: Option<Duration>,
+}
+
+impl Default for TimeoutConf {
+    fn default() -> Self {
+        Self {
+            connect: Some(Duration::seconds(10)),
+            auth: Some(Duration::seconds(30)),
+        }
+    }
+}
+
 /// Live session parameter which controls gateway behavior when the client
 /// falls behind real time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,6 +92,7 @@ pub struct ClientBuilder<AK, D> {
     user_agent_ext: Option<String>,
     compression: Compression,
     slow_reader_behavior: Option<SlowReaderBehavior>,
+    timeout_conf: TimeoutConf,
 }
 
 impl Default for ClientBuilder<Unset, Unset> {
@@ -89,6 +108,7 @@ impl Default for ClientBuilder<Unset, Unset> {
             user_agent_ext: None,
             compression: Compression::None,
             slow_reader_behavior: None,
+            timeout_conf: TimeoutConf::default(),
         }
     }
 }
@@ -166,6 +186,13 @@ impl<AK, D> ClientBuilder<AK, D> {
         self.slow_reader_behavior = Some(slow_reader_behavior);
         self
     }
+
+    /// Sets the timeouts for connecting and authenticating with the gateway.
+    /// Defaults to 10 seconds for connect and 30 seconds for auth.
+    pub fn timeout_conf(mut self, timeout_conf: TimeoutConf) -> Self {
+        self.timeout_conf = timeout_conf;
+        self
+    }
 }
 
 impl ClientBuilder<Unset, Unset> {
@@ -192,6 +219,7 @@ impl<D> ClientBuilder<Unset, D> {
             user_agent_ext: self.user_agent_ext,
             compression: self.compression,
             slow_reader_behavior: self.slow_reader_behavior,
+            timeout_conf: self.timeout_conf,
         })
     }
 
@@ -221,6 +249,7 @@ impl<AK> ClientBuilder<AK, Unset> {
             user_agent_ext: self.user_agent_ext,
             compression: self.compression,
             slow_reader_behavior: self.slow_reader_behavior,
+            timeout_conf: self.timeout_conf,
         }
     }
 }

@@ -38,13 +38,21 @@ pub enum Error {
     /// An error related to DBN encoding or decoding.
     #[error("DBN error: {0}")]
     Dbn(#[source] dbn::Error),
-    /// An when authentication failed.
+    /// An error when authentication failed.
     #[error("authentication failed: {0}")]
     Auth(String),
     /// A heartbeat timeout, i.e. no data received within the expected interval.
     #[cfg(feature = "live")]
     #[error("heartbeat timeout: no data received for {0:?}")]
     HeartbeatTimeout(time::Duration),
+    /// The TCP connection to the gateway timed out.
+    #[cfg(feature = "live")]
+    #[error("connect timeout: failed to connect within {0:?}")]
+    ConnectTimeout(time::Duration),
+    /// Authentication with the gateway timed out.
+    #[cfg(feature = "live")]
+    #[error("auth timeout: authentication did not complete within {0:?}")]
+    AuthTimeout(time::Duration),
 }
 /// An alias for a `Result` with [`databento::Error`](crate::Error) as the error type.
 pub type Result<T> = std::result::Result<T, Error>;

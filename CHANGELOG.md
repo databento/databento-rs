@@ -2,13 +2,18 @@
 
 ## 0.46.0 - TBD
 
-### Bug fixes
-- Added missing `None` variant to `SplitDuration` enum for explicitly requesting no
-  time-based splitting
+### Enhancements
+- Added `TimeoutConf` struct and `timeout_conf()` builder method for configuring connect
+  and auth timeouts on the Live client (defaults to 10s and 30s)
+- Added `ConnectTimeout` and `AuthTimeout` error variants
 
 ### Breaking changes
 - Changed `split_duration` field in `SubmitJobParams` and `BatchJob` from
   `Option<SplitDuration>` to `SplitDuration`. Use `SplitDuration::None` instead of `None`
+
+### Bug fixes
+- Added missing `None` variant to `SplitDuration` enum for explicitly requesting no
+  time-based splitting
 
 ## 0.45.0 - 2026-03-31
 
