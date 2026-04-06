@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.46.0 - TBD
+
+### Bug fixes
+- Added missing `None` variant to `SplitDuration` enum for explicitly requesting no
+  time-based splitting
+
+### Breaking changes
+- Changed `split_duration` field in `SubmitJobParams` and `BatchJob` from
+  `Option<SplitDuration>` to `SplitDuration`. Use `SplitDuration::None` instead of `None`
+
 ## 0.45.0 - 2026-03-31
 
 ### Enhancements

@@ -47,11 +47,9 @@ impl AddToForm<SplitSize> for ReqwestForm {
     }
 }
 
-impl AddToForm<Option<SplitDuration>> for ReqwestForm {
-    fn add_to_form(mut self, split_duration: &Option<SplitDuration>) -> Self {
-        if let Some(split_duration) = split_duration {
-            self.push(("split_duration", split_duration.to_string()));
-        }
+impl AddToForm<SplitDuration> for ReqwestForm {
+    fn add_to_form(mut self, split_duration: &SplitDuration) -> Self {
+        self.push(("split_duration", split_duration.to_string()));
         self
     }
 }
@@ -350,6 +348,8 @@ pub enum SplitDuration {
     Week,
     /// One file per month.
     Month,
+    /// No time-based splitting.
+    None,
 }
 
 /// How the batch job will be delivered.
@@ -386,6 +386,7 @@ pub struct SubmitJobParams {
     /// The data record schema.
     pub schema: Schema,
     /// The request range with an inclusive start and an exclusive end.
+    ///
     /// Filters on `ts_recv` if it exists in the schema, otherwise `ts_event`.
     #[builder(setter(into))]
     pub date_time_range: DateTimeRange,
@@ -412,10 +413,12 @@ pub struct SubmitJobParams {
     #[builder(default)]
     pub split_symbols: bool,
     /// The maximum time duration before batched data is split into multiple
-    /// files. If `None` the data will not be split by time. Defaults to
-    /// [`Day`](SplitDuration::Day).
-    #[builder(default = Some(SplitDuration::default()))]
-    pub split_duration: Option<SplitDuration>,
+    /// files.
+    ///
+    /// [`None`](SplitDuration::None) means the data will not be split by time. Defaults
+    /// to [`Day`](SplitDuration::Day).
+    #[builder(default)]
+    pub split_duration: SplitDuration,
     /// The optional maximum size (in bytes) of each batched data file before being split.
     /// Must be an integer between 1e9 and 10e9 inclusive (1GB - 10GB). Defaults to `None`.
     #[builder(default, setter(strip_option))]
@@ -482,7 +485,7 @@ pub struct BatchJob {
     pub split_symbols: bool,
     /// The maximum time interval for an individual file before splitting into multiple
     /// files.
-    pub split_duration: Option<SplitDuration>,
+    pub split_duration: SplitDuration,
     /// The maximum size for an individual file before splitting into multiple files.
     pub split_size: Option<NonZeroU64>,
     /// The delivery mechanism of the batch data.
@@ -566,6 +569,7 @@ impl SplitDuration {
             SplitDuration::Day => "day",
             SplitDuration::Week => "week",
             SplitDuration::Month => "month",
+            SplitDuration::None => "none",
         }
     }
 }
@@ -584,6 +588,7 @@ impl FromStr for SplitDuration {
             "day" => Ok(SplitDuration::Day),
             "week" => Ok(SplitDuration::Week),
             "month" => Ok(SplitDuration::Month),
+            "none" => Ok(SplitDuration::None),
             _ => Err(crate::Error::bad_arg(
                 "s",
                 format!(
@@ -597,8 +602,12 @@ impl FromStr for SplitDuration {
 
 impl<'de> Deserialize<'de> for SplitDuration {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let str = String::deserialize(deserializer)?;
-        FromStr::from_str(&str).map_err(de::Error::custom)
+        let opt = Option::<String>::deserialize(deserializer)?;
+        match opt {
+            Some(str) => FromStr::from_str(&str).map_err(de::Error::custom),
+            // The API returns `null` instead of `"none"` for no time-based splitting
+            None => Ok(SplitDuration::None),
+        }
     }
 }
 
@@ -921,7 +930,7 @@ mod tests {
         assert!(job_desc.pretty_px);
         assert!(!job_desc.pretty_ts);
         assert!(job_desc.map_symbols);
-        assert_eq!(job_desc.split_duration, Some(SplitDuration::Day));
+        assert_eq!(job_desc.split_duration, SplitDuration::Day);
         assert!(job_desc.progress.is_none());
 
         job_desc = &job_descs[1];
@@ -940,7 +949,7 @@ mod tests {
         assert!(!job_desc.pretty_ts);
         assert!(job_desc.map_symbols);
         assert!(!job_desc.split_symbols);
-        assert_eq!(job_desc.split_duration, None);
+        assert_eq!(job_desc.split_duration, SplitDuration::None);
         assert_eq!(job_desc.progress, Some(100));
 
         Ok(())
