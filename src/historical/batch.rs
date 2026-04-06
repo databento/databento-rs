@@ -343,6 +343,8 @@ impl BatchClient<'_> {
 /// The duration of time at which batch files will be split.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum SplitDuration {
+    /// No time-based splitting.
+    None,
     /// One file per day.
     #[default]
     Day,
@@ -412,8 +414,8 @@ pub struct SubmitJobParams {
     #[builder(default)]
     pub split_symbols: bool,
     /// The maximum time duration before batched data is split into multiple
-    /// files. If `None` the data will not be split by time. Defaults to
-    /// [`Day`](SplitDuration::Day).
+    /// files. If `None`, defaults to [`Day`](SplitDuration::Day).
+    /// Use `Some(SplitDuration::None)` to disable time-based splitting.
     #[builder(default = Some(SplitDuration::default()))]
     pub split_duration: Option<SplitDuration>,
     /// The optional maximum size (in bytes) of each batched data file before being split.
@@ -563,6 +565,7 @@ impl SplitDuration {
     /// Converts the enum to its `str` representation.
     pub const fn as_str(&self) -> &'static str {
         match self {
+            SplitDuration::None => "none",
             SplitDuration::Day => "day",
             SplitDuration::Week => "week",
             SplitDuration::Month => "month",
@@ -581,6 +584,7 @@ impl FromStr for SplitDuration {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "none" => Ok(SplitDuration::None),
             "day" => Ok(SplitDuration::Day),
             "week" => Ok(SplitDuration::Week),
             "month" => Ok(SplitDuration::Month),
