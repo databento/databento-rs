@@ -294,6 +294,37 @@ static USER_AGENT: LazyLock<String> = LazyLock::new(|| {
     )
 });
 
+mod private {
+    pub trait Sealed {}
+
+    impl<T: super::DateTimeLike> Sealed for T {}
+    impl<T: super::DateTimeLike> Sealed for Option<T> {}
+}
+
+/// A value that can be infallibly converted into `Option<OffsetDateTime>`.
+///
+/// This is a convenience trait for APIs that should accept either:
+/// - a concrete `T: DateTimeLike`, which becomes `Some(...)`, or
+/// - `Option<T>`, which maps `Some(...)` and preserves `None`.
+///
+/// This trait is sealed and is not intended for downstream implementation.
+pub trait DateTimeLikeOpt: private::Sealed {
+    /// Converts this value into an optional datetime.
+    fn to_date_time_opt(self) -> Option<time::OffsetDateTime>;
+}
+
+impl<T: DateTimeLike> DateTimeLikeOpt for T {
+    fn to_date_time_opt(self) -> Option<time::OffsetDateTime> {
+        Some(self.to_date_time())
+    }
+}
+
+impl<T: DateTimeLike> DateTimeLikeOpt for Option<T> {
+    fn to_date_time_opt(self) -> Option<time::OffsetDateTime> {
+        self.map(DateTimeLike::to_date_time)
+    }
+}
+
 /// A datetime or object that can be non-fallibly converted to a datetime.
 pub trait DateTimeLike {
     /// Converts the object to a datetime.
