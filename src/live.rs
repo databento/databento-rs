@@ -11,7 +11,7 @@ use tokio::net::{lookup_host, ToSocketAddrs};
 use tracing::warn;
 use typed_builder::TypedBuilder;
 
-use crate::{ApiKey, DateTimeLike, Symbols};
+use crate::{ApiKey, DateTimeLikeOpt, Symbols};
 
 pub use client::Client;
 
@@ -60,7 +60,7 @@ pub struct Subscription {
     ///
     /// Cannot be specified after the session is started with [`LiveClient::start`](crate::LiveClient::start).
     /// See [`Intraday Replay`](https://databento.com/docs/api-reference-live/basics/intraday-replay).
-    #[builder(default, setter(transform = |dt: impl DateTimeLike| Some(dt.to_date_time())))]
+    #[builder(default, setter(transform = |dt: impl DateTimeLikeOpt| dt.to_date_time_opt()))]
     pub start: Option<OffsetDateTime>,
     #[doc(hidden)]
     /// Request subscription with snapshot. Only supported with `Mbo` schema.
@@ -298,6 +298,18 @@ mod tests {
             .symbols("AAPL")
             .schema(Schema::Trades)
             .start(date)
+            .build();
+        assert_eq!(sub.start, Some(datetime!(2024-03-15 00:00:00 UTC)));
+    }
+
+    #[test]
+    fn subscription_with_time_date_or_none() {
+        let date = time::macros::date!(2024 - 03 - 15);
+        let flag = true;
+        let sub = Subscription::builder()
+            .symbols("AAPL")
+            .schema(Schema::Trades)
+            .start(if flag { Some(date) } else { None })
             .build();
         assert_eq!(sub.start, Some(datetime!(2024-03-15 00:00:00 UTC)));
     }
