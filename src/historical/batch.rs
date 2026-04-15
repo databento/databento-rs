@@ -21,7 +21,6 @@ use tokio::{
     io::{AsyncReadExt, BufWriter},
 };
 use tracing::{debug, error, info, info_span, instrument, warn, Instrument};
-use typed_builder::TypedBuilder;
 
 use crate::{
     deserialize::{deserialize_date_time, deserialize_opt_date_time},
@@ -73,7 +72,13 @@ impl BatchClient<'_> {
             ("compression", params.compression.to_string()),
             ("pretty_px", params.pretty_px.to_string()),
             ("pretty_ts", params.pretty_ts.to_string()),
-            ("map_symbols", params.map_symbols.to_string()),
+            (
+                "map_symbols",
+                params
+                    .map_symbols
+                    .unwrap_or(params.encoding != Encoding::Dbn)
+                    .to_string(),
+            ),
             ("split_symbols", params.split_symbols.to_string()),
             ("delivery", params.delivery.to_string()),
             ("stype_in", params.stype_in.to_string()),
@@ -375,20 +380,20 @@ pub enum JobState {
 
 /// The parameters for [`BatchClient::submit_job()`]. Use [`SubmitJobParams::builder()`] to
 /// get a builder type with all the preset defaults.
-#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
+#[derive(Debug, Clone, bon::Builder, PartialEq, Eq)]
 pub struct SubmitJobParams {
     /// The dataset code.
-    #[builder(setter(transform = |dt: impl ToString| dt.to_string()))]
+    #[builder(with = |d: impl ToString| d.to_string())]
     pub dataset: String,
     /// The symbols to filter for.
-    #[builder(setter(into))]
+    #[builder(into)]
     pub symbols: Symbols,
     /// The data record schema.
     pub schema: Schema,
     /// The request range with an inclusive start and an exclusive end.
     ///
     /// Filters on `ts_recv` if it exists in the schema, otherwise `ts_event`.
-    #[builder(setter(into))]
+    #[builder(into)]
     pub date_time_range: DateTimeRange,
     /// The data encoding. Defaults to [`Dbn`](Encoding::Dbn).
     #[builder(default = Encoding::Dbn)]
@@ -405,10 +410,9 @@ pub struct SubmitJobParams {
     #[builder(default)]
     pub pretty_ts: bool,
     /// If `true`, a symbol field will be included with each text-encoded
-    /// record. If `None`, will default to `true` for [`Encoding::Csv`] and [`Encoding::Json`] encodings,
-    /// and `false` for [`Encoding::Dbn`].
-    #[builder(default_code = "*encoding != Encoding::Dbn")]
-    pub map_symbols: bool,
+    /// record. Defaults to `true` for [`Encoding::Csv`] and [`Encoding::Json`] encodings
+    /// when `None`, and `false` for [`Encoding::Dbn`].
+    pub map_symbols: Option<bool>,
     /// If `true`, files will be split by raw symbol. Cannot be requested with [`Symbols::All`].
     #[builder(default)]
     pub split_symbols: bool,
@@ -421,7 +425,6 @@ pub struct SubmitJobParams {
     pub split_duration: SplitDuration,
     /// The optional maximum size (in bytes) of each batched data file before being split.
     /// Must be an integer between 1e9 and 10e9 inclusive (1GB - 10GB). Defaults to `None`.
-    #[builder(default, setter(strip_option))]
     pub split_size: Option<NonZeroU64>,
     /// The delivery mechanism for the batched data files once processed.
     /// Only [`Download`](Delivery::Download) is supported at this time.
@@ -439,7 +442,6 @@ pub struct SubmitJobParams {
     #[builder(default = SType::InstrumentId)]
     pub stype_out: SType,
     /// The optional maximum number of records to return. Defaults to no limit.
-    #[builder(default)]
     pub limit: Option<NonZeroU64>,
 }
 
@@ -523,14 +525,12 @@ pub struct BatchJob {
 
 /// The parameters for [`BatchClient::list_jobs()`]. Use [`ListJobsParams::builder()`] to
 /// get a builder type with all the preset defaults.
-#[derive(Debug, Clone, Default, TypedBuilder, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, bon::Builder, PartialEq, Eq)]
 pub struct ListJobsParams {
     /// The optional filter for job states. If `None`, defaults to all except `Expired`.
-    #[builder(default, setter(strip_option))]
     pub states: Option<Vec<JobState>>,
     /// The optional filter for timestamp submitted (will not include jobs prior to
     /// this time).
-    #[builder(default, setter(strip_option))]
     pub since: Option<OffsetDateTime>,
 }
 
@@ -549,16 +549,16 @@ pub struct BatchFileDesc {
 
 /// The parameters for [`BatchClient::download()`]. Use [`DownloadParams::builder()`] to
 /// get a builder type with all the preset defaults.
-#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
+#[derive(Debug, Clone, bon::Builder, PartialEq, Eq)]
 pub struct DownloadParams {
     /// The directory to download the file(s) to.
-    #[builder(setter(transform = |dt: impl Into<PathBuf>| dt.into()))]
+    #[builder(into)]
     pub output_dir: PathBuf,
     /// The batch job identifier.
-    #[builder(setter(transform = |dt: impl ToString| dt.to_string()))]
+    #[builder(with = |id: impl ToString| id.to_string())]
     pub job_id: String,
     /// `None` means all files associated with the job will be downloaded.
-    #[builder(default, setter(transform = |filename: impl ToString| Some(filename.to_string())))]
+    #[builder(with = |f: impl ToString| f.to_string())]
     pub filename_to_download: Option<String>,
 }
 
@@ -803,6 +803,8 @@ mod tests {
         const START: time::OffsetDateTime = datetime!(2023 - 06 - 14 00:00 UTC);
         const END: time::OffsetDateTime = datetime!(2023 - 06 - 17 00:00 UTC);
 
+        // When not explicitly set, map_symbols is None (resolved at request time
+        // based on encoding)
         let params = SubmitJobParams::builder()
             .dataset(Dataset::GlbxMdp3)
             .encoding(Encoding::Dbn)
@@ -811,7 +813,7 @@ mod tests {
             .date_time_range(START..END)
             .build();
         assert_eq!(params.encoding, Encoding::Dbn);
-        assert_eq!(params.map_symbols, false);
+        assert!(params.map_symbols.is_none());
 
         let params = SubmitJobParams::builder()
             .dataset(Dataset::GlbxMdp3)
@@ -821,8 +823,9 @@ mod tests {
             .date_time_range(START..END)
             .build();
         assert_eq!(params.encoding, Encoding::Csv);
-        assert_eq!(params.map_symbols, true);
+        assert!(params.map_symbols.is_none());
 
+        // When explicitly set, map_symbols preserves the value
         let params = SubmitJobParams::builder()
             .dataset(Dataset::GlbxMdp3)
             .encoding(Encoding::Json)
@@ -832,7 +835,7 @@ mod tests {
             .map_symbols(false)
             .build();
         assert_eq!(params.encoding, Encoding::Json);
-        assert_eq!(params.map_symbols, false);
+        assert_eq!(params.map_symbols, Some(false));
 
         Ok(())
     }

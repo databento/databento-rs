@@ -6,7 +6,6 @@ use dbn::{Encoding, SType, Schema};
 use reqwest::RequestBuilder;
 use serde::{Deserialize, Deserializer};
 use tracing::instrument;
-use typed_builder::TypedBuilder;
 
 use crate::{
     deserialize::deserialize_date_time,
@@ -233,7 +232,7 @@ pub struct PublisherDetail {
 
 /// The parameters for [`MetadataClient::list_fields()`]. Use
 /// [`ListFieldsParams::builder()`] to get a builder type with all the preset defaults.
-#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
+#[derive(Debug, Clone, bon::Builder, PartialEq, Eq)]
 pub struct ListFieldsParams {
     /// The encoding to request fields for.
     pub encoding: Encoding,
@@ -263,14 +262,14 @@ pub struct UnitPricesForMode {
 /// The parameters for [`MetadataClient::get_dataset_condition()`]. Use
 /// [`GetDatasetConditionParams::builder()`] to get a builder type with all the preset
 /// defaults.
-#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
+#[derive(Debug, Clone, bon::Builder, PartialEq, Eq)]
 pub struct GetDatasetConditionParams {
     /// The dataset code.
-    #[builder(setter(transform = |dataset: impl ToString| dataset.to_string()))]
+    #[builder(with = |d: impl ToString| d.to_string())]
     pub dataset: String,
     /// The UTC date request range with an inclusive start date and an inclusive end date.
     /// If `None` then will return all available dates.
-    #[builder(default, setter(transform = |dr: impl Into<DateRange>| Some(dr.into())))]
+    #[builder(into)]
     pub date_range: Option<DateRange>,
 }
 
@@ -310,25 +309,24 @@ impl From<DatasetRange> for DateTimeRange {
 }
 
 /// The parameters for several metadata requests.
-#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
+#[derive(Debug, Clone, bon::Builder, PartialEq, Eq)]
 pub struct GetQueryParams {
     /// The dataset code.
-    #[builder(setter(transform = |dataset: impl ToString| dataset.to_string()))]
+    #[builder(with = |d: impl ToString| d.to_string())]
     pub dataset: String,
     /// The symbols to filter for.
-    #[builder(setter(into))]
+    #[builder(into)]
     pub symbols: Symbols,
     /// The data record schema.
     pub schema: Schema,
     /// The request range with an inclusive start and an exclusive end.
-    #[builder(setter(into))]
+    #[builder(into)]
     pub date_time_range: DateTimeRange,
     /// The symbology type of the input `symbols`. Defaults to
     /// [`RawSymbol`](dbn::enums::SType::RawSymbol).
     #[builder(default = SType::RawSymbol)]
     pub stype_in: SType,
     /// The optional maximum number of records to return. Defaults to no limit.
-    #[builder(default)]
     pub limit: Option<NonZeroU64>,
 }
 

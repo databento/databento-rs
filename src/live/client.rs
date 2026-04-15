@@ -588,7 +588,7 @@ mod tests {
         enums::rtype,
         publishers::Dataset,
         record::{HasRType, OhlcvMsg, RecordHeader, TradeMsg, WithTsOut},
-        FlagSet, Mbp10Msg, MetadataBuilder, Record, SType, Schema,
+        FlagSet, Mbp10Msg, MetadataBuilder, Record, RecordBuf, SType, Schema,
     };
     use time::{Duration, OffsetDateTime};
     use tokio::{
@@ -704,8 +704,8 @@ mod tests {
             info!("Sent: {}", &bytes[..bytes.len() - 1])
         }
 
-        async fn send_record(&mut self, record: Box<dyn AsRef<[u8]> + Send>) {
-            let bytes = (*record).as_ref();
+        async fn send_record(&mut self, record: RecordBuf) {
+            let bytes = record.as_ref();
             // test for partial read bugs
             let half = bytes.len() / 2;
             self.stream().write_all(&bytes[..half]).await.unwrap();
@@ -777,7 +777,7 @@ mod tests {
         Send(String),
         Subscribe(Subscription, bool),
         Start,
-        SendRecord(Box<dyn AsRef<[u8]> + Send>),
+        SendRecord(RecordBuf),
         Disconnect,
     }
 
@@ -844,12 +844,9 @@ mod tests {
             self.send.send(Event::Send(msg)).unwrap();
         }
 
-        pub fn send_record<R>(&mut self, record: R)
-        where
-            R: HasRType + AsRef<[u8]> + Clone + Send + 'static,
-        {
+        pub fn send_record<R: HasRType>(&mut self, record: R) {
             self.send
-                .send(Event::SendRecord(Box::new(record.clone())))
+                .send(Event::SendRecord(RecordBuf::from(record)))
                 .unwrap();
         }
 
@@ -922,7 +919,7 @@ mod tests {
             .symbols(vec!["MSFT", "TSLA", "QQQ"])
             .schema(Schema::Ohlcv1M)
             .stype_in(SType::RawSymbol)
-            .use_snapshot()
+            .use_snapshot(true)
             .build();
         fixture.expect_subscribe(subscription.clone(), true);
         client.subscribe(subscription).await.unwrap();
@@ -941,7 +938,7 @@ mod tests {
                     .schema(Schema::Ohlcv1M)
                     .stype_in(SType::RawSymbol)
                     .start(time::OffsetDateTime::now_utc())
-                    .use_snapshot()
+                    .use_snapshot(true)
                     .build(),
             )
             .await
