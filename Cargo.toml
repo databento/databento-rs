@@ -52,7 +52,7 @@ tokio = { version = ">=1.41", features = ["io-util", "macros"] }
 # Stream utils
 tokio-util = { version = "0.7", features = ["io"], optional = true }
 tracing = "0.1"
-typed-builder = "0.23"
+bon = "3"
 zstd = { version = "0.13", optional = true }
 
 [dev-dependencies]

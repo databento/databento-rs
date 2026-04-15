@@ -124,7 +124,7 @@ async fn run_with_snapshot(args: Args, mut client: LiveClient) -> anyhow::Result
                 .schema(args.schema)
                 .symbols(args.symbols)
                 .stype_in(args.stype)
-                .use_snapshot()
+                .use_snapshot(true)
                 .build(),
         )
         .await?;

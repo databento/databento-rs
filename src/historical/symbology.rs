@@ -6,7 +6,6 @@ use dbn::{MappingInterval, Metadata, SType, TsSymbolMap};
 use reqwest::RequestBuilder;
 use serde::Deserialize;
 use tracing::instrument;
-use typed_builder::TypedBuilder;
 
 use crate::{historical::AddToForm, Symbols};
 
@@ -57,13 +56,13 @@ impl SymbologyClient<'_> {
 
 /// The parameters for [`SymbologyClient::resolve()`]. Use [`ResolveParams::builder()`]
 /// to get a builder type with all the preset defaults.
-#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
+#[derive(Debug, Clone, bon::Builder, PartialEq, Eq)]
 pub struct ResolveParams {
     /// The dataset code.
-    #[builder(setter(transform = |dt: impl ToString| dt.to_string()))]
+    #[builder(with = |d: impl ToString| d.to_string())]
     pub dataset: String,
     /// The symbols to resolve.
-    #[builder(setter(into))]
+    #[builder(into)]
     pub symbols: Symbols,
     /// The symbology type of the input `symbols`. Defaults to
     /// [`RawSymbol`](dbn::enums::SType::RawSymbol).
@@ -77,7 +76,7 @@ pub struct ResolveParams {
     #[builder(default = SType::InstrumentId)]
     pub stype_out: SType,
     /// The UTC date range with an inclusive start and an exclusive end.
-    #[builder(setter(into))]
+    #[builder(into)]
     pub date_range: DateRange,
 }
 

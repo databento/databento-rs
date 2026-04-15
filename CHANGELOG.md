@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.47.0 - TBD
+
+### Enhancements
+- Replaced `typed-builder` dependency with `bon` for all parameter builder structs
+- Added `maybe_` prefixed setters for all `Option` fields on parameter builders, allowing
+  callers to pass `Option<T>` directly (e.g. `maybe_start(Some(datetime))` or `maybe_start(None)`)
+
+### Breaking changes
+- Changed `use_snapshot()` setter on `Subscription` builder to require an explicit `bool`
+  argument: `.use_snapshot()` becomes `.use_snapshot(true)`
+- Changed `map_symbols` field in `SubmitJobParams` from `bool` to `Option<bool>`
+- Changed `limit()` setter on `GetRangeParams`, `GetRangeToFileParams`, `GetQueryParams`, and
+  `SubmitJobParams` builders to accept `NonZeroU64` instead of `Option<NonZeroU64>`.
+  Use `maybe_limit()` for the previous behavior of passing an `Option` directly
+
+### Bug fixes
+- Removed `#[doc(hidden)]` from `Subscription::use_snapshot`
+
 ## 0.46.0 - 2026-04-07
 
 ### Enhancements

@@ -16,7 +16,6 @@ use tokio::{
 };
 use tokio_util::{bytes::Bytes, io::StreamReader};
 use tracing::{error, instrument};
-use typed_builder::TypedBuilder;
 
 use crate::{
     historical::{check_warnings, AddToForm, Limit},
@@ -163,19 +162,19 @@ impl TimeseriesClient<'_> {
 
 /// The parameters for [`TimeseriesClient::get_range()`]. Use
 /// [`GetRangeParams::builder()`] to get a builder type with all the preset defaults.
-#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
+#[derive(Debug, Clone, bon::Builder, PartialEq, Eq)]
 pub struct GetRangeParams {
     /// The dataset code.
-    #[builder(setter(transform = |dt: impl ToString| dt.to_string()))]
+    #[builder(with = |d: impl ToString| d.to_string())]
     pub dataset: String,
     /// The symbols to filter for.
-    #[builder(setter(into))]
+    #[builder(into)]
     pub symbols: Symbols,
     /// The data record schema.
     pub schema: Schema,
     /// The request range with an inclusive start and an exclusive end.
     /// Filters on `ts_recv` if it exists in the schema, otherwise `ts_event`.
-    #[builder(setter(into))]
+    #[builder(into)]
     pub date_time_range: DateTimeRange,
     /// The symbology type of the input `symbols`. Defaults to
     /// [`RawSymbol`](dbn::enums::SType::RawSymbol).
@@ -189,11 +188,9 @@ pub struct GetRangeParams {
     #[builder(default = SType::InstrumentId)]
     pub stype_out: SType,
     /// The optional maximum number of records to return. Defaults to no limit.
-    #[builder(default)]
     pub limit: Option<NonZeroU64>,
     /// How to decode DBN from prior versions. Defaults to upgrade to the latest
     /// version.
-    #[builder(default, setter(strip_option))]
     #[deprecated(
         since = "0.28.0",
         note = "Use the upgrade_policy configuration option on HistoricalClient"
@@ -203,19 +200,19 @@ pub struct GetRangeParams {
 
 /// The parameters for [`TimeseriesClient::get_range_to_file()`]. Use
 /// [`GetRangeToFileParams::builder()`] to get a builder type with all the preset defaults.
-#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
+#[derive(Debug, Clone, bon::Builder, PartialEq, Eq)]
 pub struct GetRangeToFileParams {
     /// The dataset code.
-    #[builder(setter(transform = |dt: impl ToString| dt.to_string()))]
+    #[builder(with = |d: impl ToString| d.to_string())]
     pub dataset: String,
     /// The symbols to filter for.
-    #[builder(setter(into))]
+    #[builder(into)]
     pub symbols: Symbols,
     /// The data record schema.
     pub schema: Schema,
     /// The request range with an inclusive start and an exclusive end.
     /// Filters on `ts_recv` if it exists in the schema, otherwise `ts_event`.
-    #[builder(setter(into))]
+    #[builder(into)]
     pub date_time_range: DateTimeRange,
     /// The symbology type of the input `symbols`. Defaults to
     /// [`RawSymbol`](dbn::enums::SType::RawSymbol).
@@ -229,18 +226,16 @@ pub struct GetRangeToFileParams {
     #[builder(default = SType::InstrumentId)]
     pub stype_out: SType,
     /// The optional maximum number of records to return. Defaults to no limit.
-    #[builder(default)]
     pub limit: Option<NonZeroU64>,
     /// How to decode DBN from prior versions. Defaults to upgrade to the latest
     /// version.
-    #[builder(default, setter(strip_option))]
     #[deprecated(
         since = "0.28.0",
         note = "Use the upgrade_policy configuration option on HistoricalClient"
     )]
     pub upgrade_policy: Option<VersionUpgradePolicy>,
     /// The file path to persist the stream data to.
-    #[builder(default, setter(transform = |p: impl Into<PathBuf>| p.into()))]
+    #[builder(default, into)]
     pub path: PathBuf,
 }
 

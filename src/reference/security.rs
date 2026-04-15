@@ -7,7 +7,6 @@ use reqwest::RequestBuilder;
 use serde::Deserialize;
 use time::{Date, OffsetDateTime};
 use tracing::instrument;
-use typed_builder::TypedBuilder;
 
 use crate::{
     deserialize::deserialize_date_time,
@@ -94,21 +93,21 @@ pub enum Index {
 
 /// The parameters for [`SecurityMasterClient::get_range()`]. Use
 /// [`GetRangeParams::builder()`] to get a builder type with all the preset defaults.
-#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
+#[derive(Debug, Clone, bon::Builder, PartialEq, Eq)]
 pub struct GetRangeParams {
     /// The inclusive start time of the request range. Filters on `index`.
-    #[builder(setter(transform = |dt: impl DateTimeLike| dt.to_date_time()))]
+    #[builder(with = |dt: impl DateTimeLike| dt.to_date_time())]
     pub start: OffsetDateTime,
     /// The exclusive end time of the request range. Filters on `index`.
     ///
     /// If `None`, all data after `start` will be included in the response.
-    #[builder(default, setter(transform = |dt: impl DateTimeLike| Some(dt.to_date_time())))]
+    #[builder(with = |dt: impl DateTimeLike| dt.to_date_time())]
     pub end: Option<OffsetDateTime>,
     /// The timestamp to use for filtering.
     #[builder(default)]
     pub index: Index,
     /// The symbols to filter for.
-    #[builder(setter(into))]
+    #[builder(into)]
     pub symbols: Symbols,
     /// The symbology type of the input `symbols`. Defaults to
     /// [`RawSymbol`](SType::RawSymbol).
@@ -116,20 +115,20 @@ pub struct GetRangeParams {
     pub stype_in: SType,
     /// An optional list of country codes to filter for. By default all countries are
     /// included.
-    #[builder(default, setter(into))]
+    #[builder(default, into)]
     pub countries: Vec<Country>,
     /// An optional list of security types to filter for. By default all security types
     /// are included.
-    #[builder(default, setter(into))]
+    #[builder(default, into)]
     pub security_types: Vec<SecurityType>,
 }
 
 /// The parameters for [`SecurityMasterClient::get_last()`]. Use
 /// [`GetLastParams::builder()`] to get a builder type with all the preset defaults.
-#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
+#[derive(Debug, Clone, bon::Builder, PartialEq, Eq)]
 pub struct GetLastParams {
     /// The symbols to filter for.
-    #[builder(setter(into))]
+    #[builder(into)]
     pub symbols: Symbols,
     /// The symbology type of the input `symbols`. Defaults to
     /// [`RawSymbol`](SType::RawSymbol).
@@ -137,11 +136,11 @@ pub struct GetLastParams {
     pub stype_in: SType,
     /// An optional list of country codes to filter for. By default all countries are
     /// included.
-    #[builder(default, setter(into))]
+    #[builder(default, into)]
     pub countries: Vec<Country>,
     /// An optional list of security types to filter for. By default all security types
     /// are included.
-    #[builder(default, setter(into))]
+    #[builder(default, into)]
     pub security_types: Vec<SecurityType>,
 }
 

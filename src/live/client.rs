@@ -922,7 +922,7 @@ mod tests {
             .symbols(vec!["MSFT", "TSLA", "QQQ"])
             .schema(Schema::Ohlcv1M)
             .stype_in(SType::RawSymbol)
-            .use_snapshot()
+            .use_snapshot(true)
             .build();
         fixture.expect_subscribe(subscription.clone(), true);
         client.subscribe(subscription).await.unwrap();
@@ -941,7 +941,7 @@ mod tests {
                     .schema(Schema::Ohlcv1M)
                     .stype_in(SType::RawSymbol)
                     .start(time::OffsetDateTime::now_utc())
-                    .use_snapshot()
+                    .use_snapshot(true)
                     .build(),
             )
             .await

@@ -9,7 +9,6 @@ use dbn::{Compression, SType, Schema, VersionUpgradePolicy};
 use time::{Duration, OffsetDateTime};
 use tokio::net::{lookup_host, ToSocketAddrs};
 use tracing::warn;
-use typed_builder::TypedBuilder;
 
 use crate::{ApiKey, DateTimeLike, Symbols};
 
@@ -44,10 +43,11 @@ pub enum SlowReaderBehavior {
 }
 
 /// A subscription for real-time or intraday historical data.
-#[derive(Debug, Clone, TypedBuilder, PartialEq, Eq)]
+#[derive(Debug, Clone, bon::Builder, PartialEq, Eq)]
+#[builder(derive(Clone))]
 pub struct Subscription {
     /// The symbols of the instruments to subscribe to.
-    #[builder(setter(into))]
+    #[builder(into)]
     pub symbols: Symbols,
     /// The data record schema of data to subscribe to.
     pub schema: Schema,
@@ -60,15 +60,13 @@ pub struct Subscription {
     ///
     /// Cannot be specified after the session is started with [`LiveClient::start`](crate::LiveClient::start).
     /// See [`Intraday Replay`](https://databento.com/docs/api-reference-live/basics/intraday-replay).
-    #[builder(default, setter(transform = |dt: impl DateTimeLike| Some(dt.to_date_time())))]
+    #[builder(with = |dt: impl DateTimeLike| dt.to_date_time())]
     pub start: Option<OffsetDateTime>,
-    #[doc(hidden)]
     /// Request subscription with snapshot. Only supported with `Mbo` schema.
     /// Defaults to `false`. Conflicts with the `start` parameter.
-    #[builder(setter(strip_bool))]
+    #[builder(default)]
     pub use_snapshot: bool,
     /// The optional numerical identifier associated with this subscription.
-    #[builder(default, setter(strip_option))]
     pub id: Option<u32>,
 }
 
