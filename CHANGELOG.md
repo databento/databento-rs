@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.48.0 - 2026-04-21
+
+### Enhancements
+- Upgraded DBN version to 0.55.0:
+  - Added new publisher values for OPRA MEMX MX2 Options and IEX Options
+  - Improved `DbnFsm` decode throughput on current-version data and `AsIs` workloads
+
+### Bug fixes
+- Removed unsound `Copy` and `Clone` implementations for `RecordRefMut`
+
 ## 0.47.0 - 2026-04-15
 
 ### Enhancements
