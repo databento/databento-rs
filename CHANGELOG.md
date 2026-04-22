@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.49.0 - TBD
+
+### Enhancements
+- Added `SplitDuration::Year` for historical batch job submission
+
 ## 0.48.0 - 2026-04-21
 
 ### Enhancements
