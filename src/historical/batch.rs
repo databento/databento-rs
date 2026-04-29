@@ -353,6 +353,8 @@ pub enum SplitDuration {
     Week,
     /// One file per month.
     Month,
+    /// One file per year.
+    Year,
     /// No time-based splitting.
     None,
 }
@@ -569,6 +571,7 @@ impl SplitDuration {
             SplitDuration::Day => "day",
             SplitDuration::Week => "week",
             SplitDuration::Month => "month",
+            SplitDuration::Year => "year",
             SplitDuration::None => "none",
         }
     }
@@ -588,6 +591,7 @@ impl FromStr for SplitDuration {
             "day" => Ok(SplitDuration::Day),
             "week" => Ok(SplitDuration::Week),
             "month" => Ok(SplitDuration::Month),
+            "year" => Ok(SplitDuration::Year),
             "none" => Ok(SplitDuration::None),
             _ => Err(crate::Error::bad_arg(
                 "s",

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.49.0 - 2026-04-29
+
+### Enhancements
+- Added `SplitDuration::Year` for historical batch job submission
+- Upgraded DBN version to 0.56.0:
+  - Added `DecodeRecordRef::decode_buf_iter()` for lazily iterating owned `RecordBuf`s
+    via a standard `Iterator`
+  - Added `AsyncDecodeRecordRef::decode_stream()` for lazily decoding owned `RecordBuf`s
+    via a `futures::Stream`
+  - Improved `DbnFsm` decode throughput by making `AlignedBuffer` shifts lazy,
+    deferring the internal move to buffer refill boundaries
+  - Added new publisher values for Cboe Titanium Cboe Global Indices Feed
+  - Added support for splitting files by year to `TimeSplitter`
+
 ## 0.48.0 - 2026-04-21
 
 ### Enhancements
