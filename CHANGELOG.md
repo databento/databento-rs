@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.50.0 - 2026-05-05
+
+### Enhancements
+- Upgraded DBN version to 0.57.0:
+  - Added `INDEX` `InstrumentClass` variant
+  - Added `StatType` variants `INDICATIVE_CLOSE_PRICE` and `VENUE_SPECIFIC_PRICE_1`
+
 ## 0.49.0 - 2026-04-29
 
 ### Enhancements
