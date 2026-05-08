@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.51.0 - TBD
+
+### Enhancements
+- Added `case` and `payload` fields to `ApiError` to expose the machine-readable error
+  identifier and structured context (dataset, requested range, available range, etc.)
+  returned by the historical API
+- Included the error `case` in `ApiError`'s `Display` output
+
 ## 0.50.0 - 2026-05-05
 
 ### Enhancements

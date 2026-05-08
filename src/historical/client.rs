@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io;
 
 use async_compression::tokio::bufread::ZstdDecoder;
@@ -44,8 +45,11 @@ pub(crate) enum ApiErrorResponse {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct BusinessErrorDetails {
+    case: Option<String>,
     message: String,
     docs: String,
+    #[serde(default)]
+    payload: Option<HashMap<String, serde_json::Value>>,
 }
 
 pub(crate) const WARNING_HEADER: &str = "X-Warning";
@@ -166,22 +170,28 @@ pub(crate) async fn check_http_error(
             Ok(ApiErrorResponse::Simple { detail: message }) => ApiError {
                 request_id,
                 status_code,
+                case: None,
                 message,
                 docs_url: None,
+                payload: None,
             },
             Ok(ApiErrorResponse::Business { detail }) => ApiError {
                 request_id,
                 status_code,
+                case: detail.case,
                 message: detail.message,
                 docs_url: Some(detail.docs),
+                payload: detail.payload.map(Box::new),
             },
             Err(e) => {
                 warn!("Failed to deserialize error response to expected JSON format: {e:?}");
                 ApiError {
                     request_id,
                     status_code,
+                    case: None,
                     message: body,
                     docs_url: None,
+                    payload: None,
                 }
             }
         };
@@ -397,6 +407,115 @@ mod tests {
     use wiremock::{matchers::method, Mock, MockServer, ResponseTemplate};
 
     use super::*;
+
+    #[tokio::test]
+    async fn check_http_error_simple_detail() {
+        const BODY: &str = r#"{"detail": "Authorization failed: bad key."}"#;
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::UNAUTHORIZED.as_u16()).set_body_string(BODY),
+            )
+            .mount(&mock_server)
+            .await;
+        let resp = reqwest::get(mock_server.uri()).await.unwrap();
+        let Error::Api(api_err) = check_http_error(resp).await.unwrap_err() else {
+            panic!("expected Error::Api");
+        };
+        assert_eq!(api_err.status_code, StatusCode::UNAUTHORIZED);
+        assert_eq!(api_err.message, "Authorization failed: bad key.");
+        assert!(api_err.case.is_none());
+        assert!(api_err.docs_url.is_none());
+        assert!(api_err.payload.is_none());
+    }
+
+    #[tokio::test]
+    async fn check_http_error_business_detail() {
+        const BODY: &str = r#"{
+            "detail": {
+                "case": "data_start_before_available_start",
+                "message": "`start` was before the available start.",
+                "status_code": 422,
+                "docs": "https://databento.com/docs/api-reference-historical/metadata/metadata-get-dataset",
+                "payload": {
+                    "dataset": "GLBX.MDP3",
+                    "start": "2022-06-10T00:00:00.000000000Z",
+                    "available_start": "2022-12-11T00:00:00.000000000Z"
+                }
+            }
+        }"#;
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::UNPROCESSABLE_ENTITY.as_u16())
+                    .set_body_string(BODY),
+            )
+            .mount(&mock_server)
+            .await;
+        let resp = reqwest::get(mock_server.uri()).await.unwrap();
+        let Error::Api(api_err) = check_http_error(resp).await.unwrap_err() else {
+            panic!("expected Error::Api");
+        };
+        assert_eq!(api_err.status_code, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(
+            api_err.case.as_deref(),
+            Some("data_start_before_available_start")
+        );
+        assert_eq!(api_err.message, "`start` was before the available start.");
+        assert_eq!(
+            api_err.docs_url.as_deref(),
+            Some(
+                "https://databento.com/docs/api-reference-historical/metadata/metadata-get-dataset"
+            )
+        );
+        let payload = api_err.payload.expect("expected payload");
+        assert_eq!(
+            payload.get("dataset").and_then(|v| v.as_str()),
+            Some("GLBX.MDP3")
+        );
+        assert!(payload.contains_key("available_start"));
+    }
+
+    #[tokio::test]
+    async fn check_http_error_business_detail_no_payload() {
+        const BODY: &str = r#"{
+            "detail": {
+                "case": "validation_failed",
+                "message": "bad input",
+                "status_code": 400,
+                "docs": "https://databento.com/docs"
+            }
+        }"#;
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::BAD_REQUEST.as_u16()).set_body_string(BODY),
+            )
+            .mount(&mock_server)
+            .await;
+        let resp = reqwest::get(mock_server.uri()).await.unwrap();
+        let Error::Api(api_err) = check_http_error(resp).await.unwrap_err() else {
+            panic!("expected Error::Api");
+        };
+        assert_eq!(api_err.case.as_deref(), Some("validation_failed"));
+        assert!(api_err.payload.is_none());
+    }
+
+    #[test]
+    fn api_error_display_includes_case() {
+        let err = ApiError {
+            request_id: Some("abc123".to_string()),
+            status_code: StatusCode::UNPROCESSABLE_ENTITY,
+            case: Some("dataset_not_found".to_string()),
+            message: "Dataset not found.".to_string(),
+            docs_url: Some("https://databento.com/docs".to_string()),
+            payload: None,
+        };
+        let rendered = err.to_string();
+        assert!(rendered.contains("dataset_not_found"), "{rendered}");
+        assert!(rendered.contains("abc123"), "{rendered}");
+        assert!(rendered.contains("Dataset not found."), "{rendered}");
+    }
 
     #[tokio::test]
     async fn check_http_error_non_json() {

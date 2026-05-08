@@ -65,10 +65,17 @@ pub struct ApiError {
     pub request_id: Option<String>,
     /// The HTTP status code of the response.
     pub status_code: reqwest::StatusCode,
+    /// A machine-readable identifier for the error case, when the server returns a
+    /// structured error envelope. `None` for unstructured errors.
+    pub case: Option<String>,
     /// The message from the Databento API.
     pub message: String,
     /// The link to documentation related to the error.
     pub docs_url: Option<String>,
+    /// Additional context for the error, when the server provides one. Common keys
+    /// include `dataset`, `start`, `end`, `available_start`, and `available_end`.
+    // Boxed to keep `Error::Api` small on the stack on the common no-payload path.
+    pub payload: Option<Box<std::collections::HashMap<String, serde_json::Value>>>,
 }
 
 impl Error {
@@ -97,17 +104,22 @@ impl From<dbn::Error> for Error {
 #[cfg(feature = "historical")]
 impl std::fmt::Display for ApiError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let doc = if let Some(ref docs_url) = self.docs_url {
-            format!(" See {docs_url} for documentation.")
-        } else {
-            String::new()
-        };
+        let doc = self
+            .docs_url
+            .as_ref()
+            .map(|d| format!(" See {d} for documentation."))
+            .unwrap_or_default();
+        let case = self
+            .case
+            .as_ref()
+            .map(|c| format!(" (case: {c})"))
+            .unwrap_or_default();
         let status = self.status_code;
         let msg = &self.message;
         if let Some(ref request_id) = self.request_id {
-            write!(f, "{request_id} failed with {status} {msg}{doc}")
+            write!(f, "{request_id} failed with {status} {msg}{doc}{case}")
         } else {
-            write!(f, "{status} {msg}{doc}")
+            write!(f, "{status} {msg}{doc}{case}")
         }
     }
 }
