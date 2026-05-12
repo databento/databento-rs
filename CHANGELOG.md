@@ -1,12 +1,15 @@
 # Changelog
 
-## 0.51.0 - TBD
+## 0.51.0 - 2026-05-12
 
 ### Enhancements
 - Added `case` and `payload` fields to `ApiError` to expose the machine-readable error
   identifier and structured context (dataset, requested range, available range, etc.)
   returned by the historical API
 - Included the error `case` in `ApiError`'s `Display` output
+- Upgraded DBN version to 0.58.0:
+  - Relaxed `TsSymbolMap::insert` to accept `impl Into<Arc<String>>` for the
+    `symbol` parameter
 
 ## 0.50.0 - 2026-05-05
 
