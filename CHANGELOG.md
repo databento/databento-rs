@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.0 - TBD
+
+### Enhancements
+- Added `BatchClient::get_job_details()` to access the full details of a batch job
+
 ## 0.52.0 - 2026-05-26
 
 ### Enhancements

@@ -120,6 +120,21 @@ impl BatchClient<'_> {
         handle_response(resp).await
     }
 
+    /// Gets the details of a batch job with ID `job_id`.
+    ///
+    /// # Errors
+    /// This function returns an error when it fails to communicate with the Databento API
+    /// or the API indicates there's an issue with the request.
+    #[instrument(name = "batch.get_job_details")]
+    pub async fn get_job_details(&mut self, job_id: &str) -> crate::Result<BatchJob> {
+        let resp = self
+            .get("get_job_details")?
+            .query(&[("job_id", job_id)])
+            .send()
+            .await?;
+        handle_response(resp).await
+    }
+
     /// Lists all files associated with the batch job with ID `job_id`.
     ///
     /// # Errors
@@ -719,7 +734,7 @@ mod tests {
     use serde_json::json;
     use time::macros::datetime;
     use wiremock::{
-        matchers::{basic_auth, method, path, query_param_is_missing},
+        matchers::{basic_auth, method, path, query_param, query_param_is_missing},
         Mock, MockServer, ResponseTemplate,
     };
 
@@ -959,6 +974,58 @@ mod tests {
         assert_eq!(job_desc.split_duration, SplitDuration::None);
         assert_eq!(job_desc.progress, Some(100));
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_job_details() -> crate::Result<()> {
+        const SCHEMA: Schema = Schema::Trades;
+        const JOB_ID: &str = "XNAS-20250602-5KM3HL5BUW";
+
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(basic_auth(API_KEY, ""))
+            .and(path(format!("/v{API_VERSION}/batch.get_job_details")))
+            .and(query_param("job_id", JOB_ID))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!({
+                    "id": JOB_ID,
+                    "user_id": "test_user",
+                    "cost_usd": 10.50,
+                    "dataset": "XNAS.ITCH",
+                    "symbols": "TSLA",
+                    "stype_in": "raw_symbol",
+                    "stype_out": "instrument_id",
+                    "schema": SCHEMA.as_str(),
+                    "start": "2023-06-14T00:00:00.000000000Z",
+                    "end": "2023-06-17T00:00:00.000000000Z",
+                    "limit": null,
+                    "encoding": "dbn",
+                    "compression": "zstd",
+                    "pretty_px": false,
+                    "pretty_ts": false,
+                    "map_symbols": false,
+                    "split_symbols": false,
+                    "split_duration": "day",
+                    "split_size": null,
+                    "delivery": "download",
+                    "state": "done",
+                    "ts_received": "2023-07-19T23:00:04.095538123Z",
+                    "ts_queued": "2023-07-19T23:00:08.095538123Z",
+                    "ts_process_start": "2023-07-19T23:01:04.000000000Z",
+                    "ts_process_done": "2023-07-19T23:02:04.000000000Z",
+                    "ts_expiration": "2023-08-19T23:00:00.000000000Z",
+                    "progress": 100
+                })),
+            )
+            .mount(&mock_server)
+            .await;
+        let mut target = client(&mock_server);
+        let job_desc = target.batch().get_job_details(JOB_ID).await?;
+        assert_eq!(job_desc.id, JOB_ID);
+        assert_eq!(job_desc.dataset, "XNAS.ITCH");
+        assert_eq!(job_desc.state, JobState::Done);
+        assert_eq!(job_desc.progress, Some(100));
         Ok(())
     }
 
