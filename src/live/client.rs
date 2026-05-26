@@ -8,14 +8,15 @@ use dbn::{
         },
         AsyncDynReader,
     },
-    Compression, Metadata, RecordRef, VersionUpgradePolicy,
+    rtype, v1, Compression, ErrorCode, ErrorMsg, Metadata, Record, RecordRef, SystemCode,
+    SystemMsg, VersionUpgradePolicy,
 };
 use time::Duration;
 use tokio::{
     io::{AsyncReadExt, BufReader, ReadHalf, WriteHalf},
     net::{TcpStream, ToSocketAddrs},
 };
-use tracing::{info, info_span, instrument, warn, Span};
+use tracing::{debug, error, info, info_span, instrument, warn, Span};
 
 use crate::ApiKey;
 
@@ -341,7 +342,9 @@ impl Client {
                 time::Duration::try_from(timeout).unwrap(),
             )
         })??;
-        if record.is_none() {
+        if let Some(rec) = record {
+            Self::log_record(&self.span, rec);
+        } else {
             self.is_closed = true;
         }
         Ok(record)
@@ -442,7 +445,10 @@ impl Client {
             });
         };
         match self.fsm.process() {
-            ProcessResult::Record(_) => Ok(self.fsm.last_record()),
+            ProcessResult::Record(_) => Ok(self
+                .fsm
+                .last_record()
+                .inspect(|rec| Self::log_record(&self.span, *rec))),
             ProcessResult::ReadMore(_) => Ok(None),
             ProcessResult::Err(err) => Err(err.into()),
             ProcessResult::Metadata(_) => unreachable!("metadata already decoded"),
@@ -526,6 +532,51 @@ impl Client {
         }
         Ok(())
     }
+
+    fn log_record(span: &tracing::Span, rec: RecordRef) {
+        match rec.header().rtype {
+            rtype::SYSTEM => {
+                if let Ok(system) = rec.try_get::<SystemMsg>() {
+                    let msg = system.msg().unwrap_or("<invalid msg>");
+                    let code = system.code().ok().unwrap_or(SystemCode::Unset);
+                    match code {
+                        SystemCode::Heartbeat => {
+                            debug!(parent: span, ?code, "Received gateway heartbeat");
+                        }
+                        SystemCode::EndOfInterval => {
+                            debug!(parent: span, ?code, %msg, "Received system message");
+                        }
+                        SystemCode::SlowReaderWarning => {
+                            warn!(parent: span, ?code, %msg, "Received system message");
+                        }
+                        _ => {
+                            info!(parent: span, ?code, %msg, "Received system message");
+                        }
+                    }
+                } else {
+                    let system = rec.get::<v1::SystemMsg>().unwrap();
+                    if system.is_heartbeat() {
+                        debug!(parent: span, "Received gateway heartbeat");
+                    } else {
+                        let msg = system.msg().unwrap_or("<invalid msg>");
+                        info!(parent: span,  %msg, "Received system message");
+                    }
+                }
+            }
+            rtype::ERROR => {
+                if let Ok(error) = rec.try_get::<ErrorMsg>() {
+                    let msg = error.err().unwrap_or("<invalid err>");
+                    let code = error.code().unwrap_or(ErrorCode::Unset);
+                    error!(parent: span, ?code, %msg, "Received error");
+                } else {
+                    let error = rec.get::<v1::ErrorMsg>().unwrap();
+                    let msg = error.err().unwrap_or("<invalid err>");
+                    error!(parent: span, %msg, "Received error");
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 impl fmt::Debug for Client {
@@ -544,6 +595,7 @@ impl fmt::Debug for Client {
             .field("sub_counter", &self.sub_counter)
             .field("subscriptions", &self.subscriptions)
             .field("session_id", &self.session_id)
+            .field("is_closed", &self.is_closed)
             .finish_non_exhaustive()
     }
 }
