@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.52.0 - TBD
+## 0.52.0 - 2026-05-26
 
 ### Enhancements
 - Added logging for gateway `ErrorMsg` and `SystemMsg` records in the live
