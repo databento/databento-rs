@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.53.0 - 2026-06-02
+
+### Enhancements
+- Added `BatchClient::get_job_details()` to access the full details of a batch job
+- Upgraded DBN version to 0.59.0:
+  - Added `encode_record_ref_with_ts_out` and `encode_record_refs_with_ts_out` methods to
+    the `EncodeRecordRef` and `AsyncEncodeRecordRef` traits. The DBN encoder uses vectored
+    I/O to append the `ts_out` timestamp without copying the record body, while
+    CSV and JSON encoders serialize from a cloned struct as usual
+  - Added new venues, datasets, and publishers for US Equities Securities Information Processors
+
 ## 0.52.0 - 2026-05-26
 
 ### Enhancements
