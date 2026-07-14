@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.55.0 - Upcoming
+
+### Enhancements
+- Upgraded DBN version to 0.63.0:
+  - Added an integer representation for `VersionUpgradePolicy`
+
 ## 0.54.0 - 2026-07-07
 
 ### Enhancements
