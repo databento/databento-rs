@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.55.0 - Upcoming
+## 0.55.0 - 2026-07-14
 
 ### Enhancements
 - Upgraded DBN version to 0.63.0:
