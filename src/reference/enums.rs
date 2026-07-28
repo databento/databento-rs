@@ -2215,6 +2215,150 @@ impl Display for Event {
     }
 }
 
+/// Category of the corporate actions event
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
+pub enum EventCategory {
+    /// Distribution event
+    Distribution,
+    /// Distribution debit event
+    DistributionDebit,
+    /// Event is related to an ongoing legal action
+    LegalAction,
+    /// Other
+    Other,
+    /// Event is related to a proposal by the company
+    Proposals,
+    /// Event is the result of a reorganization in the company
+    Reorganisation,
+    /// Static reference to an event
+    StaticReference,
+    /// Event is the result of a tax-related action
+    TaxRelated,
+    /// Fallback for unknown variants.
+    Unknown(String),
+}
+
+impl AsRef<str> for EventCategory {
+    fn as_ref(&self) -> &str {
+        match self {
+            Self::Distribution => "distribution",
+            Self::DistributionDebit => "distribution_debit",
+            Self::LegalAction => "legal_action",
+            Self::Other => "other",
+            Self::Proposals => "proposals",
+            Self::Reorganisation => "reorganisation",
+            Self::StaticReference => "static_reference",
+            Self::TaxRelated => "tax_related",
+            Self::Unknown(s) => s,
+        }
+    }
+}
+
+impl std::str::FromStr for EventCategory {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Infallible> {
+        match s {
+            "distribution" => Ok(Self::Distribution),
+            "distribution_debit" => Ok(Self::DistributionDebit),
+            "legal_action" => Ok(Self::LegalAction),
+            "other" => Ok(Self::Other),
+            "proposals" => Ok(Self::Proposals),
+            "reorganisation" => Ok(Self::Reorganisation),
+            "static_reference" => Ok(Self::StaticReference),
+            "tax_related" => Ok(Self::TaxRelated),
+            s => Ok(Self::Unknown(s.to_owned())),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for EventCategory {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        let str = String::deserialize(deserializer)?;
+        FromStr::from_str(&str).map_err(de::Error::custom)
+    }
+}
+
+impl Serialize for EventCategory {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.as_ref().serialize(serializer)
+    }
+}
+
+impl Display for EventCategory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
+        write!(f, "{}", self.as_ref())
+    }
+}
+
+/// Level the corporate actions event is applied to.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
+pub enum EventLevel {
+    /// Applied at country level
+    Country,
+    /// Applied at issuer level
+    Issuer,
+    /// Applied at listing level
+    Listing,
+    /// Applied at security level
+    Security,
+    /// Fallback for unknown variants.
+    Unknown(String),
+}
+
+impl AsRef<str> for EventLevel {
+    fn as_ref(&self) -> &str {
+        match self {
+            Self::Country => "country",
+            Self::Issuer => "issuer",
+            Self::Listing => "listing",
+            Self::Security => "security",
+            Self::Unknown(s) => s,
+        }
+    }
+}
+
+impl std::str::FromStr for EventLevel {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Infallible> {
+        match s {
+            "country" => Ok(Self::Country),
+            "issuer" => Ok(Self::Issuer),
+            "listing" => Ok(Self::Listing),
+            "security" => Ok(Self::Security),
+            s => Ok(Self::Unknown(s.to_owned())),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for EventLevel {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        let str = String::deserialize(deserializer)?;
+        FromStr::from_str(&str).map_err(de::Error::custom)
+    }
+}
+
+impl Serialize for EventLevel {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.as_ref().serialize(serializer)
+    }
+}
+
+impl Display for EventLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
+        write!(f, "{}", self.as_ref())
+    }
+}
+
 /// A corporate actions sub-event type.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
@@ -2526,6 +2670,66 @@ impl Serialize for EventSubType {
 }
 
 impl Display for EventSubType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
+        write!(f, "{}", self.as_ref())
+    }
+}
+
+/// Group a field belongs to.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
+pub enum FieldGroup {
+    /// Event Information
+    EventInfo,
+    /// Date Information
+    DateInfo,
+    /// Rate Information
+    RateInfo,
+    /// Fallback for unknown variants.
+    Unknown(String),
+}
+
+impl AsRef<str> for FieldGroup {
+    fn as_ref(&self) -> &str {
+        match self {
+            Self::EventInfo => "event_info",
+            Self::DateInfo => "date_info",
+            Self::RateInfo => "rate_info",
+            Self::Unknown(s) => s,
+        }
+    }
+}
+
+impl std::str::FromStr for FieldGroup {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Infallible> {
+        match s {
+            "event_info" => Ok(Self::EventInfo),
+            "date_info" => Ok(Self::DateInfo),
+            "rate_info" => Ok(Self::RateInfo),
+            s => Ok(Self::Unknown(s.to_owned())),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for FieldGroup {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        let str = String::deserialize(deserializer)?;
+        FromStr::from_str(&str).map_err(de::Error::custom)
+    }
+}
+
+impl Serialize for FieldGroup {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.as_ref().serialize(serializer)
+    }
+}
+
+impl Display for FieldGroup {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::result::Result<(), fmt::Error> {
         write!(f, "{}", self.as_ref())
     }

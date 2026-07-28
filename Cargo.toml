@@ -1,7 +1,7 @@
 [package]
 name = "databento"
 authors = ["Databento <support@databento.com>"]
-version = "0.55.0"
+version = "0.56.0"
 edition = "2021"
 repository = "https://github.com/databento/databento-rs"
 description = "Official Databento client library"
@@ -33,7 +33,7 @@ live = ["tokio/net", "tokio/time"]
 chrono = ["dep:chrono"]
 
 [dependencies]
-dbn = { version = "0.63", features = ["async", "serde"] }
+dbn = { version = "0.64", features = ["async", "serde"] }
 
 async-compression = { version = "0.4", features = ["tokio", "zstd"], optional = true }
 chrono = { version = ">=0.4.34", optional = true, default-features = false, features = ["alloc"] }
@@ -56,12 +56,12 @@ bon = "3"
 zstd = { version = "0.13", optional = true }
 
 [dev-dependencies]
-anyhow = "1.0.100"
+anyhow = "1.0.104"
 chrono = { version = ">=0.4.34", default-features = false, features = ["alloc"] }
 async-compression = { version = "0.4", features = ["tokio", "zstd"] }
-clap = { version = "4.5.51", features = ["derive"] }
+clap = { version = "4.6.4", features = ["derive"] }
 rstest = "0.26.1"
-tempfile = "3.23.0"
-tokio = { version = "1.48", features = ["full", "test-util"] }
-tracing-subscriber = "0.3.20"
+tempfile = "3.27.0"
+tokio = { version = "1.53", features = ["full", "test-util"] }
+tracing-subscriber = "0.3.23"
 wiremock = "0.6"
