@@ -9,10 +9,11 @@ use tracing::instrument;
 
 use crate::{
     deserialize::{deserialize_date_time, deserialize_opt_date_time_hash_map},
-    historical::{handle_zstd_jsonl_response, AddToForm, ReqwestForm},
+    historical::{handle_response, handle_zstd_jsonl_response, AddToForm, ReqwestForm},
     reference::{
-        Action, Country, Currency, End, Event, EventSubType, Fraction, GlobalStatus, ListingSource,
-        ListingStatus, MandVolu, OutturnStyle, PaymentType, SecurityType, Start,
+        Action, Country, Currency, End, Event, EventCategory, EventLevel, EventSubType, FieldGroup,
+        Fraction, GlobalStatus, ListingSource, ListingStatus, MandVolu, OutturnStyle, PaymentType,
+        SecurityType, Start,
     },
     DateTimeLike, Symbols,
 };
@@ -60,6 +61,38 @@ impl CorporateActionsClient<'_> {
             Index::TsRecord => corporate_actions.sort_by_key(|a| a.ts_record),
         };
         Ok(corporate_actions)
+    }
+
+    /// Requests documentation for all supported corporate action events, keyed by
+    /// event code as a `String` (e.g. `AGM`).
+    ///
+    /// # Errors
+    /// This function returns an error when it fails to communicate with the Databento API
+    /// or the API indicates there's an issue with the request.
+    #[instrument(name = "corporate_actions.list_events")]
+    pub async fn list_events(&mut self) -> crate::Result<HashMap<String, EventDoc>> {
+        let resp = self
+            .inner
+            .get("corporate_actions.list_events")?
+            .send()
+            .await?;
+        handle_response(resp).await
+    }
+
+    /// Requests documentation for the full set of enumerations used across corporate
+    /// actions data, keyed by enum group name (e.g. `ACTION`).
+    ///
+    /// # Errors
+    /// This function returns an error when it fails to communicate with the Databento API
+    /// or the API indicates there's an issue with the request.
+    #[instrument(name = "corporate_actions.list_enums")]
+    pub async fn list_enums(&mut self) -> crate::Result<HashMap<String, Vec<EventEnumVariant>>> {
+        let resp = self
+            .inner
+            .get("corporate_actions.list_enums")?
+            .send()
+            .await?;
+        handle_response(resp).await
     }
 }
 
@@ -412,6 +445,68 @@ impl Display for Index {
     }
 }
 
+/// Corporate Actions Event docs calendar date entry.
+/// Designates the important calendar dates for a corporate actions event.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct EventDocCalendarDates {
+    /// Alias of the calendar date under the given name e.g. (meeting_date in place of event_date).
+    pub alias: Option<String>,
+    /// Name of the calendar date (e.g. event_date).
+    pub name: String,
+}
+
+/// Corporate Action Events docs event subtype entry.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct EventDocSubType {
+    /// Code for the event subtype.
+    pub code: Option<EventSubType>,
+    /// Description of the event subtype.
+    pub description: String,
+}
+
+/// Corporate action events doc fields.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct EventDocField {
+    /// Description of the field.
+    pub description: String,
+    /// Group field will belong to (event_info, date_info, rate_info).
+    pub group: FieldGroup,
+    /// Name of field.
+    pub name: String,
+}
+
+/// A record in the corporate actions event documentation response.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct EventDoc {
+    /// The calendar dates relevant to the event.
+    pub calendar_dates: Option<Vec<EventDocCalendarDates>>,
+    /// The category of the event (e.g. distribution, proposals).
+    pub category: Option<EventCategory>,
+    /// The code for the event (e.g. AGM).
+    pub code: Option<Event>,
+    /// Description of the event.
+    pub description: Option<String>,
+    /// The fields relevant to the event.
+    pub fields: Option<Vec<EventDocField>>,
+    /// The level the event applies to (e.g. issuer, security).
+    pub level: EventLevel,
+    /// Name of the event.
+    pub name: String,
+    /// Whether the event is mandatory, voluntary, or a mix of the two.
+    pub participation: Option<String>,
+    /// The subtypes relevant to the event.
+    pub subtypes: Option<Vec<EventDocSubType>>,
+}
+
+/// A single code/description variant of a corporate action enum.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct EventEnumVariant {
+    /// Code for the enum variant.
+    pub code: Option<String>,
+    /// Description of the enum variant.
+    pub description: String,
+}
+
 #[cfg(test)]
 mod tests {
     use std::io;
@@ -626,5 +721,100 @@ mod tests {
             action.related_event,
             Some(Event::Unknown("CORR".to_owned()))
         );
+    }
+
+    #[tokio::test]
+    async fn test_list_events() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(basic_auth(API_KEY, ""))
+            .and(path(format!(
+                "/v{API_VERSION}/corporate_actions.list_events"
+            )))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(serde_json::json!({
+                    "AGM": {
+                        "calendar_dates": [
+                            {"alias": "meeting_date", "name": "event_date"},
+                            {"alias": null, "name": "record_date"},
+                        ],
+                        "category": "proposals",
+                        "code": "AGM",
+                        "description": "Annual General meeting of shareholders.",
+                        "fields": [
+                            {
+                                "description": "Company Meeting Number",
+                                "group": "event_info",
+                                "name": "meeting_number",
+                            },
+                        ],
+                        "level": "issuer",
+                        "name": "Company Meeting",
+                        "participation": "voluntary",
+                        "subtypes": [
+                            {"code": "AGM", "description": "Annual General Meeting"},
+                        ],
+                    },
+                })),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let mut client = client(&mock_server);
+        let docs = client.corporate_actions().list_events().await.unwrap();
+        assert_eq!(docs.len(), 1);
+        let agm = docs.get("AGM").unwrap();
+        assert_eq!(agm.name, "Company Meeting");
+        assert_eq!(agm.level, EventLevel::Issuer);
+        assert_eq!(agm.category, Some(EventCategory::Proposals));
+        assert_eq!(agm.code, Some(Event::Agm));
+        assert_eq!(agm.participation.as_deref(), Some("voluntary"));
+
+        let calendar_dates = agm.calendar_dates.as_ref().unwrap();
+        assert_eq!(calendar_dates.len(), 2);
+        assert_eq!(calendar_dates[0].name, "event_date");
+        assert_eq!(calendar_dates[0].alias.as_deref(), Some("meeting_date"));
+        assert_eq!(calendar_dates[1].name, "record_date");
+        assert_eq!(calendar_dates[1].alias, None);
+
+        let fields = agm.fields.as_ref().unwrap();
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].name, "meeting_number");
+        assert_eq!(fields[0].group, FieldGroup::EventInfo);
+
+        let subtypes = agm.subtypes.as_ref().unwrap();
+        assert_eq!(subtypes.len(), 1);
+        assert_eq!(subtypes[0].code, Some(EventSubType::Agm));
+        assert_eq!(subtypes[0].description, "Annual General Meeting");
+    }
+
+    #[tokio::test]
+    async fn test_list_enums() {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(basic_auth(API_KEY, ""))
+            .and(path(format!(
+                "/v{API_VERSION}/corporate_actions.list_enums"
+            )))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(serde_json::json!({
+                    "ACTION": [
+                        {"code": "C", "description": "Cancelled"},
+                        {"code": "I", "description": "Inserted"},
+                    ],
+                })),
+            )
+            .mount(&mock_server)
+            .await;
+
+        let mut client = client(&mock_server);
+        let enums = client.corporate_actions().list_enums().await.unwrap();
+        assert_eq!(enums.len(), 1);
+        let action = enums.get("ACTION").unwrap();
+        assert_eq!(action.len(), 2);
+        assert_eq!(action[0].code.as_deref(), Some("C"));
+        assert_eq!(action[0].description, "Cancelled");
+        assert_eq!(action[1].code.as_deref(), Some("I"));
+        assert_eq!(action[1].description, "Inserted");
     }
 }

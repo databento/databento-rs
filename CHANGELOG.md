@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.56.0 - Upcoming
+
+### Enhancements
+- Added `CorporateActionsClient::list_events()` and `list_enums()` for fetching
+  documentation on supported corporate action event types and enum values
+
 ## 0.55.0 - 2026-07-14
 
 ### Enhancements

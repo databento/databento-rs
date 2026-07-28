@@ -26,6 +26,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .await?;
     println!("{actions:?}");
 
+    let event_docs = client.corporate_actions().list_events().await?;
+    println!("{event_docs:?}");
+
+    let enum_docs = client.corporate_actions().list_enums().await?;
+    println!("{enum_docs:?}");
+
     let adjustments = client
         .adjustment_factors()
         .get_range(

@@ -74,6 +74,10 @@ impl Client {
         self.request(reqwest::Method::POST, slug)
     }
 
+    pub(crate) fn get(&mut self, slug: &str) -> crate::Result<RequestBuilder> {
+        self.request(reqwest::Method::GET, slug)
+    }
+
     fn request(&mut self, method: reqwest::Method, slug: &str) -> crate::Result<RequestBuilder> {
         Ok(self
             .client
