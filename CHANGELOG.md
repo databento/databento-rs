@@ -1,10 +1,21 @@
 # Changelog
 
-## 0.56.0 - Upcoming
+## 0.56.0 - 2026-07-28
 
 ### Enhancements
 - Added `CorporateActionsClient::list_events()` and `list_enums()` for fetching
   documentation on supported corporate action event types and enum values
+- Upgraded DBN version to 0.64.0:
+  - Added a `finish()` method to `DynWriter` to flush data and finalize the output
+    stream. For compressed data this will write the zstandard end-of-frame block
+  - Upgraded `time` version to 0.3.54
+
+### Bug fixes
+- From DBN:
+  - Fixed `AsRef<[u8]>` for concrete record types encoding only
+    `size_of::<Self>()` bytes instead of the full `record_size()` from the header
+    length, which dropped appended `ts_out` bytes and corrupted output when
+    re-encoding a typed record decoded from a stream with `ts_out`
 
 ## 0.55.0 - 2026-07-14
 
