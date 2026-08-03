@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.57.0 - Upcoming
+
+### Enhancements
+- Added an `allocate_isins` field to `GetRangeParams` and `GetLastParams` for
+  `AdjustmentFactorsClient`, `CorporateActionsClient`, and
+  `SecurityMasterClient` to control whether new ISINs are allocated for plans
+  that are ISIN-limited
+
 ## 0.56.0 - 2026-07-28
 
 ### Enhancements

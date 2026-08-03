@@ -32,6 +32,7 @@ impl AdjustmentFactorsClient<'_> {
         let form = vec![
             ("stype_in", params.stype_in.to_string()),
             ("symbols", params.symbols.to_api_string()),
+            ("allocate_isins", params.allocate_isins.to_string()),
             ("compression", Compression::Zstd.to_string()),
         ]
         .add_to_form(&Start(params.start))
@@ -79,6 +80,11 @@ pub struct GetRangeParams {
     /// are included.
     #[builder(default, into)]
     pub security_types: Vec<SecurityType>,
+    /// Whether the request should allocate any new ISINs for plans that are
+    /// ISIN-limited. If `false`, the request will drop any rows that would create
+    /// new allocations. Defaults to `true`.
+    #[builder(default = true)]
+    pub allocate_isins: bool,
 }
 
 /// A record in the adjustment factor response.
