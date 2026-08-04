@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.57.0 - 2026-08-04
+
+### Enhancements
+- Added an `allocate_isins` field to `GetRangeParams` and `GetLastParams` for
+  `AdjustmentFactorsClient`, `CorporateActionsClient`, and
+  `SecurityMasterClient` to control whether new ISINs are allocated for plans
+  that are ISIN-limited
+- Upgraded DBN version to 0.65.0:
+  - Added a `ReplayDataAgedOut` variant to `ErrorCode` for when the data for a
+    replay subscription is no longer retained and the schema is incompatible
+    with skipping records
+  - Added new publisher values for JPX
+  - Upgraded `time` version to 0.3.55
+
 ## 0.56.0 - 2026-07-28
 
 ### Enhancements
