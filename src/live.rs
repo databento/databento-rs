@@ -129,8 +129,8 @@ impl<AK, D> ClientBuilder<AK, D> {
 
     /// Sets `heartbeat_interval`, which controls the interval at which the gateway
     /// will send heartbeat records if no other data records are sent. If no heartbeat
-    /// interval is configured, the gateway default will be used. Minimum interval
-    /// is 5 seconds.
+    /// interval is configured, the gateway default will be used. Must be between 5
+    /// and 1800 seconds.
     ///
     /// Note that granularity of less than a second is not supported and will be
     /// ignored.
