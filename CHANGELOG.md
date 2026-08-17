@@ -7,6 +7,9 @@
   `SType::SecurityId` as `stype_in` values for the security master and
   corporate actions reference data endpoints, and `SType::SecurityId` for the
   adjustment factors endpoint
+- Added a `dataset` field to `ListFieldsParams` for `MetadataClient::list_fields()`.
+  If not provided, the returned fields are for the latest DBN encoding
+  version, which may not match a specific dataset's schema
 
 ## 0.58.0 - 2026-08-11
 
