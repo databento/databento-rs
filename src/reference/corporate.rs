@@ -275,9 +275,9 @@ pub struct CorporateAction {
     pub bbg_comp_id: Option<String>,
     /// Bloomberg composite ticker.
     pub bbg_comp_ticker: Option<String>,
-    /// Bloomberg FIGI, that is exchange level ID.
+    /// Bloomberg FIGI, that is exchange-level ID.
     pub figi: Option<String>,
-    /// Bloomberg exchange level ticker.
+    /// Bloomberg exchange-level ticker.
     pub figi_ticker: Option<String>,
 
     /*
@@ -387,9 +387,9 @@ pub struct CorporateAction {
     pub outturn_bbg_comp_id: Option<String>,
     /// Outturn Bloomberg composite ticker.
     pub outturn_bbg_comp_ticker: Option<String>,
-    /// Outturn FIGI - Bloomberg exchange level ID.
+    /// Outturn FIGI - Bloomberg exchange-level ID.
     pub outturn_figi: Option<String>,
-    /// Outturn FIGI - Bloomberg exchange level ticker.
+    /// Outturn FIGI - Bloomberg exchange-level ticker.
     pub outturn_figi_ticker: Option<String>,
     /// The quantity range within which the shareholder can offer from their total
     /// holding in the event.

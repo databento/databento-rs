@@ -228,9 +228,9 @@ pub struct SecurityMaster {
     pub bbg_comp_id: Option<String>,
     /// Bloomberg composite ticker.
     pub bbg_comp_ticker: Option<String>,
-    /// Bloomberg FIGI, that is exchange level ID.
+    /// Bloomberg FIGI, that is exchange-level ID.
     pub figi: Option<String>,
-    /// Bloomberg exchange level ticker.
+    /// Bloomberg exchange-level ticker.
     pub figi_ticker: Option<String>,
     /// Financial Instrument Short Name.
     pub fisn: Option<String>,
