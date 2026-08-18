@@ -67,6 +67,11 @@ impl MetadataClient<'_> {
 
     /// Lists all fields for a schema and encoding.
     ///
+    /// <div class="warning">
+    /// If `params.dataset` is `None`, the fields for the latest DBN encoding version are
+    /// returned, which may differ from a specific dataset's schema.
+    /// </div>
+    ///
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
@@ -75,10 +80,15 @@ impl MetadataClient<'_> {
         &mut self,
         params: &ListFieldsParams,
     ) -> crate::Result<Vec<FieldDetail>> {
-        let builder = self.get("list_fields")?.query(&[
+        let mut builder = self.get("list_fields")?.query(&[
             ("encoding", params.encoding.as_str()),
             ("schema", params.schema.as_str()),
         ]);
+
+        if let Some(ref dataset) = params.dataset {
+            builder = builder.query(&[("dataset", dataset.as_str())]);
+        }
+
         let resp = builder.send().await?;
         handle_response(resp).await
     }
@@ -238,6 +248,11 @@ pub struct ListFieldsParams {
     pub encoding: Encoding,
     /// The data record schema to request fields for.
     pub schema: Schema,
+    /// The optional dataset used to determine which fields are relevant. If `None`, the
+    /// fields for the latest DBN encoding version are returned, which may differ from a
+    /// specific dataset's schema.
+    #[builder(with = |d: impl ToString| d.to_string())]
+    pub dataset: Option<String>,
 }
 
 /// The details about a field in a schema.
@@ -501,6 +516,76 @@ mod tests {
                 &ListFieldsParams::builder()
                     .encoding(ENC)
                     .schema(SCHEMA)
+                    .build(),
+            )
+            .await
+            .unwrap();
+        let exp = vec![
+            FieldDetail {
+                name: "ts_event".to_owned(),
+                type_name: "uint64_t".to_owned(),
+            },
+            FieldDetail {
+                name: "rtype".to_owned(),
+                type_name: "uint8_t".to_owned(),
+            },
+            FieldDetail {
+                name: "open".to_owned(),
+                type_name: "int64_t".to_owned(),
+            },
+            FieldDetail {
+                name: "high".to_owned(),
+                type_name: "int64_t".to_owned(),
+            },
+            FieldDetail {
+                name: "low".to_owned(),
+                type_name: "int64_t".to_owned(),
+            },
+            FieldDetail {
+                name: "close".to_owned(),
+                type_name: "int64_t".to_owned(),
+            },
+            FieldDetail {
+                name: "volume".to_owned(),
+                type_name: "uint64_t".to_owned(),
+            },
+        ];
+        assert_eq!(*fields, exp);
+    }
+
+    #[tokio::test]
+    async fn test_list_fields_with_dataset() {
+        const ENC: Encoding = Encoding::Dbn;
+        const SCHEMA: Schema = Schema::Trades;
+        const DATASET: &str = "GLBX.MDP3";
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(basic_auth(API_KEY, ""))
+            .and(path(format!("/v{API_VERSION}/metadata.list_fields")))
+            .and(query_param("encoding", ENC.as_str()))
+            .and(query_param("schema", SCHEMA.as_str()))
+            .and(query_param("dataset", DATASET))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!([
+                    {"name":"ts_event", "type": "uint64_t"},
+                    {"name":"rtype", "type": "uint8_t"},
+                    {"name":"open", "type": "int64_t"},
+                    {"name":"high", "type": "int64_t"},
+                    {"name":"low", "type": "int64_t"},
+                    {"name":"close", "type": "int64_t"},
+                    {"name":"volume", "type": "uint64_t"},
+                ])),
+            )
+            .mount(&mock_server)
+            .await;
+        let mut target = client(&mock_server);
+        let fields = target
+            .metadata()
+            .list_fields(
+                &ListFieldsParams::builder()
+                    .encoding(ENC)
+                    .schema(SCHEMA)
+                    .dataset(DATASET)
                     .build(),
             )
             .await

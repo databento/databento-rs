@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.59.0 - 2026-08-18
+
+### Enhancements
+- Added a `dataset` field to `ListFieldsParams` for `MetadataClient::list_fields()`.
+  If not provided, the returned fields are for the latest DBN encoding
+  version, which may not match a specific dataset's schema
+- Upgraded DBN version to 0.67.0:
+  - Added `SType::ListingId`, `SType::IssuerId`, and `SType::SecurityId`
+    variants, for use with the reference data API
+- Upgraded `sha2` version to 0.11
+
+### Breaking changes
+- Updated the minimum supported `tokio` version to 1.47, which was released one year ago
+
 ## 0.58.0 - 2026-08-11
 
 ### Enhancements
