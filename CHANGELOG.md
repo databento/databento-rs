@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.60.0 - Upcoming
+
+### Breaking changes
+- Changed `BatchClient::list_jobs()` to request the new short response format of the
+  `batch.list_jobs` endpoint and return `Vec<BatchJobShort>`, which contains only the
+  `id`, `state`, and `ts_received` fields for each job. Use
+  `BatchClient::get_job_details()` to fetch the complete details of an individual job
+
+### Deprecations
+- Deprecated `BatchClient::list_jobs_full()`, which returns the full job details like
+  `list_jobs()` did previously. The `batch.list_jobs` endpoint will stop returning
+  full job details at a future date, at which point this method will be removed
+
 ## 0.59.0 - 2026-08-18
 
 ### Enhancements
