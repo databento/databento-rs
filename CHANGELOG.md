@@ -1,6 +1,13 @@
 # Changelog
 
-## 0.60.0 - Upcoming
+## 0.60.0 - 2026-08-25
+
+### Enhancements
+- Upgraded DBN version to 0.68.0:
+  - Added `MetadataEncoder::encoded_len()` for the number of bytes `encode()`
+    will write
+  - Improved documentation for the `min_price_increment_amount` and
+    `inst_attrib_value` fields
 
 ### Breaking changes
 - Changed `BatchClient::list_jobs()` to request the new short response format of the
