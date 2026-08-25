@@ -94,13 +94,49 @@ impl BatchClient<'_> {
         handle_response(resp).await
     }
 
-    /// Lists previous batch jobs with filtering by `params`.
+    /// Lists previous batch jobs with filtering by `params`. Returns the short form
+    /// of each job, which contains only the job ID, state, and received timestamp.
+    ///
+    /// Use [`get_job_details()`](Self::get_job_details) to fetch the complete
+    /// details of an individual job.
     ///
     /// # Errors
     /// This function returns an error when it fails to communicate with the Databento API
     /// or the API indicates there's an issue with the request.
     #[instrument(name = "batch.list_jobs")]
-    pub async fn list_jobs(&mut self, params: &ListJobsParams) -> crate::Result<Vec<BatchJob>> {
+    pub async fn list_jobs(
+        &mut self,
+        params: &ListJobsParams,
+    ) -> crate::Result<Vec<BatchJobShort>> {
+        let resp = self
+            .list_jobs_builder(params)?
+            .query(&[("short", "true")])
+            .send()
+            .await?;
+        handle_response(resp).await
+    }
+
+    /// Lists previous batch jobs with filtering by `params`, returning the full
+    /// details of each job.
+    ///
+    /// # Errors
+    /// This function returns an error when it fails to communicate with the Databento API
+    /// or the API indicates there's an issue with the request.
+    #[deprecated(
+        since = "0.60.0",
+        note = "the batch.list_jobs endpoint will stop returning full job details at a \
+        future date; use list_jobs() and get_job_details() instead"
+    )]
+    #[instrument(name = "batch.list_jobs_full")]
+    pub async fn list_jobs_full(
+        &mut self,
+        params: &ListJobsParams,
+    ) -> crate::Result<Vec<BatchJob>> {
+        let resp = self.list_jobs_builder(params)?.send().await?;
+        handle_response(resp).await
+    }
+
+    fn list_jobs_builder(&mut self, params: &ListJobsParams) -> crate::Result<RequestBuilder> {
         let mut builder = self.get("list_jobs")?;
         if let Some(ref states) = params.states {
             let states_str = states.iter().fold(String::new(), |mut acc, s| {
@@ -116,8 +152,7 @@ impl BatchClient<'_> {
         if let Some(ref since) = params.since {
             builder = builder.query(&[("since", &since.unix_timestamp_nanos().to_string())]);
         }
-        let resp = builder.send().await?;
-        handle_response(resp).await
+        Ok(builder)
     }
 
     /// Gets the details of a batch job with ID `job_id`.
@@ -540,6 +575,21 @@ pub struct BatchJob {
     pub progress: Option<u8>,
 }
 
+/// The short-form description of a batch job, as returned by
+/// [`BatchClient::list_jobs()`]. Use
+/// [`BatchClient::get_job_details()`] to fetch the complete [`BatchJob`]
+/// details of an individual job.
+#[derive(Debug, Clone, Deserialize)]
+pub struct BatchJobShort {
+    /// The unique job ID.
+    pub id: String,
+    /// The current status of the batch job.
+    pub state: JobState,
+    /// The timestamp of when Databento received the batch job.
+    #[serde(deserialize_with = "deserialize_date_time")]
+    pub ts_received: OffsetDateTime,
+}
+
 /// The parameters for [`BatchClient::list_jobs()`]. Use [`ListJobsParams::builder()`] to
 /// get a builder type with all the preset defaults.
 #[derive(Debug, Clone, Default, bon::Builder, PartialEq, Eq)]
@@ -860,13 +910,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_list_jobs() -> crate::Result<()> {
+    async fn test_list_jobs_full() -> crate::Result<()> {
         const SCHEMA: Schema = Schema::Trades;
 
         let mock_server = MockServer::start().await;
         Mock::given(method("GET"))
             .and(basic_auth(API_KEY, ""))
             .and(path(format!("/v{API_VERSION}/batch.list_jobs")))
+            .and(query_param_is_missing("short"))
             .and(query_param_is_missing("states"))
             .and(query_param_is_missing("since"))
             .respond_with(
@@ -937,7 +988,11 @@ mod tests {
             .mount(&mock_server)
             .await;
         let mut target = client(&mock_server);
-        let job_descs = target.batch().list_jobs(&ListJobsParams::default()).await?;
+        #[expect(deprecated)]
+        let job_descs = target
+            .batch()
+            .list_jobs_full(&ListJobsParams::default())
+            .await?;
         assert_eq!(job_descs.len(), 2);
         let mut job_desc = &job_descs[0];
         assert_eq!(
@@ -973,6 +1028,50 @@ mod tests {
         assert!(!job_desc.split_symbols);
         assert_eq!(job_desc.split_duration, SplitDuration::None);
         assert_eq!(job_desc.progress, Some(100));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_list_jobs() -> crate::Result<()> {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(basic_auth(API_KEY, ""))
+            .and(path(format!("/v{API_VERSION}/batch.list_jobs")))
+            .and(query_param("short", "true"))
+            .and(query_param_is_missing("states"))
+            .and(query_param_is_missing("since"))
+            .respond_with(
+                ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!([{
+                    "id": "123",
+                    "state": "processing",
+                    "ts_received": "2023-07-19 23:00:04.095538+00:00"
+                },
+                {
+                    "id": "XNAS-20250602-5KM3HL5BUW",
+                    "state": "done",
+                    "ts_received": "2025-06-02T15:51:19.251582000Z"
+                }])),
+            )
+            .mount(&mock_server)
+            .await;
+        let mut target = client(&mock_server);
+        let job_descs = target.batch().list_jobs(&ListJobsParams::default()).await?;
+        assert_eq!(job_descs.len(), 2);
+        let job_desc = &job_descs[0];
+        assert_eq!(job_desc.id, "123");
+        assert_eq!(job_desc.state, JobState::Processing);
+        assert_eq!(
+            job_desc.ts_received,
+            datetime!(2023-07-19 23:00:04.095538 UTC)
+        );
+        let job_desc = &job_descs[1];
+        assert_eq!(job_desc.id, "XNAS-20250602-5KM3HL5BUW");
+        assert_eq!(job_desc.state, JobState::Done);
+        assert_eq!(
+            job_desc.ts_received,
+            datetime!(2025-06-02 15:51:19.251582000 UTC)
+        );
 
         Ok(())
     }
