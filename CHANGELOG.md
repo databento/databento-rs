@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.61.0 - 2026-09-01
+
+### Enhancements
+- Upgraded DBN version to 0.69.0:
+  - Added `UnsubscribeAck` to the `SystemCode` enum for acknowledging unsubscribe
+    requests
+
+### Bug fixes
+- From DBN:
+  - Fixed unsound `AsRef<[u8]>` for `RecordBuf`, which produced a slice longer than
+    the buffer when the header `length` written through `raw_buf_mut()` exceeded the
+    capacity
+  - Fixed incorrect count in DBN metadata causing decoding to read into the start of
+    records
+
 ## 0.60.0 - 2026-08-25
 
 ### Enhancements
