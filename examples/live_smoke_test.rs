@@ -1,6 +1,6 @@
 use clap::Parser;
 use databento::{
-    dbn::{Dataset, ErrorMsg, MboMsg, RType, Record, SType, Schema},
+    dbn::{Dataset, ErrorMsg, MboMsg, RType, SType, Schema},
     live::Subscription,
     LiveClient,
 };
