@@ -8,8 +8,8 @@ use dbn::{
         },
         AsyncDynReader,
     },
-    rtype, v1, Compression, ErrorCode, ErrorMsg, Metadata, Record, RecordRef, SystemCode,
-    SystemMsg, VersionUpgradePolicy,
+    rtype, v1, Compression, ErrorCode, ErrorMsg, Metadata, RecordRef, SystemCode, SystemMsg,
+    VersionUpgradePolicy,
 };
 use time::Duration;
 use tokio::{
