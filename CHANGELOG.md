@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.62.1 - Upcoming
+
+### Enhancements
+- Optimized `LiveClient::next_record()` and `LiveClient::try_next_record()` to decode
+  records in batches
+
 ## 0.62.0 - 2026-09-21
 
 ### Enhancements
