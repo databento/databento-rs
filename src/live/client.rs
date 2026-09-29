@@ -3,7 +3,7 @@ use std::{fmt, future::Future, net::SocketAddr, time::Duration as StdDuration};
 use dbn::{
     decode::{
         dbn::{
-            async_decode_metadata_with_fsm, async_decode_record_ref_with_fsm,
+            async_decode_metadata_with_fsm,
             fsm::{DbnFsm, ProcessResult},
         },
         AsyncDynReader,
@@ -328,26 +328,43 @@ impl Client {
                 param_name: "self",
                 desc: "Can't call LiveClient::next_record before starting session".to_owned(),
             });
-        };
-        let timeout = self.heartbeat_timeout();
-        let record = tokio::time::timeout(
-            timeout,
-            async_decode_record_ref_with_fsm(&mut self.reader, &mut self.fsm),
-        )
-        .await
-        .map_err(|_elapsed| {
-            self.is_closed = true;
-            crate::Error::HeartbeatTimeout(
-                // timeout should be well within range
-                time::Duration::try_from(timeout).unwrap(),
-            )
-        })??;
-        if let Some(rec) = record {
-            Self::log_record(&self.span, rec);
-        } else {
-            self.is_closed = true;
         }
-        Ok(record)
+        while !self.fsm.has_buffered_record() {
+            let timeout = self.heartbeat_timeout();
+            match self.fsm.process_batch() {
+                ProcessResult::ReadMore(_) => {
+                    match tokio::time::timeout(timeout, self.reader.read(self.fsm.space()))
+                        .await
+                        .map_err(|_elapsed| {
+                            self.is_closed = true;
+                            crate::Error::HeartbeatTimeout(
+                                // timeout should be well within range
+                                time::Duration::try_from(timeout).unwrap(),
+                            )
+                        })? {
+                        Ok(0) => {
+                            self.is_closed = true;
+                            return Ok(None);
+                        }
+                        Ok(nbytes) => {
+                            self.fsm.fill(nbytes);
+                        }
+                        Err(err) if err.kind() == std::io::ErrorKind::UnexpectedEof => {
+                            self.is_closed = true;
+                            return Ok(None);
+                        }
+                        Err(err) => return Err(crate::Error::Io(err)),
+                    }
+                }
+                ProcessResult::Record(_) => break,
+                ProcessResult::Err(err) => return Err(crate::Error::from(err)),
+                ProcessResult::Metadata(_) => unreachable!("metadata already decoded"),
+            }
+        }
+        Ok(self
+            .fsm
+            .next_buffered_record()
+            .inspect(|rec| Self::log_record(&self.span, *rec)))
     }
 
     /// Reads available data from the socket into the internal buffer.
@@ -444,15 +461,18 @@ impl Client {
                 desc: "Can't call LiveClient::try_next_record before starting session".to_owned(),
             });
         };
-        match self.fsm.process() {
-            ProcessResult::Record(_) => Ok(self
-                .fsm
-                .last_record()
-                .inspect(|rec| Self::log_record(&self.span, *rec))),
-            ProcessResult::ReadMore(_) => Ok(None),
-            ProcessResult::Err(err) => Err(err.into()),
-            ProcessResult::Metadata(_) => unreachable!("metadata already decoded"),
+        if !self.fsm.has_buffered_record() {
+            match self.fsm.process_batch() {
+                ProcessResult::Record(_) => {}
+                ProcessResult::ReadMore(_) => return Ok(None),
+                ProcessResult::Err(err) => return Err(err.into()),
+                ProcessResult::Metadata(_) => unreachable!("metadata already decoded"),
+            }
         }
+        Ok(self
+            .fsm
+            .next_buffered_record()
+            .inspect(|rec| Self::log_record(&self.span, *rec)))
     }
 
     /// Returns `true` if the connection is closed.
@@ -640,7 +660,7 @@ mod tests {
         enums::rtype,
         publishers::Dataset,
         record::{HasRType, OhlcvMsg, RecordHeader, TradeMsg, WithTsOut},
-        FlagSet, Mbp10Msg, MetadataBuilder, Record, RecordBuf, SType, Schema,
+        FlagSet, Mbp10Msg, MetadataBuilder, RecordBuf, SType, Schema,
     };
     use time::{Duration, OffsetDateTime};
     use tokio::{
