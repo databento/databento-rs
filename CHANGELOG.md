@@ -1,10 +1,17 @@
 # Changelog
 
-## 0.62.1 - Upcoming
+## 0.63.0 - 2026-09-29
 
 ### Enhancements
 - Optimized `LiveClient::next_record()` and `LiveClient::try_next_record()` to decode
   records in batches
+- Upgraded DBN version to 0.71.0
+- Upgraded zstd to 0.14
+
+### Deprecations
+- From DBN:
+  - Deprecated `dbn::decode::dbn::async_decode_record_ref_with_fsm`; `DbnFsm` can be
+    used directly
 
 ## 0.62.0 - 2026-09-21
 
