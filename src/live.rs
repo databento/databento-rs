@@ -68,6 +68,31 @@ pub struct Subscription {
     pub use_snapshot: bool,
     /// The optional numerical identifier associated with this subscription.
     pub id: Option<u32>,
+    /// When the subscription was last sent to the gateway.
+    #[builder(skip = OffsetDateTime::UNIX_EPOCH)]
+    pub sent_at: OffsetDateTime,
+}
+
+/// A request to remove symbols from a live session's subscriptions for a schema.
+///
+/// The symbols don't need to match an earlier [`Subscription`]: any subset of the
+/// subscribed symbols can be removed, and [`Symbols::All`] removes every symbol for
+/// the schema.
+#[derive(Debug, Clone, bon::Builder, PartialEq, Eq)]
+#[builder(derive(Clone))]
+pub struct Unsubscription {
+    /// The symbols of the instruments to unsubscribe from.
+    #[builder(into)]
+    pub symbols: Symbols,
+    /// The data record schema of data to unsubscribe from.
+    pub schema: Schema,
+    /// The symbology type of the symbols in [`symbols`](Self::symbols). Must be
+    /// [`SType::RawSymbol`], [`SType::Parent`], or [`SType::InstrumentId`].
+    #[builder(default = SType::RawSymbol)]
+    pub stype_in: SType,
+    /// When the unsubscription was last sent to the gateway.
+    #[builder(skip = OffsetDateTime::UNIX_EPOCH)]
+    pub sent_at: OffsetDateTime,
 }
 
 #[doc(hidden)]

@@ -18,7 +18,7 @@ use tracing::{debug, error, instrument};
 
 use crate::{ApiKey, Error, USER_AGENT};
 
-use super::{SlowReaderBehavior, Subscription};
+use super::{SlowReaderBehavior, Subscription, Unsubscription};
 
 /// Returns the host and port for the live gateway for the given dataset.
 ///
@@ -149,6 +149,29 @@ where
             );
             debug!(?sub_req, "Sending subscription request");
             self.sender.write_all(sub_req.as_bytes()).await?;
+        }
+        Ok(())
+    }
+
+    /// Sends one or more unsubscribe messages for `unsub` depending on the number of
+    /// symbols.
+    ///
+    /// # Errors
+    /// This function returns an error if it's unable to communicate with the gateway.
+    ///
+    /// # Cancel safety
+    /// This method is not cancellation safe. If this method is used in a
+    /// [`tokio::select!`] statement and another branch completes first, the
+    /// unsubscription may have been partially sent, resulting in the gateway rejecting
+    /// it, sending an error, and closing the connection.
+    pub async fn unsubscribe(&mut self, unsub: &Unsubscription) -> crate::Result<()> {
+        let symbol_chunks = unsub.symbols.to_chunked_api_string();
+        let last_chunk_idx = symbol_chunks.len() - 1;
+        for (i, sym_str) in symbol_chunks.into_iter().enumerate() {
+            let unsub_req =
+                UnsubRequest::new(unsub.schema, unsub.stype_in, &sym_str, i == last_chunk_idx);
+            debug!(?unsub_req, "Sending unsubscribe request");
+            self.sender.write_all(unsub_req.as_bytes()).await?;
         }
         Ok(())
     }
@@ -390,6 +413,35 @@ impl RawApiMsg for SubRequest {
 }
 
 impl Debug for SubRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Should never be empty
+        write!(f, "{}", &self.0[..self.0.len() - 1])
+    }
+}
+
+/// An unsubscribe request to be sent to the live gateway.
+#[derive(Clone)]
+pub struct UnsubRequest(String);
+
+impl UnsubRequest {
+    /// Creates the raw API unsubscribe request message from the given parameters.
+    /// `symbols` is expected to already be a valid length, such as from
+    /// [`Symbols::to_chunked_api_string()`](crate::Symbols::to_chunked_api_string).
+    pub fn new(schema: Schema, stype_in: SType, symbols: &str, is_last: bool) -> Self {
+        let is_last = is_last as u8;
+        Self(format!(
+            "unsubscribe|schema={schema}|stype_in={stype_in}|symbols={symbols}|is_last={is_last}\n"
+        ))
+    }
+}
+
+impl RawApiMsg for UnsubRequest {
+    fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl Debug for UnsubRequest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Should never be empty
         write!(f, "{}", &self.0[..self.0.len() - 1])

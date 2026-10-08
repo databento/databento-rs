@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.64.0 - Upcoming
+
+### Enhancements
+- Added `LiveClient::unsubscribe()` and the `Unsubscription` type for removing symbols
+  from a live session's subscriptions
+- Added `LiveClient::unsubscriptions()` and `LiveClient::unsubscriptions_mut()`
+- Modified `LiveClient::resubscribe()` to resubscribe only to active subscriptions
+
+### Breaking changes
+- Added `sent_at` field to `Subscription`
+
 ## 0.63.0 - 2026-09-29
 
 ### Enhancements

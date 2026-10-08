@@ -11,7 +11,7 @@ use dbn::{
     rtype, v1, Compression, ErrorCode, ErrorMsg, Metadata, RecordRef, SystemCode, SystemMsg,
     VersionUpgradePolicy,
 };
-use time::Duration;
+use time::{Duration, OffsetDateTime};
 use tokio::{
     io::{AsyncReadExt, BufReader, ReadHalf, WriteHalf},
     net::{TcpStream, ToSocketAddrs},
@@ -22,7 +22,7 @@ use crate::ApiKey;
 
 use super::{
     protocol::{self, Protocol, SessionOptions},
-    ClientBuilder, SlowReaderBehavior, Subscription, TimeoutConf, Unset,
+    ClientBuilder, SlowReaderBehavior, Subscription, TimeoutConf, Unset, Unsubscription,
 };
 
 /// The Live client. Used for subscribing to real-time and intraday historical market data.
@@ -43,6 +43,7 @@ pub struct Client {
     peer_addr: SocketAddr,
     sub_counter: u32,
     subscriptions: Vec<Subscription>,
+    unsubscriptions: Vec<Unsubscription>,
     reader: AsyncDynReader<BufReader<ReadHalf<TcpStream>>>,
     fsm: DbnFsm,
     session_id: String,
@@ -173,6 +174,7 @@ impl Client {
             span,
             sub_counter: 0,
             subscriptions: Vec::new(),
+            unsubscriptions: Vec::new(),
         })
     }
 
@@ -238,6 +240,16 @@ impl Client {
         &mut self.subscriptions
     }
 
+    /// Returns an immutable reference to all unsubscriptions made with this instance.
+    pub fn unsubscriptions(&self) -> &Vec<Unsubscription> {
+        &self.unsubscriptions
+    }
+
+    /// Returns a mutable reference to all unsubscriptions made with this instance.
+    pub fn unsubscriptions_mut(&mut self) -> &mut Vec<Unsubscription> {
+        &mut self.unsubscriptions
+    }
+
     /// Closes the connection with the gateway, ending the session and all subscriptions.
     ///
     /// # Errors
@@ -271,7 +283,31 @@ impl Client {
             sub.id = Some(self.sub_counter);
         }
         self.protocol.subscribe(&sub).await?;
+        sub.sent_at = OffsetDateTime::now_utc();
         self.subscriptions.push(sub);
+        Ok(())
+    }
+
+    /// Attempts to remove symbols from the session's subscriptions. Note that an
+    /// `Ok(())` result from this function does not necessarily indicate that the
+    /// unsubscription succeeded, only that it was sent to the gateway.
+    ///
+    /// The gateway acknowledges the request with a system message with
+    /// [`SystemCode::UnsubscribeAck`].
+    ///
+    /// # Errors
+    /// This function returns an error if it's unable to communicate with the gateway.
+    ///
+    /// # Cancel safety
+    /// This method is not cancellation safe. If this method is used in a
+    /// [`tokio::select!`] statement and another branch completes first, the
+    /// unsubscription may have been partially sent, resulting in the gateway rejecting
+    /// it, sending an error, and closing the connection.
+    #[instrument(parent = &self.span, skip_all)]
+    pub async fn unsubscribe(&mut self, mut unsub: Unsubscription) -> crate::Result<()> {
+        self.protocol.unsubscribe(&unsub).await?;
+        unsub.sent_at = OffsetDateTime::now_utc();
+        self.unsubscriptions.push(unsub);
         Ok(())
     }
 
@@ -538,17 +574,31 @@ impl Client {
         Ok(())
     }
 
-    /// Resubscribes to all subscriptions, removing the original `start` time, if any.
-    /// Usually performed after a [`reconnect()`](Self::reconnect).
+    /// Resubscribes only to active subscriptions, removing the original `start` time,
+    /// if any. Usually performed after a [`reconnect()`](Self::reconnect).
     ///
     /// # Errors
-    /// This function returns an error if it fails to send any of the subscriptions to
-    /// the gateway.
+    /// This function returns an error if it fails to send any of the subscriptions or
+    /// unsubscriptions to the gateway.
     pub async fn resubscribe(&mut self) -> crate::Result<()> {
-        for sub in self.subscriptions.iter_mut() {
-            sub.start = None;
-            self.sub_counter = self.sub_counter.max(sub.id.unwrap_or(0));
-            self.protocol.subscribe(sub).await?;
+        // Replay subscriptions and unsubscriptions in the order they were sent so the
+        // gateway ends up with the same symbols. Ties keep the subscription first.
+        let mut subs = self.subscriptions.iter_mut().peekable();
+        let mut unsubs = self.unsubscriptions.iter_mut().peekable();
+        loop {
+            if let Some(unsub) =
+                unsubs.next_if(|u| subs.peek().is_none_or(|s| u.sent_at < s.sent_at))
+            {
+                self.protocol.unsubscribe(unsub).await?;
+                unsub.sent_at = OffsetDateTime::now_utc();
+            } else if let Some(sub) = subs.next() {
+                sub.start = None;
+                self.sub_counter = self.sub_counter.max(sub.id.unwrap_or(0));
+                self.protocol.subscribe(sub).await?;
+                sub.sent_at = OffsetDateTime::now_utc();
+            } else {
+                break;
+            }
         }
         Ok(())
     }
@@ -614,6 +664,7 @@ impl fmt::Debug for Client {
             .field("peer_addr", &self.peer_addr)
             .field("sub_counter", &self.sub_counter)
             .field("subscriptions", &self.subscriptions)
+            .field("unsubscriptions", &self.unsubscriptions)
             .field("session_id", &self.session_id)
             .field("is_closed", &self.is_closed)
             .finish_non_exhaustive()
@@ -674,7 +725,7 @@ mod tests {
     use tracing::level_filters::LevelFilter;
 
     use super::*;
-    use crate::USER_AGENT;
+    use crate::{Symbols, USER_AGENT};
 
     const TEST_KEY: &str = "32-character-with-lots-of-filler";
 
@@ -749,6 +800,20 @@ mod tests {
             }
             assert!(sub_line.contains(&format!("snapshot={}", subscription.use_snapshot as u8)));
             assert!(sub_line.contains(&format!("is_last={}", is_last as u8)));
+        }
+
+        async fn unsubscribe(&mut self, unsubscription: Unsubscription, is_last: bool) {
+            let unsub_line = self.read_line().await;
+            assert_eq!(
+                unsub_line,
+                format!(
+                    "unsubscribe|schema={}|stype_in={}|symbols={}|is_last={}\n",
+                    unsubscription.schema,
+                    unsubscription.stype_in,
+                    unsubscription.symbols.to_api_string(),
+                    is_last as u8
+                )
+            );
         }
 
         async fn start(&mut self) {
@@ -848,6 +913,7 @@ mod tests {
         Authenticate(Option<Duration>),
         Send(String),
         Subscribe(Subscription, bool),
+        Unsubscribe(Unsubscription, bool),
         Start,
         SendRecord(RecordBuf),
         Disconnect,
@@ -861,6 +927,9 @@ mod tests {
                 Event::Authenticate(hb_int) => write!(f, "Authenticate({hb_int:?})"),
                 Event::Send(msg) => write!(f, "Send({msg:?})"),
                 Event::Subscribe(sub, is_last) => write!(f, "Subscribe({sub:?}, {is_last:?})"),
+                Event::Unsubscribe(unsub, is_last) => {
+                    write!(f, "Unsubscribe({unsub:?}, {is_last:?})")
+                }
                 Event::Start => write!(f, "Start"),
                 Event::SendRecord(_) => write!(f, "SendRecord"),
                 Event::Disconnect => write!(f, "Disconnect"),
@@ -880,6 +949,9 @@ mod tests {
                         Some(Event::Accept) => mock.accept().await,
                         Some(Event::Send(msg)) => mock.send(&msg).await,
                         Some(Event::Subscribe(sub, is_last)) => mock.subscribe(sub, is_last).await,
+                        Some(Event::Unsubscribe(unsub, is_last)) => {
+                            mock.unsubscribe(unsub, is_last).await
+                        }
                         Some(Event::Start) => mock.start().await,
                         Some(Event::SendRecord(rec)) => mock.send_record(rec).await,
                         Some(Event::Disconnect) => mock.close().await,
@@ -905,6 +977,12 @@ mod tests {
         pub fn expect_subscribe(&mut self, subscription: Subscription, is_last: bool) {
             self.send
                 .send(Event::Subscribe(subscription, is_last))
+                .unwrap();
+        }
+
+        pub fn expect_unsubscribe(&mut self, unsubscription: Unsubscription, is_last: bool) {
+            self.send
+                .send(Event::Unsubscribe(unsubscription, is_last))
                 .unwrap();
         }
 
@@ -1037,6 +1115,64 @@ mod tests {
             let chunk_size = 500.min(SYMBOL_COUNT - i);
             fixture.expect_subscribe(
                 sub_base.clone().symbols(vec![SYMBOL; chunk_size]).build(),
+                i + chunk_size == SYMBOL_COUNT,
+            );
+            i += chunk_size;
+        }
+        fixture.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_unsubscribe() {
+        let (mut fixture, mut client) = setup(Dataset::GlbxMdp3, false, None).await;
+        let subscription = Subscription::builder()
+            .symbols(vec!["ESZ6", "NQZ6"])
+            .schema(Schema::Mbo)
+            .build();
+        fixture.expect_subscribe(subscription.clone(), true);
+        client.subscribe(subscription).await.unwrap();
+        fixture.start();
+        client.start().await.unwrap();
+        let unsubscription = Unsubscription::builder()
+            .symbols(vec!["NQZ6"])
+            .schema(Schema::Mbo)
+            .build();
+        fixture.expect_unsubscribe(unsubscription.clone(), true);
+        let before_send = OffsetDateTime::now_utc();
+        client.unsubscribe(unsubscription).await.unwrap();
+        assert_eq!(client.unsubscriptions().len(), 1);
+        assert!(client.unsubscriptions()[0].sent_at >= before_send);
+        fixture.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_unsubscribe_all_symbols() {
+        let (mut fixture, mut client) = setup(Dataset::XnasItch, false, None).await;
+        let unsubscription = Unsubscription::builder()
+            .symbols(Symbols::All)
+            .schema(Schema::Trades)
+            .build();
+        fixture.expect_unsubscribe(unsubscription.clone(), true);
+        client.unsubscribe(unsubscription).await.unwrap();
+        fixture.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_unsubscribe_chunking() {
+        const SYMBOL: &str = "TEST";
+        const SYMBOL_COUNT: usize = 1001;
+        let (mut fixture, mut client) = setup(Dataset::XnasItch, false, None).await;
+        let unsub_base = Unsubscription::builder().schema(Schema::Trades);
+        let unsubscription = unsub_base
+            .clone()
+            .symbols(vec![SYMBOL; SYMBOL_COUNT])
+            .build();
+        client.unsubscribe(unsubscription).await.unwrap();
+        let mut i = 0;
+        while i < SYMBOL_COUNT {
+            let chunk_size = 500.min(SYMBOL_COUNT - i);
+            fixture.expect_unsubscribe(
+                unsub_base.clone().symbols(vec![SYMBOL; chunk_size]).build(),
                 i + chunk_size == SYMBOL_COUNT,
             );
             i += chunk_size;
@@ -1236,6 +1372,73 @@ mod tests {
         client.resubscribe().await.unwrap();
         fixture.start();
         client.start().await.unwrap();
+        fixture.send_record(trade.clone());
+        assert_eq!(
+            *client
+                .next_record()
+                .await
+                .unwrap()
+                .unwrap()
+                .get::<TradeMsg>()
+                .unwrap(),
+            trade
+        );
+
+        fixture.stop().await;
+    }
+
+    #[tokio::test]
+    async fn test_resubscribe_replays_unsubscribe() {
+        let (mut fixture, mut client) = setup(Dataset::GlbxMdp3, false, None).await;
+        let sub = Subscription::builder()
+            .symbols(["ESZ6", "NQZ6"])
+            .schema(Schema::Mbo)
+            .build();
+        fixture.expect_subscribe(sub.clone(), true);
+        client.subscribe(sub.clone()).await.unwrap();
+        fixture.start();
+        client.start().await.unwrap();
+        let unsub = Unsubscription::builder()
+            .symbols(["NQZ6"])
+            .schema(Schema::Mbo)
+            .build();
+        fixture.expect_unsubscribe(unsub.clone(), true);
+        client.unsubscribe(unsub.clone()).await.unwrap();
+        let resub = Subscription::builder()
+            .symbols(["NQZ6"])
+            .schema(Schema::Mbo)
+            .build();
+        fixture.expect_subscribe(resub.clone(), true);
+        client.subscribe(resub.clone()).await.unwrap();
+        assert_eq!(client.subscriptions().len(), 2);
+        assert_eq!(client.unsubscriptions().len(), 1);
+
+        fixture.disconnect();
+        // Receives None when gateway closes connection
+        assert!(client.next_record().await.unwrap().is_none());
+        fixture.authenticate(None);
+        client.reconnect().await.unwrap();
+
+        // Replayed in the order they were originally sent
+        fixture.expect_subscribe(sub, true);
+        fixture.expect_unsubscribe(unsub, true);
+        fixture.expect_subscribe(resub, true);
+        client.resubscribe().await.unwrap();
+        fixture.start();
+        client.start().await.unwrap();
+
+        let trade = TradeMsg {
+            hd: RecordHeader::default::<TradeMsg>(rtype::MBP_0),
+            price: 1,
+            size: 2,
+            action: 'T' as c_char,
+            side: 'B' as c_char,
+            flags: FlagSet::default(),
+            depth: 0,
+            ts_recv: 3,
+            ts_in_delta: 4,
+            sequence: 5,
+        };
         fixture.send_record(trade.clone());
         assert_eq!(
             *client
