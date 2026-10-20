@@ -78,6 +78,9 @@ pub struct Subscription {
 /// The symbols don't need to match an earlier [`Subscription`]: any subset of the
 /// subscribed symbols can be removed, and [`Symbols::All`] removes every symbol for
 /// the schema.
+///
+/// To reverse a [`Subscription`], convert it with
+/// [`Subscription::to_unsubscription`] or [`Unsubscription::from`].
 #[derive(Debug, Clone, bon::Builder, PartialEq, Eq)]
 #[builder(derive(Clone))]
 pub struct Unsubscription {
@@ -93,6 +96,24 @@ pub struct Unsubscription {
     /// When the unsubscription was last sent to the gateway.
     #[builder(skip = OffsetDateTime::UNIX_EPOCH)]
     pub sent_at: OffsetDateTime,
+}
+
+impl Subscription {
+    /// Creates an [`Unsubscription`] that removes this subscription's symbols for its
+    /// schema.
+    pub fn to_unsubscription(&self) -> Unsubscription {
+        Unsubscription::from(self)
+    }
+}
+
+impl From<&Subscription> for Unsubscription {
+    fn from(sub: &Subscription) -> Self {
+        Self::builder()
+            .symbols(sub.symbols.clone())
+            .schema(sub.schema)
+            .stype_in(sub.stype_in)
+            .build()
+    }
 }
 
 #[doc(hidden)]
@@ -323,6 +344,24 @@ mod tests {
             .start(date)
             .build();
         assert_eq!(sub.start, Some(datetime!(2024-03-15 00:00:00 UTC)));
+    }
+
+    #[test]
+    fn subscription_to_unsubscription() {
+        let sub = Subscription::builder()
+            .symbols(vec!["ES.FUT", "NQ.FUT"])
+            .schema(Schema::Trades)
+            .stype_in(SType::Parent)
+            .start(datetime!(2024-03-15 09:30:00 UTC))
+            .id(5)
+            .build();
+        let expected = Unsubscription::builder()
+            .symbols(vec!["ES.FUT", "NQ.FUT"])
+            .schema(Schema::Trades)
+            .stype_in(SType::Parent)
+            .build();
+        assert_eq!(sub.to_unsubscription(), expected);
+        assert_eq!(Unsubscription::from(&sub), expected);
     }
 
     #[cfg(feature = "chrono")]

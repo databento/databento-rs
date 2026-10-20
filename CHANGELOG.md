@@ -6,6 +6,8 @@
 - Added `LiveClient::unsubscribe()` and the `Unsubscription` type for removing symbols
   from a live session's subscriptions
 - Added `LiveClient::unsubscriptions()` and `LiveClient::unsubscriptions_mut()`
+- Added `Subscription::to_unsubscription()` and `From<&Subscription>` for
+  `Unsubscription` for reversing a subscription
 - Modified `LiveClient::resubscribe()` to resubscribe only to active subscriptions
 
 ### Breaking changes
