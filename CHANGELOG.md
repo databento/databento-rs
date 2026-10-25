@@ -12,6 +12,10 @@
 
 ### Breaking changes
 - Added `sent_at` field to `Subscription`
+- Removed the deprecated `BatchClient::list_jobs_full()` method. `list_jobs()` no longer
+  sends the `short` parameter now that the `batch.list_jobs` endpoint only returns the
+  short response. Use `BatchClient::get_job_details()` to request the full details of a
+  job
 
 ## 0.63.0 - 2026-09-29
 

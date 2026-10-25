@@ -108,35 +108,6 @@ impl BatchClient<'_> {
         &mut self,
         params: &ListJobsParams,
     ) -> crate::Result<Vec<BatchJobShort>> {
-        let resp = self
-            .list_jobs_builder(params)?
-            .query(&[("short", "true")])
-            .send()
-            .await?;
-        handle_response(resp).await
-    }
-
-    /// Lists previous batch jobs with filtering by `params`, returning the full
-    /// details of each job.
-    ///
-    /// # Errors
-    /// This function returns an error when it fails to communicate with the Databento API
-    /// or the API indicates there's an issue with the request.
-    #[deprecated(
-        since = "0.60.0",
-        note = "the batch.list_jobs endpoint will stop returning full job details at a \
-        future date; use list_jobs() and get_job_details() instead"
-    )]
-    #[instrument(name = "batch.list_jobs_full")]
-    pub async fn list_jobs_full(
-        &mut self,
-        params: &ListJobsParams,
-    ) -> crate::Result<Vec<BatchJob>> {
-        let resp = self.list_jobs_builder(params)?.send().await?;
-        handle_response(resp).await
-    }
-
-    fn list_jobs_builder(&mut self, params: &ListJobsParams) -> crate::Result<RequestBuilder> {
         let mut builder = self.get("list_jobs")?;
         if let Some(ref states) = params.states {
             let states_str = states.iter().fold(String::new(), |mut acc, s| {
@@ -152,7 +123,8 @@ impl BatchClient<'_> {
         if let Some(ref since) = params.since {
             builder = builder.query(&[("since", &since.unix_timestamp_nanos().to_string())]);
         }
-        Ok(builder)
+        let resp = builder.send().await?;
+        handle_response(resp).await
     }
 
     /// Gets the details of a batch job with ID `job_id`.
@@ -910,135 +882,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_list_jobs_full() -> crate::Result<()> {
-        const SCHEMA: Schema = Schema::Trades;
-
-        let mock_server = MockServer::start().await;
-        Mock::given(method("GET"))
-            .and(basic_auth(API_KEY, ""))
-            .and(path(format!("/v{API_VERSION}/batch.list_jobs")))
-            .and(query_param_is_missing("short"))
-            .and(query_param_is_missing("states"))
-            .and(query_param_is_missing("since"))
-            .respond_with(
-                ResponseTemplate::new(StatusCode::OK.as_u16()).set_body_json(json!([{
-                    "id": "123",
-                    "user_id": "test_user",
-                    "cost_usd": 10.50,
-                    "dataset": "XNAS.ITCH",
-                    "symbols": "TSLA",
-                    "stype_in": "raw_symbol",
-                    "stype_out": "instrument_id",
-                    "schema": SCHEMA.as_str(),
-                    // test both time formats
-                    "start": "2023-06-14 00:00:00+00:00",
-                    "end": "2023-06-17T00:00:00.012345678Z",
-                    "limit": null,
-                    "encoding": "json",
-                    "compression": "zstd",
-                    "pretty_px": true,
-                    "pretty_ts": false,
-                    "map_symbols": true,
-                    "split_symbols": false,
-                    "split_duration": "day",
-                    "split_size": null,
-                    "delivery": "download",
-                    "state": "processing",
-                     "ts_received": "2023-07-19 23:00:04.095538+00:00",
-                     "ts_queued": "2023-07-19T23:00:08.095538123Z",
-                     "ts_process_start": "2023-07-19 23:01:04.000000+00:00",
-                     "ts_process_done": null,
-                     "ts_expiration": null
-                },
-                {
-                    "id": "XNAS-20250602-5KM3HL5BUW",
-                    "user_id": "AA89XSlBV",
-                    "cost_usd": 0.0,
-                    "dataset": "XNAS.ITCH",
-                    "symbols": "MSFT",
-                    "stype_in": "raw_symbol",
-                    "stype_out": "instrument_id",
-                    "schema": "trades",
-                    "start": "2022-06-10T12:30:00.000000000Z",
-                    "end": "2022-06-10T14:00:00.000000000Z",
-                    "limit": 1000,
-                    "encoding": "csv",
-                    "compression": null,
-                    "pretty_px": false,
-                    "pretty_ts": false,
-                    "map_symbols": true,
-                    "split_symbols": false,
-                    "split_duration": null,
-                    "split_size": null,
-                    "packaging": null,
-                    "delivery": "download",
-                    "record_count": 1000,
-                    "billed_size": 48000,
-                    "actual_size": 94000,
-                    "package_size": 97690,
-                    "state": "done",
-                    "ts_received": "2025-06-02T15:51:19.251582000Z",
-                    "ts_queued": "2025-06-02T15:51:20.997673000Z",
-                    "ts_process_start": "2025-06-02T15:51:45.312317000Z",
-                    "ts_process_done": "2025-06-02T15:51:46.324860000Z",
-                    "ts_expiration": "2025-07-02T16:00:00.000000000Z",
-                    "progress": 100
-                }])),
-            )
-            .mount(&mock_server)
-            .await;
-        let mut target = client(&mock_server);
-        #[expect(deprecated)]
-        let job_descs = target
-            .batch()
-            .list_jobs_full(&ListJobsParams::default())
-            .await?;
-        assert_eq!(job_descs.len(), 2);
-        let mut job_desc = &job_descs[0];
-        assert_eq!(
-            job_desc.ts_queued.unwrap(),
-            datetime!(2023-07-19 23:00:08.095538123 UTC)
-        );
-        assert_eq!(
-            job_desc.ts_process_start.unwrap(),
-            datetime!(2023-07-19 23:01:04 UTC)
-        );
-        assert_eq!(job_desc.encoding, Encoding::Json);
-        assert!(job_desc.pretty_px);
-        assert!(!job_desc.pretty_ts);
-        assert!(job_desc.map_symbols);
-        assert_eq!(job_desc.split_duration, SplitDuration::Day);
-        assert!(job_desc.progress.is_none());
-
-        job_desc = &job_descs[1];
-        assert_eq!(
-            job_desc.ts_queued.unwrap(),
-            datetime!(2025-06-02 15:51:20.997673000 UTC)
-        );
-        assert_eq!(
-            job_desc.ts_process_start.unwrap(),
-            datetime!(2025-06-02 15:51:45.312317000 UTC)
-        );
-        assert_eq!(job_desc.start, datetime!(2022-06-10 12:30:00.000000000 UTC));
-        assert_eq!(job_desc.end, datetime!(2022-06-10 14:00:00.000000000 UTC));
-        assert_eq!(job_desc.encoding, Encoding::Csv);
-        assert!(!job_desc.pretty_px);
-        assert!(!job_desc.pretty_ts);
-        assert!(job_desc.map_symbols);
-        assert!(!job_desc.split_symbols);
-        assert_eq!(job_desc.split_duration, SplitDuration::None);
-        assert_eq!(job_desc.progress, Some(100));
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn test_list_jobs() -> crate::Result<()> {
         let mock_server = MockServer::start().await;
         Mock::given(method("GET"))
             .and(basic_auth(API_KEY, ""))
             .and(path(format!("/v{API_VERSION}/batch.list_jobs")))
-            .and(query_param("short", "true"))
+            .and(query_param_is_missing("short"))
             .and(query_param_is_missing("states"))
             .and(query_param_is_missing("since"))
             .respond_with(
