@@ -710,7 +710,8 @@ mod tests {
         encode::AsyncDbnMetadataEncoder,
         enums::rtype,
         publishers::Dataset,
-        record::{HasRType, OhlcvMsg, RecordHeader, TradeMsg, WithTsOut},
+        record::{OhlcvMsg, RecordHeader, TradeMsg, WithTsOut},
+        v3::HasRType,
         FlagSet, Mbp10Msg, MetadataBuilder, RecordBuf, SType, Schema,
     };
     use time::{Duration, OffsetDateTime};
