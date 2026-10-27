@@ -1,5 +1,85 @@
 # Changelog
 
+## 0.64.0 - 2026-10-27
+
+### Enhancements
+- Added `LiveClient::unsubscribe()` and the `Unsubscription` type for removing symbols
+  from a live session's subscriptions
+- Added `LiveClient::unsubscriptions()` and `LiveClient::unsubscriptions_mut()`
+- Added `Subscription::to_unsubscription()` and `From<&Subscription>` for
+  `Unsubscription` for reversing a subscription
+- Modified `LiveClient::resubscribe()` to resubscribe only to active subscriptions
+- Upgraded DBN version to 0.73.0:
+  - Reduced the memory usage of `TsSymbolMap` for requests spanning many days
+  - Added `TsSymbolMap::get_for_ts()` for looking up a mapping by UNIX timestamp
+  - Added `TsSymbolMap::on_record()` and `TsSymbolMap::on_symbol_mapping()` for
+    building a `TsSymbolMap` from live `SymbolMappingMsg` records
+  - Added `DynEncoder::finish()` to flush buffered records and finalize the output,
+    which surfaces errors that dropping the encoder would swallow, and
+    `SplitEncoder::finish()` to do the same for every `DynEncoder` sub-encoder
+  - Added `SizeSplitter` for splitting encoded output into parts by size, which can be
+    nested in the other splitters
+  - Improved the performance of `SymbolSplitter` with metadata containing many symbols
+  - Added decoders and DBN, JSON, and CSV encoders for the in-development DBN version
+    4. DBN version 3 remains the default
+  - Implemented `Debug` for the sync and async DBN `Decoder`, `RecordDecoder`, and
+    `MetadataDecoder`
+
+### Breaking changes
+- Added `sent_at` field to `Subscription`
+- Removed the deprecated `BatchClient::list_jobs_full()` method. `list_jobs()` no longer
+  sends the `short` parameter now that the `batch.list_jobs` endpoint only returns the
+  short response. Use `BatchClient::get_job_details()` to request the full details of a
+  job
+- From DBN:
+  - Changed `TsSymbolMap::insert()` to take the `start` and `end` of the mapping as
+    UNIX timestamps instead of dates, and `symbol` as `impl Into<String>` instead of
+    `impl Into<Arc<String>>`
+  - `RecordRef`, `RecordRefMut`, and `RecordBuf` are generic over the record header
+    layout, which defaults to the v1-v3 `RecordHeader`. `Record` has a new `Header`
+    associated type naming the layout a record begins with. Generic code bounded on
+    `T: HasRType` that downcasts a `RecordRef` or builds a `RecordBuf` needs
+    `T: v3::HasRType`
+  - `RecordRef::new()`, `RecordRefMut::new()`, and their `unchecked_from_header()`
+    constructors need the header specified
+  - `HasRType::has_rtype()` takes a `u16`, and `HasRType` no longer requires
+    `RecordMut`
+  - The `RecordMut` trait now requires `Record` and `RecordMut::header_mut()` returns
+    `&mut Self::Header`. Generic code for version 1-3 that uses `header_mut()` will
+    need a `v3::HasRType` bound
+  - `DecodeRecord`, `DecodeStream`, and `AsyncDecodeRecord` decode v1-v3 records, so
+    their generic methods require `T: v3::HasRType`
+  - `WithTsOut`, `transmute_record()`, `transmute_record_bytes()`, and
+    `transmute_record_mut()` accept only v1-v3 records, and `InstrumentDefRec`,
+    `StatRec`, and `SymbolMappingRec` extend `v3::HasRType`
+  - `dyn Record` requires naming the header, e.g. `dyn v3::Record`, which can also
+    hold v1 and v2 records since they share the same header
+  - Removed `From<&RecordEnum>` and `From<&RecordBuf>` for `RecordRef`, and
+    `From<&mut RecordBuf>` for `RecordRefMut`. The blanket `From<&R> for RecordRef`
+    covers every `Record`, including these
+  - Added `layout` field to `Metadata` for the record layouts of a DBN version 4
+    stream
+  - Added a `'static` bound to the `DbnEncodable` trait. All DBN record types satisfy
+    it, but generic code that restates the trait's bounds needs to add `'static`
+  - Changed `DynEncoder` and `DynEncoderBuilder` to require `W: io::Write + Send`
+    (previously `W: io::Write`). All standard writers (`File`, `BufWriter`,
+    `Vec<u8>`) satisfy this bound
+  - The CSV `Encoder` now returns `Error::Encode` when `encode_record` and
+    `encode_record_with_sym` are mismatched against the builder's `with_symbol`
+    setting (previously, mismatches silently produced rows whose column count did
+    not match the header)
+  - Added required `into_sub_encoders()` method to the `Splitter` trait, which
+    consumes the splitter and yields every active sub-encoder
+
+### Bug fixes
+- From DBN:
+  - Fixed legacy DBZ metadata decoding allocating memory for the symbol mapping count
+    and metadata length before checking them against the input
+
+### Deprecations
+- From DBN:
+  - Deprecated `TsSymbolMap::get()` in favor of `get_for_ts()`
+
 ## 0.63.0 - 2026-09-29
 
 ### Enhancements

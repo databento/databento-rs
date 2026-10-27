@@ -1,6 +1,6 @@
 //! The historical symbology API.
 
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use dbn::{MappingInterval, Metadata, SType, TsSymbolMap};
 use reqwest::RequestBuilder;
@@ -157,15 +157,14 @@ impl Resolution {
                 for interval in intervals {
                     map.insert(
                         iid,
-                        interval.start_date,
-                        interval.end_date,
-                        Arc::new(interval.symbol.clone()),
+                        date_to_ts(interval.start_date),
+                        date_to_ts(interval.end_date),
+                        interval.symbol.as_str(),
                     )?;
                 }
             }
         } else {
             for (raw_symbol, intervals) in self.mappings.iter() {
-                let raw_symbol = Arc::new(raw_symbol.clone());
                 for interval in intervals {
                     let iid = interval.symbol.parse().map_err(|_| {
                         crate::Error::internal(format!(
@@ -175,9 +174,9 @@ impl Resolution {
                     })?;
                     map.insert(
                         iid,
-                        interval.start_date,
-                        interval.end_date,
-                        raw_symbol.clone(),
+                        date_to_ts(interval.start_date),
+                        date_to_ts(interval.end_date),
+                        raw_symbol.as_str(),
                     )?;
                 }
             }
@@ -192,6 +191,10 @@ struct ResolutionResp {
     pub mappings: HashMap<String, Vec<MappingInterval>>,
     pub partial: Vec<String>,
     pub not_found: Vec<String>,
+}
+
+fn date_to_ts(date: time::Date) -> u64 {
+    date.midnight().assume_utc().unix_timestamp_nanos() as u64
 }
 
 #[cfg(test)]
