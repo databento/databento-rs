@@ -511,6 +511,63 @@ impl Client {
             .inspect(|rec| Self::log_record(&self.span, *rec)))
     }
 
+    /// Decodes the records already in the internal buffer into `rec_refs`, up to its
+    /// length, without performing any I/O. Returns an empty slice if no complete record
+    /// is buffered or `rec_refs` is empty. Use [`fill_buf()`](Self::fill_buf) to read
+    /// more from the socket.
+    ///
+    /// This is [`try_next_record()`](Self::try_next_record) for a whole read at a time.
+    ///
+    /// # Errors
+    /// This function returns an error if it encounters an invalid record or if the
+    /// session hasn't been started. Records decoded before an invalid record are
+    /// returned first, and the error is returned by the following call.
+    ///
+    /// # Example
+    /// ```no_run
+    /// # async fn read(mut client: databento::LiveClient) -> databento::Result<()> {
+    /// loop {
+    ///     // Keep the slots scoped to this call because the records borrow the client.
+    ///     let has_records = {
+    ///         let mut slots = [None; 256];
+    ///         let records = client.try_next_records(&mut slots)?;
+    ///         for record in records.iter() {
+    ///             // Process each record.
+    ///             let _ = record;
+    ///         }
+    ///         !records.is_empty()
+    ///     };
+    ///     if !has_records && client.fill_buf().await? == 0 {
+    ///         break;
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[forbid(unsafe_code)]
+    pub fn try_next_records<'a>(
+        &'a mut self,
+        rec_refs: &'a mut [Option<RecordRef<'a>>],
+    ) -> crate::Result<&'a mut [RecordRef<'a>]> {
+        if !self.fsm.has_decoded_metadata() {
+            return Err(crate::Error::BadArgument {
+                param_name: "self",
+                desc: "Can't call LiveClient::try_next_records before starting session".to_owned(),
+            });
+        };
+        match self.fsm.process_many(rec_refs) {
+            ProcessResult::Record(records) => {
+                for record in records.iter() {
+                    Self::log_record(&self.span, *record);
+                }
+                Ok(records)
+            }
+            ProcessResult::ReadMore(_) => Ok(&mut []),
+            ProcessResult::Err(err) => Err(err.into()),
+            ProcessResult::Metadata(_) => unreachable!("metadata already decoded"),
+        }
+    }
+
     /// Returns `true` if the connection is closed.
     ///
     /// The connection is considered closed after [`next_record()`](Self::next_record)
@@ -1509,6 +1566,160 @@ mod tests {
         assert_eq!(*rec2.get::<OhlcvMsg>().unwrap(), REC);
 
         mock_task.await.unwrap();
+    }
+
+    #[tokio::test]
+    #[forbid(unsafe_code)]
+    async fn test_try_next_records_and_switching_apis() {
+        const REC: OhlcvMsg = OhlcvMsg {
+            hd: RecordHeader::new::<OhlcvMsg>(rtype::OHLCV_1M, 1, 2, 3),
+            open: 1,
+            high: 2,
+            low: 3,
+            close: 4,
+            volume: 5,
+        };
+        let (mut fixture, mut client) = setup(Dataset::GlbxMdp3, false, None).await;
+        {
+            let mut slots = [None; 3];
+            assert!(matches!(
+                client.try_next_records(&mut slots),
+                Err(crate::Error::BadArgument { .. })
+            ));
+        }
+        fixture.start();
+        client.start().await.unwrap();
+        {
+            let mut slots = [None; 3];
+            assert!(client.try_next_records(&mut slots).unwrap().is_empty());
+        }
+
+        let expected: Vec<_> = (0..20).map(|i| OhlcvMsg { open: i, ..REC }).collect();
+        for record in &expected {
+            fixture.send_record(record.clone());
+        }
+        // Buffer all records, even if TCP splits them across reads. This makes the
+        // transitions between reading APIs deterministic.
+        let mut read = 0;
+        let expected_bytes = expected.len() * std::mem::size_of::<OhlcvMsg>();
+        while read < expected_bytes {
+            let nbytes = client.fill_buf().await.unwrap();
+            assert!(nbytes > 0);
+            read += nbytes;
+        }
+
+        let mut actual = Vec::new();
+        actual.push(
+            client
+                .try_next_record()
+                .unwrap()
+                .unwrap()
+                .get::<OhlcvMsg>()
+                .unwrap()
+                .clone(),
+        );
+        {
+            let mut slots = [None; 3];
+            let records = client.try_next_records(&mut slots).unwrap();
+            assert_eq!(records.len(), 3);
+            actual.extend(
+                records
+                    .iter()
+                    .map(|rec| rec.get::<OhlcvMsg>().unwrap().clone()),
+            );
+        }
+        actual.push(
+            client
+                .try_next_record()
+                .unwrap()
+                .unwrap()
+                .get::<OhlcvMsg>()
+                .unwrap()
+                .clone(),
+        );
+        while actual.len() < expected.len() {
+            let mut slots = [None; 5];
+            let records = client.try_next_records(&mut slots).unwrap();
+            assert!(!records.is_empty());
+            actual.extend(
+                records
+                    .iter()
+                    .map(|rec| rec.get::<OhlcvMsg>().unwrap().clone()),
+            );
+        }
+        assert_eq!(actual, expected);
+        {
+            let mut slots = [];
+            assert!(client.try_next_records(&mut slots).unwrap().is_empty());
+        }
+        assert!(client.try_next_record().unwrap().is_none());
+        fixture.stop().await;
+    }
+
+    #[tokio::test]
+    #[forbid(unsafe_code)]
+    async fn test_try_next_records_preserves_mixed_upgraded_records() {
+        let (mut fixture, mut client) = setup(Dataset::GlbxMdp3, false, None).await;
+        fixture.start();
+        client.start().await.unwrap();
+        client
+            .fsm
+            .set_upgrade_policy(VersionUpgradePolicy::UpgradeToV3)
+            .unwrap();
+        client.fsm.set_input_dbn_version(1).unwrap();
+
+        let mut first = dbn::MboMsg::default();
+        first.hd.instrument_id = 101;
+        let mut last = dbn::MboMsg::default();
+        last.hd.instrument_id = 202;
+        let old_stat = dbn::v1::StatMsg::default();
+        let upgraded_stat = dbn::v3::StatMsg::from(&old_stat);
+        let input = [first.as_ref(), old_stat.as_ref(), last.as_ref()].concat();
+        client.fsm.space()[..input.len()].copy_from_slice(&input);
+        client.fsm.fill(input.len());
+
+        {
+            let mut slots = [None; 4];
+            let records = client.try_next_records(&mut slots).unwrap();
+            assert_eq!(records.len(), 3);
+            assert_eq!(records[0].as_ref(), first.as_ref());
+            assert_eq!(records[1].as_ref(), upgraded_stat.as_ref());
+            assert_eq!(records[2].as_ref(), last.as_ref());
+        }
+        fixture.stop().await;
+    }
+
+    #[tokio::test]
+    #[forbid(unsafe_code)]
+    async fn test_try_next_records_returns_valid_prefix_before_error() {
+        const REC: OhlcvMsg = OhlcvMsg {
+            hd: RecordHeader::new::<OhlcvMsg>(rtype::OHLCV_1M, 1, 2, 3),
+            open: 1,
+            high: 2,
+            low: 3,
+            close: 4,
+            volume: 5,
+        };
+        let (mut fixture, mut client) = setup(Dataset::GlbxMdp3, false, None).await;
+        fixture.start();
+        client.start().await.unwrap();
+        let input = [REC.as_ref(), &[0; 16]].concat();
+        client.fsm.space()[..input.len()].copy_from_slice(&input);
+        client.fsm.fill(input.len());
+        {
+            let mut slots = [None; 4];
+            let records = client.try_next_records(&mut slots).unwrap();
+            assert_eq!(records.len(), 1);
+            assert_eq!(*records[0].get::<OhlcvMsg>().unwrap(), REC);
+        }
+        {
+            let mut slots = [None; 4];
+            assert!(matches!(
+                client.try_next_records(&mut slots),
+                Err(crate::Error::Dbn(_))
+            ));
+        }
+        fixture.stop().await;
     }
 
     #[tokio::test]
