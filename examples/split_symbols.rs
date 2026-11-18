@@ -8,7 +8,7 @@ use databento::{
     dbn::{
         decode::{AsyncDbnDecoder, DbnMetadata},
         encode::{AsyncDbnEncoder, AsyncEncodeRecord, AsyncEncodeRecordRef},
-        InstrumentDefMsg, Metadata, Schema, SymbolIndex,
+        InstrumentDefMsg, InstrumentDefRec, Metadata, Schema, SymbolIndex,
     },
     historical::timeseries::GetRangeParams,
     HistoricalClient,

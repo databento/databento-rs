@@ -1,5 +1,68 @@
 # Changelog
 
+## 0.65.0 - 2026-11-17
+
+### Enhancements
+- Upgraded DBN version to 0.74.0:
+  - Added a trait for each record type, e.g. `TradeRec` and `InstrumentDefRec`, for
+    reading records of any DBN version through the same methods, and a `prelude`
+    module for importing them
+  - Added nanosecond-precision symbology intervals to DBN version 4 metadata to
+    support intraday symbology changes
+  - Added record group symbology to DBN version 4 for symbology changes mid-stream
+  - Added `TsSymbolMap::retain_from()` for removing intervals that end at or before a
+    timestamp
+  - Added `InstrumentDefOffsets`, `ImbalanceOffsets`, and `SymbolMappingOffsets` for
+    reading DBN version 4 fields the compiled record structs don't hold, such as
+    `raw_symbol`, `strike_price`, and `leg_side`
+  - Added support for `seek_to()` and `is_compressed()` to the sync and async
+    `RecordDecoder` over a `DynReader` or `AsyncDynReader` when decoding DBN version 4
+    records
+  - Added `StreamLayout::merge()` for combining the layouts of different record types,
+    which `Metadata::merge()` uses to merge version 4 metadata of different schemas
+  - Added the DBN version 4 stream layout to JSON metadata as `layout`, which is
+    `null` for earlier DBN versions
+  - Added `encode_record_with_sym()` and `encode_ref_with_sym()` to the version 4
+    JSON `Encoder` for adding a `symbol` field
+  - Optimized `MergeDecoder` and `MergeRecordDecoder` to reorder the advanced stream
+    in place instead of removing and reinserting it
+  - Added new venues, datasets, and publishers for HKEX
+
+### Breaking changes
+- From DBN:
+  - Moved the record methods that convert fields, such as `ts_recv()`, `action()`, and
+    `price_f64()`, into the new record traits. Import them from `databento::dbn` or
+    with `use databento::dbn::prelude::*`
+  - Replaced `compat::InstrumentDefRec`, `compat::StatRec`, and
+    `compat::SymbolMappingRec` with the record traits of the same names in the crate
+    root, which cover DBN versions 1 through 4
+    - `InstrumentDefRec::channel_id()` returns a `u8`, and `asset()` and
+      `security_type()` are methods of the version 1 through 3 structs
+    - Removed `StatRec::UNDEF_STAT_QUANTITY`. `quantity()` returns
+      `UNDEF_STAT_QUANTITY` for a null quantity in every version
+  - Changed the methods for the definition and imbalance fields DBN version 4 holds
+    outside the compiled struct, such as `strike_price_f64()`, `leg_side()`, and
+    `user_defined_instrument()`, to return an `Option`
+  - Added `intervals` field to `Metadata` for the symbology of a DBN version 4 stream
+  - Removed `NoSchemaBehavior::Broadcast`. `SchemaSplitter` now works with encoders
+    of any DBN version
+  - Changed `is_heartbeat()` to check the message text when `code` is
+    `SystemCode::Unset`
+
+### Bug fixes
+- From DBN:
+  - Fixed panic when decoding, transcoding, or encoding a record whose length is
+    shorter than its `rtype` requires
+  - Fixed decoder panicking instead of returning an error when upgrading a DBN version
+    1 or 2 record whose length is shorter than its `rtype` requires (credit: @wtn)
+  - Fixed `RecordRef::as_enum()` and `RecordBuf::as_enum()` returning a reference past
+    the end of a record whose length is shorter than its rtype's struct (credit:
+    @samsonmaximus)
+  - Fixed DBN version 4 decoders rejecting streams with a symbol width greater than 71
+    and reading definition and symbol mapping records dynamically when it was smaller
+  - Fixed DBN version 4 layout validation accepting a repacked compiled record layout
+    smaller than its compiled struct
+
 ## 0.64.0 - 2026-10-27
 
 ### Enhancements

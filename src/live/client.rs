@@ -8,8 +8,8 @@ use dbn::{
         },
         AsyncDynReader,
     },
-    rtype, v1, Compression, ErrorCode, ErrorMsg, Metadata, RecordRef, SystemCode, SystemMsg,
-    VersionUpgradePolicy,
+    rtype, v1, Compression, ErrorCode, ErrorMsg, ErrorRec, Metadata, RecordRef, SystemCode,
+    SystemMsg, SystemRec, VersionUpgradePolicy,
 };
 use time::{Duration, OffsetDateTime};
 use tokio::{
